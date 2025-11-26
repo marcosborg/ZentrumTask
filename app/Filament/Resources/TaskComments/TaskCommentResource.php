@@ -22,6 +22,11 @@ class TaskCommentResource extends Resource
 
     protected static ?string $recordTitleAttribute = 'TaskComment';
 
+    public static function shouldRegisterNavigation(): bool
+    {
+        return false;
+    }
+
     public static function form(Schema $schema): Schema
     {
         return TaskCommentForm::configure($schema);
