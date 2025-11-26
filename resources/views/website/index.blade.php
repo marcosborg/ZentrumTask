@@ -1,4 +1,5 @@
 @extends('website.layout')
+
 @section('content')
 
     <x-hero />
@@ -7,7 +8,8 @@
 
     <x-stats-testimonial />
 
-    <x-fleet-works />
+    <x-fleet-faqs />
 
     <x-contact /> 
+
 @endsection

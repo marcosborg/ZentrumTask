@@ -15,9 +15,14 @@ class HeroForm
             ->columns(2)
             ->components([
                 TextInput::make('title')
-                    ->label('Título')
+                    ->label('Titulo')
                     ->required()
-                    ->maxLength(255),
+                    ->maxLength(255)
+                    ->columnSpanFull(),
+                Textarea::make('subtitle')
+                    ->label('Subtitulo')
+                    ->required()
+                    ->columnSpanFull(),
                 TextInput::make('cta_text')
                     ->label('Texto do CTA')
                     ->required()
@@ -25,12 +30,13 @@ class HeroForm
                 TextInput::make('cta_link')
                     ->label('Link do CTA')
                     ->url()
-                    ->required()
-                    ->columnSpanFull(),
-                Textarea::make('subtitle')
-                    ->label('Subtítulo')
-                    ->required()
-                    ->columnSpanFull(),
+                    ->required(),
+                TextInput::make('cta_secondary_text')
+                    ->label('Texto do CTA 2')
+                    ->maxLength(255),
+                TextInput::make('cta_secondary_link')
+                    ->label('Link do CTA 2')
+                    ->url(),
                 SpatieMediaLibraryFileUpload::make('hero_image')
                     ->label('Imagem do destaque')
                     ->collection('hero_image')

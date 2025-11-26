@@ -12,6 +12,8 @@
             $subtitle = $hero?->subtitle ?? 'Obtenha flexibilidade e autonomia, trabalhando como motorista TVDE.';
             $ctaText = $hero?->cta_text ?? 'Quero ser motorista';
             $ctaLink = $hero?->cta_link ?? '#';
+            $ctaSecondaryText = $hero?->cta_secondary_text;
+            $ctaSecondaryLink = $hero?->cta_secondary_link;
             $imageUrl = $hero?->getFirstMediaUrl('hero_image') ?: $hero?->getFirstMediaUrl('hero_image', 'hero_cover');
         @endphp
         <div class="swiper-slide">
@@ -23,7 +25,9 @@
               </p>
               <div class="d-flex flex-wrap gap-3">
                 <a href="{{ $ctaLink }}" class="cta-btn btn-primaria text-decoration-none">{{ $ctaText }}</a>
-                <a href="#aluguer" class="cta-btn btn-secundaria text-decoration-none">Quero alugar viatura</a>
+                @if ($ctaSecondaryText && $ctaSecondaryLink)
+                  <a href="{{ $ctaSecondaryLink }}" class="cta-btn btn-secundaria text-decoration-none">{{ $ctaSecondaryText }}</a>
+                @endif
               </div>
             </div>
             <div class="col-lg-6 text-center">

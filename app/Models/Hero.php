@@ -18,6 +18,8 @@ class Hero extends Model implements HasMedia
         'subtitle',
         'cta_text',
         'cta_link',
+        'cta_secondary_text',
+        'cta_secondary_link',
     ];
 
     public function registerMediaCollections(): void

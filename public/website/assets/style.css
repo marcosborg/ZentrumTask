@@ -225,6 +225,43 @@ h1,
   background-color: #534dd7;
 }
 
+/* Footer */
+.footer-section {
+  background: #050f29;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  font-size: 0.95rem;
+}
+.footer-logo {
+  height: 45px;
+  width: auto;
+}
+.footer-title {
+  font-weight: 700;
+  margin-bottom: 0.75rem;
+}
+.footer-links li + li {
+  margin-top: 0.35rem;
+}
+.footer-links a {
+  color: #e5e7eb;
+  text-decoration: none;
+  font-size: 0.95rem;
+}
+.footer-links a:hover {
+  color: #2dd4bf;
+}
+.footer-newsletter .form-control {
+  background-color: #0c1b3d;
+  border: 1px solid #1c2d56;
+  color: #fff;
+}
+.footer-newsletter .form-control::placeholder {
+  color: #6073a6;
+}
+.footer-legal {
+  font-size: 0.85rem;
+}
+
 /* Responsive spacing adjustments */
 @media (min-width: 992px) {
   .hero {
