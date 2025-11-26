@@ -9,6 +9,7 @@ use App\Filament\Resources\Services\Schemas\ServiceForm;
 use App\Filament\Resources\Services\Tables\ServicesTable;
 use App\Models\Service;
 use BackedEnum;
+use UnitEnum;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
@@ -21,6 +22,8 @@ class ServiceResource extends Resource
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedBriefcase;
 
     protected static ?string $recordTitleAttribute = 'name';
+
+    protected static UnitEnum|string|null $navigationGroup = 'Website';
 
     public static function form(Schema $schema): Schema
     {

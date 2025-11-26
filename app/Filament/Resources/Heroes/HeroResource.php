@@ -9,6 +9,7 @@ use App\Filament\Resources\Heroes\Schemas\HeroForm;
 use App\Filament\Resources\Heroes\Tables\HeroesTable;
 use App\Models\Hero;
 use BackedEnum;
+use UnitEnum;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
@@ -21,6 +22,8 @@ class HeroResource extends Resource
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedPhoto;
 
     protected static ?string $recordTitleAttribute = 'title';
+
+    protected static UnitEnum|string|null $navigationGroup = 'Website';
 
     public static function form(Schema $schema): Schema
     {

@@ -2,25 +2,31 @@
 
 namespace App\View\Components;
 
-use Closure;
+use App\Models\Stat;
+use App\Models\Testimonial;
 use Illuminate\Contracts\View\View;
 use Illuminate\View\Component;
 
 class StatsTestimonial extends Component
 {
-    /**
-     * Create a new component instance.
-     */
+    public $stats;
+    public $testimonials;
+
     public function __construct()
     {
-        //
+        $this->stats = Stat::query()
+            ->orderBy('id')
+            ->get();
+        $this->testimonials = Testimonial::query()
+            ->latest('id')
+            ->get();
     }
 
-    /**
-     * Get the view / contents that represent the component.
-     */
-    public function render(): View|Closure|string
+    public function render(): View
     {
-        return view('components.stats-testimonial');
+        return view('components.stats-testimonial', [
+            'stats' => $this->stats,
+            'testimonials' => $this->testimonials,
+        ]);
     }
 }
