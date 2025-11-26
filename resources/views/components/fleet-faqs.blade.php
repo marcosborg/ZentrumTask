@@ -1,33 +1,30 @@
 <section class="container pb-5">
   <div class="row g-4">
+    @php
+        $fleetItems = collect($fleets ?? []);
+        if ($fleetItems->isEmpty()) {
+            $fleetItems = \App\Models\Fleet::query()->latest('id')->get();
+        }
+    @endphp
+
     <!-- Fleet full width -->
     <div class="col-12">
       <h3 class="mb-3">A nossa frota</h3>
+      <!-- fleet-count: {{ $fleetItems->count() }} -->
       <div class="row g-3">
-        <div class="col-12 col-sm-6 col-md-4 col-lg-3">
-          <div class="fleet-card">
-            <img src="/website/assets/car_sedan.png" alt="Carro Sedan" />
-            <p>Carro Sedan</p>
+        @forelse($fleetItems as $fleet)
+          <div class="col-12 col-sm-6 col-md-4 col-lg-3">
+            <div class="fleet-card">
+              <img
+                src="{{ ($fleet->photo_path && \Illuminate\Support\Facades\Storage::disk('public')->exists($fleet->photo_path)) ? \Illuminate\Support\Facades\Storage::disk('public')->url($fleet->photo_path) : asset('website/assets/car_sedan.png') }}"
+                alt="{{ $fleet->name }}"
+              />
+              <p>{{ $fleet->name }}</p>
+            </div>
           </div>
-        </div>
-        <div class="col-12 col-sm-6 col-md-4 col-lg-3">
-          <div class="fleet-card">
-            <img src="/website/assets/car_hatch.png" alt="Carro Hatch" />
-            <p>Carro Hatch</p>
-          </div>
-        </div>
-        <div class="col-12 col-sm-6 col-md-4 col-lg-3">
-          <div class="fleet-card">
-            <img src="/website/assets/car_suv.png" alt="Carro SUV" />
-            <p>Carro SUV</p>
-          </div>
-        </div>
-        <div class="col-12 col-sm-6 col-md-4 col-lg-3">
-          <div class="fleet-card">
-            <img src="/website/assets/car_hatch.png" alt="Carro Hatch" />
-            <p>Carro Hatch</p>
-          </div>
-        </div>
+        @empty
+          <div class="col-12 text-light-subtle">Nenhum veículo na frota ainda.</div>
+        @endforelse
       </div>
     </div>
   </div>

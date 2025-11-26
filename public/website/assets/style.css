@@ -154,7 +154,8 @@ h1,
 }
 .fleet-card img {
   width: 100%;
-  height: auto;
+  aspect-ratio: 1 / 1;
+  object-fit: cover;
   display: block;
 }
 .fleet-card p {
