@@ -18,6 +18,7 @@
     <link rel="stylesheet" href="/website/assets/style.css" />
   </head>
   <body>
+    <x-navigation />
     @yield('content')
 
     <!-- Bootstrap JS (optional) -->

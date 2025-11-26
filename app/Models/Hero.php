@@ -22,7 +22,9 @@ class Hero extends Model implements HasMedia
 
     public function registerMediaCollections(): void
     {
-        $this->addMediaCollection('hero_image')->singleFile();
+        $this->addMediaCollection('hero_image')
+            ->singleFile()
+            ->useDisk('public');
     }
 
     public function registerMediaConversions(?Media $media = null): void

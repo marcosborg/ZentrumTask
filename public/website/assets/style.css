@@ -7,6 +7,39 @@ body {
   line-height: 1.6;
 }
 
+/* Navigation */
+.navbar-website {
+  background: rgba(7, 18, 46, 0.85);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  position: sticky;
+  top: 0;
+  z-index: 1030;
+}
+.navbar-website .navbar-brand .logo {
+  height: 42px;
+  width: auto;
+}
+.navbar-website .nav-link {
+  color: #e5e7eb;
+  font-weight: 600;
+  padding: 0.5rem 0.85rem;
+  transition: color 0.2s ease, transform 0.2s ease;
+}
+.navbar-website .nav-link:hover,
+.navbar-website .nav-link:focus {
+  color: #2dd4bf;
+  transform: translateY(-1px);
+}
+.navbar-website .navbar-toggler {
+  filter: invert(1);
+  border: none;
+  box-shadow: none;
+}
+.navbar-website .navbar-toggler:focus {
+  box-shadow: none;
+}
+
 h1,
  h2,
  h3,

@@ -35,6 +35,8 @@ class HeroForm
                     ->label('Imagem do destaque')
                     ->collection('hero_image')
                     ->conversion('hero_cover')
+                    ->disk('public')
+                    ->conversionsDisk('public')
                     ->image()
                     ->imageEditor()
                     ->responsiveImages()

@@ -11,7 +11,8 @@
           $subtitle = $hero?->subtitle ?? 'Obtenha flexibilidade e autonomia, trabalhando como motorista TVDE.';
           $ctaText = $hero?->cta_text ?? 'Quero ser motorista';
           $ctaLink = $hero?->cta_link ?? '#';
-          $imageUrl = $hero?->getFirstMediaUrl('hero_image', 'hero_cover') ?: $hero?->getFirstMediaUrl('hero_image');
+          // Frontend should use the full image (no cropped conversion). Thumb stays only in dashboard.
+          $imageUrl = $hero?->getFirstMediaUrl('hero_image') ?: $hero?->getFirstMediaUrl('hero_image', 'hero_cover');
       @endphp
 
       <div class="hero-slide {{ $index === 0 ? 'active' : '' }}" data-hero-slide>
