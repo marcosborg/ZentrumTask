@@ -2,25 +2,25 @@
 
 namespace App\View\Components;
 
-use Closure;
+use App\Models\Service;
 use Illuminate\Contracts\View\View;
 use Illuminate\View\Component;
 
 class Services extends Component
 {
-    /**
-     * Create a new component instance.
-     */
+    public $services;
+
     public function __construct()
     {
-        //
+        $this->services = Service::query()
+            ->orderBy('id', 'desc')
+            ->get();
     }
 
-    /**
-     * Get the view / contents that represent the component.
-     */
-    public function render(): View|Closure|string
+    public function render(): View
     {
-        return view('components.services');
+        return view('components.services', [
+            'services' => $this->services,
+        ]);
     }
 }
