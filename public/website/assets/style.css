@@ -51,7 +51,7 @@ h1,
 
 /* Hero section */
 .hero {
-  padding: 4rem 0;
+  padding: 3rem 0;
   position: relative;
 }
 .hero-image {
@@ -228,6 +228,6 @@ h1,
 /* Responsive spacing adjustments */
 @media (min-width: 992px) {
   .hero {
-    min-height: 70vh;
+    padding: 4rem 0 3rem;
   }
 }
