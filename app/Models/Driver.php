@@ -39,8 +39,10 @@ class Driver extends Model
     protected function hasActiveBillingProfile(): Attribute
     {
         return Attribute::get(function (): bool {
-            if ($this->getAttribute('has_active_billing_profile') !== null) {
-                return (bool) $this->getAttribute('has_active_billing_profile');
+            $value = $this->attributes['has_active_billing_profile'] ?? null;
+
+            if ($value !== null) {
+                return (bool) $value;
             }
 
             return $this->billingProfiles()->active()->exists();

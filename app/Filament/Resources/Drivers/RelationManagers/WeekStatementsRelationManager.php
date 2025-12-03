@@ -3,9 +3,9 @@
 namespace App\Filament\Resources\Drivers\RelationManagers;
 
 use App\Filament\Resources\DriverWeekStatements\DriverWeekStatementResource;
+use Filament\Actions;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Schemas\Schema;
-use Filament\Tables;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 
@@ -43,9 +43,9 @@ class WeekStatementsRelationManager extends RelationManager
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->actions([
-                Tables\Actions\ViewAction::make()
+                Actions\ViewAction::make()
                     ->url(fn ($record) => DriverWeekStatementResource::getUrl('view', ['record' => $record])),
-                Tables\Actions\EditAction::make()
+                Actions\EditAction::make()
                     ->url(fn ($record) => DriverWeekStatementResource::getUrl('edit', ['record' => $record])),
             ])
             ->headerActions([])

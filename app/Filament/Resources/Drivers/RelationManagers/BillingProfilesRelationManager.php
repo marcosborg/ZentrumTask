@@ -5,16 +5,17 @@ namespace App\Filament\Resources\Drivers\RelationManagers;
 use App\Enums\TaxpayerType;
 use App\Enums\VatRefundMode;
 use App\Enums\VehicleRentType;
+use Filament\Actions;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Schemas\Schema;
-use Filament\Tables;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Model;
 
 class BillingProfilesRelationManager extends RelationManager
 {
@@ -144,15 +145,17 @@ class BillingProfilesRelationManager extends RelationManager
                     ->badge(),
             ])
             ->headerActions([
-                Tables\Actions\CreateAction::make(),
+                Actions\CreateAction::make()
+                    ->visible(fn (): bool => $this->getOwnerRecord()?->billingProfiles()->doesntExist() ?? true)
+                    ->after(fn (Model $record) => $this->refreshTable()),
             ])
             ->actions([
-                Tables\Actions\EditAction::make(),
-                Tables\Actions\DeleteAction::make(),
+                Actions\EditAction::make(),
+                Actions\DeleteAction::make(),
             ])
             ->bulkActions([
-                Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\DeleteBulkAction::make(),
+                Actions\BulkActionGroup::make([
+                    Actions\DeleteBulkAction::make(),
                 ]),
             ]);
     }

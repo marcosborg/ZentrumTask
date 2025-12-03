@@ -15,7 +15,7 @@ class DriversTable
 {
     public static function configure(Table $table): Table
     {
-        return $table
+        $configured = $table
             ->modifyQueryUsing(fn ($query) => $query->withExists([
                 'billingProfiles as has_active_billing_profile' => fn ($q) => $q->active(),
             ]))
@@ -73,5 +73,7 @@ class DriversTable
                 ]),
             ])
             ->defaultSort('name');
+
+        return $configured;
     }
 }
