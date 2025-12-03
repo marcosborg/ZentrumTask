@@ -338,6 +338,8 @@ class KanbanBoard extends Page
 
     public function startBoardForm(?int $boardId = null): void
     {
+        $this->resetValidation();
+
         $this->resetBoardForm($boardId);
         $this->showBoardForm = true;
 
@@ -355,6 +357,8 @@ class KanbanBoard extends Page
 
     public function saveBoard(): void
     {
+        $this->resetValidation();
+
         $data = validator($this->boardForm, [
             'name' => ['required', 'string', 'max:255'],
             'slug' => ['nullable', 'string', 'max:255'],
@@ -393,8 +397,16 @@ class KanbanBoard extends Page
             ->send();
     }
 
+    public function closeBoardForm(): void
+    {
+        $this->resetValidation();
+        $this->showBoardForm = false;
+    }
+
     public function startStageForm(?int $stageId = null): void
     {
+        $this->resetValidation();
+
         $this->resetStageForm($stageId);
         $this->stageForm['board_id'] = $this->boardId;
         $this->showStageForm = true;
@@ -419,6 +431,8 @@ class KanbanBoard extends Page
         if (! $this->boardId) {
             return;
         }
+
+        $this->resetValidation();
 
         $data = validator($this->stageForm, [
             'name' => ['required', 'string', 'max:255'],
@@ -458,6 +472,12 @@ class KanbanBoard extends Page
             ->send();
     }
 
+    public function closeStageForm(): void
+    {
+        $this->resetValidation();
+        $this->showStageForm = false;
+    }
+
     public function moveStage(int $stageId, string $direction): void
     {
         $stages = Stage::where('board_id', $this->boardId)
@@ -488,6 +508,8 @@ class KanbanBoard extends Page
 
     public function startRuleForm(int $stageId, ?int $ruleId = null): void
     {
+        $this->resetValidation();
+
         $this->ruleForm = [
             'stage_id' => $stageId,
             'message_template_id' => null,
@@ -550,8 +572,17 @@ class KanbanBoard extends Page
             ->send();
     }
 
+    public function closeAutomationPanel(): void
+    {
+        $this->resetValidation();
+        $this->editingRuleId = null;
+        $this->showAutomationPanel = false;
+    }
+
     public function startCreateTask(?int $stageId = null): void
     {
+        $this->resetValidation();
+
         $this->resetTaskForm($stageId);
         $this->showTaskForm = true;
         $this->showTaskDetail = false;
@@ -559,25 +590,18 @@ class KanbanBoard extends Page
 
     public function editTask(int $taskId): void
     {
+        $this->resetValidation();
+
         $task = Task::with('tags')->findOrFail($taskId);
 
-        $this->taskForm = [
-            'id' => $task->id,
-            'board_id' => $task->board_id,
-            'stage_id' => $task->stage_id,
-            'assigned_to_id' => $task->assigned_to_id,
-            'title' => $task->title,
-            'description' => $task->description,
-            'priority' => $task->priority,
-            'due_at' => optional($task->due_at)?->format('Y-m-d\TH:i'),
-            'external_reference' => $task->external_reference,
-            'meta_raw' => $task->meta ? json_encode($task->meta, JSON_PRETTY_PRINT) : null,
-            'tags' => $task->tags->pluck('id')->all(),
-        ];
-
-        $this->activeTaskId = $task->id;
         $this->showTaskForm = true;
         $this->showTaskDetail = false;
+
+        $this->fillTaskForm($task);
+        logger()->info('kanban: editTask filled', $this->taskForm);
+
+        $this->activeTaskId = $task->id;
+        $this->dispatch('$refresh');
     }
 
     public function saveTask(): void
@@ -650,8 +674,16 @@ class KanbanBoard extends Page
             ->send();
     }
 
+    public function closeTaskForm(): void
+    {
+        $this->resetValidation();
+        $this->showTaskForm = false;
+    }
+
     public function openTask(int $taskId): void
     {
+        $this->resetValidation();
+
         $task = Task::with([
             'assignedTo',
             'stage',
@@ -663,19 +695,7 @@ class KanbanBoard extends Page
         ])->findOrFail($taskId);
 
         $this->activeTaskId = $task->id;
-        $this->taskForm = [
-            'id' => $task->id,
-            'board_id' => $task->board_id,
-            'stage_id' => $task->stage_id,
-            'assigned_to_id' => $task->assigned_to_id,
-            'title' => $task->title,
-            'description' => $task->description,
-            'priority' => $task->priority,
-            'due_at' => optional($task->due_at)?->format('Y-m-d\TH:i'),
-            'external_reference' => $task->external_reference,
-            'meta_raw' => $task->meta ? json_encode($task->meta, JSON_PRETTY_PRINT) : null,
-            'tags' => $task->tags->pluck('id')->all(),
-        ];
+        $this->fillTaskForm($task);
 
         $this->taskComments = $task->comments
             ->sortByDesc('created_at')
@@ -723,6 +743,32 @@ class KanbanBoard extends Page
         $this->showTaskForm = false;
 
         $this->loadBoard();
+        $this->dispatch('$refresh');
+    }
+
+    protected function fillTaskForm(Task $task): void
+    {
+        $this->taskForm = [
+            'id' => $task->id,
+            'board_id' => $task->board_id,
+            'stage_id' => $task->stage_id,
+            'assigned_to_id' => $task->assigned_to_id,
+            'title' => $task->title,
+            'description' => $task->description,
+            'priority' => $task->priority,
+            'due_at' => optional($task->due_at)?->format('Y-m-d\TH:i'),
+            'external_reference' => $task->external_reference,
+            'meta_raw' => $task->meta ? json_encode($task->meta, JSON_PRETTY_PRINT) : null,
+            'tags' => $task->tags->pluck('id')->all(),
+        ];
+
+        logger()->info('kanban: fillTaskForm', $this->taskForm);
+    }
+
+    public function closeTaskDetail(): void
+    {
+        $this->resetValidation();
+        $this->showTaskDetail = false;
     }
 
     public function addComment(): void

@@ -22,7 +22,7 @@
                         <button type="button" wire:click="startBoardForm(null)" class="kb-btn kb-btn-primary">Novo board</button>
                         <button type="button" wire:click="startStageForm()" class="kb-btn">Novo estagio</button>
                         <button type="button" wire:click="startCreateTask()" class="kb-btn kb-btn-green">Nova tarefa</button>
-                        <button type="button" wire:click="$toggle('showAutomationPanel')" class="kb-btn kb-btn-indigo">Automatizar</button>
+                        <button type="button" wire:click="$set('showAutomationPanel', true)" class="kb-btn kb-btn-indigo">Automatizar</button>
                     </div>
                 </div>
 
@@ -66,7 +66,7 @@
                 <div class="kb-card">
                     <div style="display:flex;justify-content:space-between;align-items:center;">
                         <div class="kb-section-title">Board</div>
-                        <button type="button" wire:click="$set('showBoardForm', false)" class="kb-btn">Fechar</button>
+                        <button type="button" wire:click="closeBoardForm" class="kb-btn">Fechar</button>
                     </div>
                     <form class="kb-form-grid cols-2" wire:submit.prevent="saveBoard" style="margin-top:10px;">
                         <div>
@@ -85,7 +85,7 @@
                             <input type="checkbox" wire:model="boardForm.is_active"> Ativo
                         </label>
                         <div style="grid-column: span 2;display:flex;justify-content:flex-end;gap:8px;">
-                            <button type="button" wire:click="$set('showBoardForm', false)" class="kb-btn">Cancelar</button>
+                            <button type="button" wire:click="closeBoardForm" class="kb-btn">Cancelar</button>
                             <button type="submit" class="kb-btn kb-btn-primary">Guardar board</button>
                         </div>
                     </form>
@@ -96,7 +96,7 @@
                 <div class="kb-card">
                     <div style="display:flex;justify-content:space-between;align-items:center;">
                         <div class="kb-section-title">Estagio</div>
-                        <button type="button" wire:click="$set('showStageForm', false)" class="kb-btn">Fechar</button>
+                        <button type="button" wire:click="closeStageForm" class="kb-btn">Fechar</button>
                     </div>
                     <form class="kb-form-grid cols-3" wire:submit.prevent="saveStage" style="margin-top:10px;">
                         <div style="grid-column: span 2;">
@@ -121,7 +121,7 @@
                             <input type="checkbox" wire:model="stageForm.freeze_sla"> Congelar SLA
                         </label>
                         <div style="grid-column: span 3;display:flex;justify-content:flex-end;gap:8px;">
-                            <button type="button" wire:click="$set('showStageForm', false)" class="kb-btn">Cancelar</button>
+                            <button type="button" wire:click="closeStageForm" class="kb-btn">Cancelar</button>
                             <button type="submit" class="kb-btn kb-btn-primary">Guardar estagio</button>
                         </div>
                     </form>
@@ -129,10 +129,10 @@
             @endif
 
             @if($showTaskForm)
-                <div class="kb-card">
+                <div class="kb-card" wire:key="task-form-{{ $taskForm['id'] ?? 'new' }}">
                     <div style="display:flex;justify-content:space-between;align-items:center;">
                         <div class="kb-section-title">@if($taskForm['id']) Editar tarefa #{{ $taskForm['id'] }} @else Nova tarefa @endif</div>
-                        <button type="button" wire:click="$set('showTaskForm', false)" class="kb-btn">Fechar</button>
+                        <button type="button" wire:click="closeTaskForm" class="kb-btn">Fechar</button>
                     </div>
                     <form class="kb-form-grid cols-3" wire:submit.prevent="saveTask" style="margin-top:10px;">
                         <div>
@@ -191,7 +191,7 @@
                             <textarea wire:model.defer="taskForm.meta_raw" rows="2" class="kb-input" placeholder='{"custom":"valor"}'></textarea>
                         </div>
                         <div style="grid-column: span 3;display:flex;justify-content:flex-end;gap:8px;">
-                            <button type="button" wire:click="$set('showTaskForm', false)" class="kb-btn">Cancelar</button>
+                            <button type="button" wire:click="closeTaskForm" class="kb-btn">Cancelar</button>
                             <button type="submit" class="kb-btn kb-btn-green">Guardar tarefa</button>
                         </div>
                     </form>
@@ -202,7 +202,7 @@
                 <div class="kb-card">
                     <div style="display:flex;justify-content:space-between;align-items:center;">
                         <div class="kb-section-title">Automatizacoes e comunicacao</div>
-                        <button type="button" wire:click="$set('showAutomationPanel', false)" class="kb-btn">Fechar</button>
+                        <button type="button" wire:click="closeAutomationPanel" class="kb-btn">Fechar</button>
                     </div>
                     <div style="display:grid;gap:14px;grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));margin-top:12px;">
                         <div class="kb-card" style="background: rgba(17,24,39,0.7); border-style:dashed;">
@@ -501,11 +501,11 @@
             @endif
 
             @if($showTaskDetail && $activeTaskId)
-                <div style="display:grid;gap:14px;grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));">
+                <div style="display:grid;gap:14px;grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));" wire:key="task-detail-{{ $activeTaskId }}">
                     <div class="kb-card" style="grid-column: span 2;">
                         <div style="display:flex;justify-content:space-between;align-items:center;">
                             <div class="kb-section-title">Detalhe da tarefa #{{ $taskForm['id'] }}</div>
-                            <button type="button" wire:click="$set('showTaskDetail', false)" class="kb-btn">Fechar</button>
+                            <button type="button" wire:click="closeTaskDetail" class="kb-btn">Fechar</button>
                         </div>
                         <form class="kb-form-grid cols-3" wire:submit.prevent="saveTask" style="margin-top:10px;">
                             <div>
