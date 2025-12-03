@@ -1,0 +1,12 @@
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteBase /
+
+    # Se o ficheiro existir na raiz, serve direto
+    RewriteCond %{REQUEST_FILENAME} -f [OR]
+    RewriteCond %{REQUEST_FILENAME} -d
+    RewriteRule ^ - [L]
+
+    # Caso contrário, redireciona tudo para /public
+    RewriteRule ^(.*)$ public/$1 [L]
+</IfModule>
