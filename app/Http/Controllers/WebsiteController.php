@@ -41,11 +41,12 @@ class WebsiteController extends Controller
                 'board_id' => 1,
                 'stage_id' => $stage->id,
                 'title' => 'Lead: '.$data['name'],
-                'description' => $data['message'],
+                'description' => $data['message']."\nTelefone: ".$data['phone'],
                 'priority' => 'normal',
                 'position' => $nextPosition + 1,
                 'meta' => [
                     'email' => $data['email'],
+                    'phone' => $data['phone'],
                     'source' => 'website_form',
                 ],
             ]);

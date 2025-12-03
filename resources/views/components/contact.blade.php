@@ -32,6 +32,18 @@
               />
             </div>
             <div class="col-md-6">
+              <label for="telefone" class="form-label">Telefone</label>
+              <input
+                type="text"
+                class="form-control"
+                id="telefone"
+                name="phone"
+                placeholder="O seu telefone"
+                value="{{ old('phone') }}"
+                required
+              />
+            </div>
+            <div class="col-md-6">
               <label for="email" class="form-label">Email</label>
               <input
                 type="email"
