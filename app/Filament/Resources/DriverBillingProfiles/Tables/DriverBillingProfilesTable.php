@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\DriverBillingProfiles\Tables;
 
+use App\Enums\VatRefundMode;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
@@ -46,10 +47,15 @@ class DriverBillingProfilesTable
                     ->sortable(),
                 TextColumn::make('vat_refund_mode')
                     ->label('IVA')
-                    ->formatStateUsing(fn (?string $state): ?string => match ($state) {
-                        'driver_delivers_vat' => 'Motorista entrega',
-                        default => 'Sem devolução',
-                    })
+                    ->formatStateUsing(
+                        fn (VatRefundMode|string|null $state): ?string => match (true) {
+                            $state === VatRefundMode::DriverDeliversVat,
+                            $state === VatRefundMode::DriverDeliversVat->value => 'Motorista entrega',
+                            $state === VatRefundMode::None,
+                            $state === VatRefundMode::None->value => 'Sem devolução de IVA',
+                            default => null,
+                        },
+                    )
                     ->sortable(),
                 TextColumn::make('vehicle_rent_type')
                     ->label('Renda viatura')
@@ -81,7 +87,7 @@ class DriverBillingProfilesTable
                 SelectFilter::make('vat_refund_mode')
                     ->label('IVA')
                     ->options([
-                        'none' => 'Sem devolução',
+                        'none' => 'Sem devolução de IVA',
                         'driver_delivers_vat' => 'Motorista entrega',
                     ]),
             ])
