@@ -3,9 +3,11 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\ContactTaskRequest;
+use App\Models\CmsPage;
 use App\Models\Stage;
 use App\Models\Task;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 class WebsiteController extends Controller
 {
@@ -29,7 +31,7 @@ class WebsiteController extends Controller
                 ->first();
 
         if (! $stage) {
-            return back()->withErrors(['message' => 'Não foi possível criar a tarefa: nenhum estágio inicial configurado.']);
+            return back()->withErrors(['message' => 'NÇœo foi possÇðvel criar a tarefa: nenhum estÇ­gio inicial configurado.']);
         }
 
         DB::transaction(function () use ($data, $stage): void {
@@ -52,6 +54,26 @@ class WebsiteController extends Controller
             ]);
         });
 
-        return back()->with('contact_success', 'Obrigado! Criámos uma tarefa no Kanban.');
+        return back()->with('contact_success', 'Obrigado! CriÇ­mos uma tarefa no Kanban.');
+    }
+
+    public function showCms(CmsPage $page, ?string $slug = null)
+    {
+        if (! $page->is_active) {
+            abort(404);
+        }
+
+        $expectedSlug = Str::slug($page->title);
+
+        if ($slug !== $expectedSlug) {
+            return redirect()->route('cms.show', [
+                'page' => $page->getKey(),
+                'slug' => $expectedSlug,
+            ]);
+        }
+
+        return view('website.cms', [
+            'page' => $page,
+        ]);
     }
 }
