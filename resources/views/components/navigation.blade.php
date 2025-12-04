@@ -6,8 +6,10 @@
         $dashboardUrl = $adminPanel?->getUrl() ?? url('/admin');
         $logoutUrl = $adminPanel?->getLogoutUrl() ?? url('/admin/logout');
         $menuItems = \App\Models\WebsiteMenuItem::query()
+            ->with(['children'])
+            ->whereNull('parent_id')
             ->orderBy('position')
-            ->get(['label', 'url']);
+            ->get(['id', 'label', 'url', 'position']);
     @endphp
     <a class="navbar-brand d-flex align-items-center gap-2" href="#home">
       <img src="/website/assets/logo.png" alt="Zentrum TVDE" class="logo" />
@@ -27,9 +29,31 @@
     <div class="collapse navbar-collapse justify-content-end" id="navbarNav">
       <ul class="navbar-nav align-items-lg-center gap-lg-3">
         @forelse ($menuItems as $item)
-          <li class="nav-item">
-            <a class="nav-link" href="{{ $item->url }}">{{ $item->label }}</a>
-          </li>
+          @if ($item->children->isNotEmpty())
+            <li class="nav-item dropdown">
+              <a
+                class="nav-link dropdown-toggle"
+                href="#"
+                id="menuDropdown-{{ $item->id }}"
+                role="button"
+                data-bs-toggle="dropdown"
+                aria-expanded="false"
+              >
+                {{ $item->label }}
+              </a>
+              <ul class="dropdown-menu" aria-labelledby="menuDropdown-{{ $item->id }}">
+                @foreach ($item->children as $child)
+                  <li>
+                    <a class="dropdown-item" href="{{ $child->url }}">{{ $child->label }}</a>
+                  </li>
+                @endforeach
+              </ul>
+            </li>
+          @else
+            <li class="nav-item">
+              <a class="nav-link" href="{{ $item->url ?? '#' }}">{{ $item->label }}</a>
+            </li>
+          @endif
         @empty
           <li class="nav-item">
             <a class="nav-link" href="#home">Home</a>

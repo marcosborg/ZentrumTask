@@ -18,8 +18,9 @@ class WebsiteMenuItemFactory extends Factory
     {
         return [
             'label' => $this->faker->words(2, true),
-            'url' => $this->faker->url(),
+            'url' => $this->faker->boolean(80) ? $this->faker->url() : null,
             'position' => $this->faker->numberBetween(1, 20),
+            'parent_id' => null,
         ];
     }
 }

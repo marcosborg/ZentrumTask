@@ -11,16 +11,13 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('website_menu_items', function (Blueprint $table) {
-            $table->id();
-            $table->string('label');
-            $table->string('url')->nullable();
+        Schema::table('website_menu_items', function (Blueprint $table) {
+            $table->string('url')->nullable()->change();
             $table->foreignId('parent_id')
                 ->nullable()
+                ->after('url')
                 ->constrained('website_menu_items')
                 ->cascadeOnDelete();
-            $table->unsignedInteger('position')->default(0)->index();
-            $table->timestamps();
         });
     }
 
@@ -29,6 +26,9 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('website_menu_items');
+        Schema::table('website_menu_items', function (Blueprint $table) {
+            $table->dropConstrainedForeignId('parent_id');
+            $table->string('url')->nullable(false)->change();
+        });
     }
 };

@@ -19,6 +19,10 @@ class WebsiteMenuItemsTable
                     ->label('Label')
                     ->searchable()
                     ->sortable(),
+                TextColumn::make('parent.label')
+                    ->label('Pai')
+                    ->badge()
+                    ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('url')
                     ->label('URL')
                     ->limit(60)

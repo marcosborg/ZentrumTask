@@ -4,6 +4,8 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Facades\DB;
 
 class WebsiteMenuItem extends Model
@@ -18,6 +20,7 @@ class WebsiteMenuItem extends Model
         'label',
         'url',
         'position',
+        'parent_id',
     ];
 
     protected static function booted(): void
@@ -31,5 +34,15 @@ class WebsiteMenuItem extends Model
 
             $item->position = $nextPosition + 1;
         });
+    }
+
+    public function parent(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'parent_id');
+    }
+
+    public function children(): HasMany
+    {
+        return $this->hasMany(self::class, 'parent_id')->orderBy('position');
     }
 }

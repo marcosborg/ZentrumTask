@@ -34,6 +34,11 @@
       <div class="row justify-content-center">
         <div class="col-lg-10">
           <article class="bg-white shadow-sm rounded-3 p-4 p-lg-5">
+            @if ($image = $page->getFirstMediaUrl('featured_image', 'featured_thumb'))
+              <figure class="float-lg-end ms-lg-4 mb-3 text-center" style="max-width: 320px;">
+                <img src="{{ $image }}" alt="{{ $page->title }}" class="img-fluid rounded-3 shadow-sm w-100" />
+              </figure>
+            @endif
             <div class="cms-body text-dark" style="line-height: 1.8; font-size: 1.05rem;">
               {!! $page->body !!}
             </div>
