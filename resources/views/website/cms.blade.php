@@ -34,7 +34,7 @@
       <div class="row justify-content-center">
         <div class="col-lg-10">
           <article class="bg-white shadow-sm rounded-3 p-4 p-lg-5">
-            <div class="cms-body">
+            <div class="cms-body text-dark" style="line-height: 1.8; font-size: 1.05rem;">
               {!! $page->body !!}
             </div>
           </article>
