@@ -17,7 +17,9 @@ class WebsiteMenuItemFactory extends Factory
     public function definition(): array
     {
         return [
-            //
+            'label' => $this->faker->words(2, true),
+            'url' => $this->faker->url(),
+            'position' => $this->faker->numberBetween(1, 20),
         ];
     }
 }

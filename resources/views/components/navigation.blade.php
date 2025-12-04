@@ -5,6 +5,9 @@
         $loginUrl = $adminPanel?->getLoginUrl() ?? url('/admin/login');
         $dashboardUrl = $adminPanel?->getUrl() ?? url('/admin');
         $logoutUrl = $adminPanel?->getLogoutUrl() ?? url('/admin/logout');
+        $menuItems = \App\Models\WebsiteMenuItem::query()
+            ->orderBy('position')
+            ->get(['label', 'url']);
     @endphp
     <a class="navbar-brand d-flex align-items-center gap-2" href="#home">
       <img src="/website/assets/logo.png" alt="Zentrum TVDE" class="logo" />
@@ -23,15 +26,21 @@
 
     <div class="collapse navbar-collapse justify-content-end" id="navbarNav">
       <ul class="navbar-nav align-items-lg-center gap-lg-3">
-        <li class="nav-item">
-          <a class="nav-link" href="#home">Home</a>
-        </li>
-        <li class="nav-item">
-          <a class="nav-link" href="#aluguer">Aluguer de viaturas</a>
-        </li>
-        <li class="nav-item">
-          <a class="nav-link" href="#contactos">Contactos</a>
-        </li>
+        @forelse ($menuItems as $item)
+          <li class="nav-item">
+            <a class="nav-link" href="{{ $item->url }}">{{ $item->label }}</a>
+          </li>
+        @empty
+          <li class="nav-item">
+            <a class="nav-link" href="#home">Home</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="#aluguer">Aluguer de viaturas</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="#contactos">Contactos</a>
+          </li>
+        @endforelse
         @guest
         <li class="nav-item">
           <a class="nav-link d-flex align-items-center gap-2" href="{{ $loginUrl }}">

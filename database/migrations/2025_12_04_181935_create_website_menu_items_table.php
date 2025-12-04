@@ -13,6 +13,9 @@ return new class extends Migration
     {
         Schema::create('website_menu_items', function (Blueprint $table) {
             $table->id();
+            $table->string('label');
+            $table->string('url');
+            $table->unsignedInteger('position')->default(0)->index();
             $table->timestamps();
         });
     }
