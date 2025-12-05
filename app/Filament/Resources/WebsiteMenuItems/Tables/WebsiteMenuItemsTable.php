@@ -18,7 +18,20 @@ class WebsiteMenuItemsTable
                 TextColumn::make('label')
                     ->label('Label')
                     ->searchable()
-                    ->sortable(),
+                    ->sortable()
+                    ->formatStateUsing(function (string $state, $record): string {
+                        $isChild = (bool) $record->parent_id;
+                        $prefix = $isChild ? '<span class="text-secondary">&rarr;</span>' : '';
+                        $indentClass = $isChild ? 'ms-3' : '';
+
+                        return <<<HTML
+                            <span class="d-inline-flex align-items-center gap-2 {$indentClass}">
+                                {$prefix}
+                                <span>{$state}</span>
+                            </span>
+                        HTML;
+                    })
+                    ->html(),
                 TextColumn::make('parent.label')
                     ->label('Pai')
                     ->badge()

@@ -2,6 +2,7 @@
 
 namespace App\Providers\Filament;
 
+use Filament\Actions\Action;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
@@ -37,6 +38,8 @@ class AdminPanelProvider extends PanelProvider
             ->values()
             ->all();
 
+        $homeUrl = url('/');
+
         return $panel
             ->default()
             ->id('admin')
@@ -70,6 +73,13 @@ class AdminPanelProvider extends PanelProvider
                     </script>
                 HTML,
             )
+            ->userMenuItems([
+                Action::make('visit-website')
+                    ->label('Website')
+                    ->icon(\Filament\Support\Icons\Heroicon::OutlinedGlobeAlt)
+                    ->url($homeUrl, true)
+                    ->sort(PHP_INT_MAX - 1),
+            ])
             ->maxContentWidth('full')
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\Filament\Resources')
             ->discoverPages(in: app_path('Filament/Pages'), for: 'App\Filament\Pages')
