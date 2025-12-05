@@ -11,7 +11,7 @@
             ->orderBy('position')
             ->get(['id', 'label', 'url', 'position']);
     @endphp
-    <a class="navbar-brand d-flex align-items-center gap-2" href="#home">
+    <a class="navbar-brand d-flex align-items-center gap-2" href="{{ url('/') }}">
       <img src="/website/assets/logo.png" alt="Zentrum TVDE" class="logo" />
     </a>
     <button
