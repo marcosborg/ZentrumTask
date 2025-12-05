@@ -15,11 +15,41 @@
       </div>
 
       <div class="col-md-6">
+        @php
+            $footerMenu = \App\Models\WebsiteMenuItem::query()
+                ->with(['children'])
+                ->whereNull('parent_id')
+                ->orderBy('position')
+                ->get(['id', 'label', 'url', 'position']);
+        @endphp
         <h6 class="footer-title">Menu</h6>
         <ul class="list-unstyled footer-links">
-          <li><a href="#home">Home</a></li>
-          <li><a href="#aluguer">Aluguer de viaturas</a></li>
-          <li><a href="#contactos">Contactos</a></li>
+          @forelse ($footerMenu as $item)
+            <li class="mb-1">
+              @if ($item->url)
+                <a href="{{ $item->url }}">{{ $item->label }}</a>
+              @else
+                <span class="fw-semibold">{{ $item->label }}</span>
+              @endif
+              @if ($item->children->isNotEmpty())
+                <ul class="list-unstyled ps-3 mt-1">
+                  @foreach ($item->children as $child)
+                    <li class="mb-1">
+                      @if ($child->url)
+                        <a href="{{ $child->url }}">{{ $child->label }}</a>
+                      @else
+                        <span class="fw-semibold">{{ $child->label }}</span>
+                      @endif
+                    </li>
+                  @endforeach
+                </ul>
+              @endif
+            </li>
+          @empty
+            <li><a href="#home">Home</a></li>
+            <li><a href="#aluguer">Aluguer de viaturas</a></li>
+            <li><a href="#contactos">Contactos</a></li>
+          @endforelse
         </ul>
       </div>
     </div>
