@@ -1,7 +1,8 @@
 @extends('website.layout')
 
+@section('title', ($page->meta_title ?? $page->title) . ' | Zentrum TVDE')
+
 @push('head')
-  <title>{{ $page->meta_title ?? $page->title }} | Zentrum TVDE</title>
   @if ($page->meta_description)
     <meta name="description" content="{{ $page->meta_description }}">
   @endif

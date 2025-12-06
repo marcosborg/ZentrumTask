@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Plataforma TVDE</title>
+    <title>@yield('title', 'Plataforma TVDE')</title>
     @stack('head')
     <!-- Bootstrap CSS -->
     <link
