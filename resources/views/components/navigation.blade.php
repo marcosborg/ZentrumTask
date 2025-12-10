@@ -1,4 +1,4 @@
-<nav class="navbar navbar-expand-lg py-3 navbar-website" aria-label="Main navigation">
+<nav class="navbar navbar-expand-lg py-3 navbar-website bg-white" aria-label="Main navigation">
   <div class="container">
     @php
         $adminPanel = filament()->getPanel('admin');
@@ -12,9 +12,11 @@
                 ->orderBy('position')
                 ->get(['id', 'label', 'url', 'position'])
             : collect();
+        $linkColor = '#000000';
+        $hoverColor = '#2A66B5';
     @endphp
     <a class="navbar-brand d-flex align-items-center gap-2" href="{{ url('/') }}">
-      <img src="/website/assets/logo.png" alt="Zentrum TVDE" class="logo" />
+      <img src="/website/assets/logo.svg" alt="Zentrum TVDE" class="logo" />
     </a>
     <button
       class="navbar-toggler border-0 shadow-none"
@@ -34,7 +36,7 @@
           @if ($item->children->isNotEmpty())
             <li class="nav-item dropdown">
               <a
-                class="nav-link dropdown-toggle"
+                class="nav-link dropdown-toggle nav-link-custom"
                 href="#"
                 id="menuDropdown-{{ $item->id }}"
                 role="button"
@@ -46,30 +48,30 @@
               <ul class="dropdown-menu" aria-labelledby="menuDropdown-{{ $item->id }}">
                 @foreach ($item->children as $child)
                   <li>
-                    <a class="dropdown-item" href="{{ $child->url }}">{{ $child->label }}</a>
+                    <a class="dropdown-item nav-link-custom" href="{{ $child->url }}">{{ $child->label }}</a>
                   </li>
                 @endforeach
               </ul>
             </li>
           @else
             <li class="nav-item">
-              <a class="nav-link" href="{{ $item->url ?? '#' }}">{{ $item->label }}</a>
+              <a class="nav-link nav-link-custom" href="{{ $item->url ?? '#' }}">{{ $item->label }}</a>
             </li>
           @endif
         @empty
           <li class="nav-item">
-            <a class="nav-link" href="#home">Home</a>
+            <a class="nav-link nav-link-custom" href="#home">Home</a>
           </li>
           <li class="nav-item">
-            <a class="nav-link" href="#aluguer">Aluguer de viaturas</a>
+            <a class="nav-link nav-link-custom" href="#aluguer">Aluguer de viaturas</a>
           </li>
           <li class="nav-item">
-            <a class="nav-link" href="#contactos">Contactos</a>
+            <a class="nav-link nav-link-custom" href="#contactos">Contactos</a>
           </li>
         @endforelse
         @guest
         <li class="nav-item">
-          <a class="nav-link d-flex align-items-center gap-2" href="{{ $loginUrl }}">
+          <a class="nav-link nav-link-custom d-flex align-items-center gap-2" href="{{ $loginUrl }}">
             <i class="fa-solid fa-lock"></i>
             <span class="visually-hidden">Login</span>
           </a>
@@ -78,7 +80,7 @@
         @auth
           <li class="nav-item dropdown">
             <a
-              class="nav-link dropdown-toggle d-flex align-items-center gap-2"
+              class="nav-link dropdown-toggle nav-link-custom d-flex align-items-center gap-2"
               href="#"
               id="navbarAuthDropdown"
               role="button"
@@ -90,7 +92,7 @@
             </a>
             <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="navbarAuthDropdown">
               <li>
-                <a class="dropdown-item d-flex align-items-center gap-2" href="{{ $dashboardUrl }}">
+                <a class="dropdown-item nav-link-custom d-flex align-items-center gap-2" href="{{ $dashboardUrl }}">
                   <i class="fa-solid fa-gauge-high"></i>
                   <span>Dashboard</span>
                 </a>
@@ -98,7 +100,7 @@
               <li>
                 <form method="POST" action="{{ $logoutUrl }}">
                   @csrf
-                  <button type="submit" class="dropdown-item d-flex align-items-center gap-2">
+                  <button type="submit" class="dropdown-item nav-link-custom d-flex align-items-center gap-2">
                     <i class="fa-solid fa-arrow-right-from-bracket"></i>
                     <span>Sair</span>
                   </button>
@@ -111,3 +113,14 @@
     </div>
   </div>
 </nav>
+
+<style>
+  .nav-link-custom {
+    color: {{ $linkColor }} !important;
+  }
+
+  .nav-link-custom:hover,
+  .dropdown-item.nav-link-custom:hover {
+    color: {{ $hoverColor }} !important;
+  }
+</style>

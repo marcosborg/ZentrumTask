@@ -5,6 +5,7 @@
         if ($fleetItems->isEmpty() && \Illuminate\Support\Facades\Schema::hasTable('fleets')) {
             $fleetItems = \App\Models\Fleet::query()->latest('id')->get();
         }
+        $appUrl = rtrim(config('app.url'), '/');
     @endphp
 
     <!-- Fleet full width -->
@@ -16,7 +17,7 @@
           <div class="col-12 col-sm-6 col-md-4 col-lg-3">
             <div class="fleet-card">
               <img
-                src="{{ ($fleet->photo_path && \Illuminate\Support\Facades\Storage::disk('public')->exists($fleet->photo_path)) ? \Illuminate\Support\Facades\Storage::disk('public')->url($fleet->photo_path) : asset('website/assets/car_sedan.png') }}"
+                src="{{ $fleet->photo_path ? $appUrl.'/storage/'.$fleet->photo_path : asset('website/assets/car_sedan.png') }}"
                 alt="{{ $fleet->name }}"
               />
               <p>{{ $fleet->name }}</p>
