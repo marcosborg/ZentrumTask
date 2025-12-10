@@ -1,19 +1,12 @@
 <IfModule mod_rewrite.c>
     RewriteEngine On
-
-    # Garante que o .htaccess é aplicado apenas na pasta atual
     RewriteBase /
 
-    # Se o ficheiro ou diretório existir, usa-o diretamente
-    RewriteCond %{REQUEST_FILENAME} !-f
-    RewriteCond %{REQUEST_FILENAME} !-d
+    # Se o ficheiro existir na raiz, serve direto
+    RewriteCond %{REQUEST_FILENAME} -f [OR]
+    RewriteCond %{REQUEST_FILENAME} -d
+    RewriteRule ^ - [L]
 
-    # Encaminha tudo para index.php
-    RewriteRule ^ index.php [L]
-</IfModule>
-
-<IfModule mod_headers.c>
-    Header set X-Content-Type-Options "nosniff"
-    Header always set X-Frame-Options "SAMEORIGIN"
-    Header set X-XSS-Protection "1; mode=block"
+    # Caso contrário, redireciona tudo para /public
+    RewriteRule ^(.*)$ public/$1 [L]
 </IfModule>
