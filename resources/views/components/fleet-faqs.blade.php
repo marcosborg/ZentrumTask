@@ -1,4 +1,4 @@
-<section class="container pb-5">
+<section class="container pb-5 fleet-section">
   <div class="row g-4">
     @php
         $fleetItems = collect($fleets ?? []);
@@ -80,3 +80,45 @@
     </div>
   </div>
 </section>
+
+@pushOnce('styles')
+  <style>
+    .fleet-section {
+      background: #ffffff;
+      border-radius: 18px;
+      padding: 40px 32px;
+      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.08);
+      color: #0f172a;
+    }
+
+    .fleet-section h3 {
+      color: #0f172a;
+    }
+
+    .fleet-section .fleet-card {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 14px;
+      padding: 12px;
+      text-align: center;
+      box-shadow: 0 6px 18px rgba(0, 0, 0, 0.06);
+    }
+
+    .fleet-section .fleet-card img {
+      border-radius: 12px;
+    }
+
+    .fleet-section .text-light-subtle {
+      color: #64748b !important;
+    }
+
+    .fleet-section .faq-item h6 {
+      color: #0f172a;
+      font-weight: 700;
+    }
+
+    .fleet-section .faq-item p {
+      color: #475569;
+    }
+  </style>
+@endpushOnce

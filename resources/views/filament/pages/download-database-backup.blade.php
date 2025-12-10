@@ -1,7 +1,7 @@
 <x-filament-panels::page>
     <div class="space-y-4">
         <p class="text-sm text-gray-600 dark:text-gray-300">
-            Use o botão acima para descarregar o backup mais recente guardado em
+            Use os botões acima para gerar e descarregar backups guardados em
             <code>{{ config('database.backup.path', 'backups/database') }}</code> no disco
             <code>{{ config('database.backup.disk', 'local') }}</code>.
         </p>

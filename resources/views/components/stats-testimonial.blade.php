@@ -46,7 +46,7 @@
                     </div>
                   </div>
                 </div>
-                <p class="mb-0" style="font-size: 0.9rem; color: #bec8e4;">
+                <p class="mb-0" style="font-size: 0.9rem; color: #475569;">
                   {{ $testimonial->content }}
                 </p>
               </div>

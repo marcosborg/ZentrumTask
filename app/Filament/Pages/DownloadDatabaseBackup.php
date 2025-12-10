@@ -8,9 +8,10 @@ use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Contracts\Filesystem\Filesystem;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Storage;
-use Symfony\Component\HttpFoundation\StreamedResponse;
+use Symfony\Component\HttpFoundation\Response;
 use UnitEnum;
 
 class DownloadDatabaseBackup extends Page
@@ -34,11 +35,18 @@ class DownloadDatabaseBackup extends Page
             Action::make('download')
                 ->label('Descarregar último backup')
                 ->icon(Heroicon::OutlinedArrowDownTray)
-                ->action(fn (): ?StreamedResponse => $this->downloadLatest()),
+                ->action(fn (): ?Response => $this->downloadLatest()),
+            Action::make('generate')
+                ->label('Gerar novo backup')
+                ->icon(Heroicon::OutlinedServer)
+                ->action(fn () => $this->generateBackup())
+                ->requiresConfirmation()
+                ->modalHeading('Gerar novo backup da base de dados')
+                ->modalDescription('Esta ação executa php artisan db:backup e cria um novo ficheiro.'),
         ];
     }
 
-    protected function downloadLatest(): ?StreamedResponse
+    protected function downloadLatest(): ?Response
     {
         $diskName = (string) Config::get('database.backup.disk', 'local');
         $path = trim((string) Config::get('database.backup.path', 'backups/database'), '/');
@@ -81,5 +89,38 @@ class DownloadDatabaseBackup extends Page
             ->sortDesc();
 
         return $sorted->keys()->first();
+    }
+
+    protected function generateBackup(): void
+    {
+        $diskName = (string) Config::get('database.backup.disk', 'local');
+        $path = trim((string) Config::get('database.backup.path', 'backups/database'), '/');
+
+        try {
+            $exitCode = Artisan::call('db:backup');
+            $output = trim(Artisan::output());
+
+            if ($exitCode !== 0) {
+                Notification::make()
+                    ->danger()
+                    ->title('Erro ao criar backup')
+                    ->body($output !== '' ? $output : 'O comando db:backup terminou com erro.')
+                    ->send();
+
+                return;
+            }
+
+            Notification::make()
+                ->success()
+                ->title('Backup criado com sucesso')
+                ->body("Novo ficheiro guardado em [{$diskName}] em {$path}.")
+                ->send();
+        } catch (\Throwable $e) {
+            Notification::make()
+                ->danger()
+                ->title('Erro ao criar backup')
+                ->body($e->getMessage())
+                ->send();
+        }
     }
 }

@@ -4,7 +4,7 @@
 @endphp
 
 <section class="hero hero-slider">
-  <div class="container">
+  <div class="container hero-container-fluid">
     <div class="swiper hero-swiper">
       <div class="swiper-wrapper">
         @foreach ($slides as $hero)
@@ -18,25 +18,20 @@
               $imageUrl = $hero?->getFirstMediaUrl('hero_image') ?: $hero?->getFirstMediaUrl('hero_image', 'hero_cover');
           @endphp
           <div class="swiper-slide">
-            <div class="row align-items-center gx-lg-5">
-              <div class="col-lg-6 mb-4 mb-lg-0">
-                <h1 class="display-4">{{ $title }}</h1>
-                <p class="lead mb-4">
-                  {{ $subtitle }}
-                </p>
-                <div class="d-flex flex-wrap gap-3">
-                  <a href="{{ $ctaLink }}" class="cta-btn btn-primaria text-decoration-none">{{ $ctaText }}</a>
-                  @if ($ctaSecondaryText && $ctaSecondaryLink)
-                    <a href="{{ $ctaSecondaryLink }}" class="cta-btn btn-secundaria text-decoration-none">{{ $ctaSecondaryText }}</a>
-                  @endif
+            <div class="hero-slide" style="background-image: url('{{ $imageUrl ?: asset('website/assets/hero_car_final.png') }}');">
+              <div class="hero-content">
+                <div class="hero-overlay">
+                  <h1 class="display-4">{{ $title }}</h1>
+                  <p class="lead mb-4">
+                    {{ $subtitle }}
+                  </p>
+                  <div class="d-flex flex-wrap gap-3">
+                    <a href="{{ $ctaLink }}" class="cta-btn btn-primaria text-decoration-none">{{ $ctaText }}</a>
+                    @if ($ctaSecondaryText && $ctaSecondaryLink)
+                      <a href="{{ $ctaSecondaryLink }}" class="cta-btn btn-secundaria text-decoration-none">{{ $ctaSecondaryText }}</a>
+                    @endif
+                  </div>
                 </div>
-              </div>
-              <div class="col-lg-6 text-center">
-                <img
-                  src="{{ $imageUrl ?: asset('website/assets/hero_car_final.png') }}"
-                  alt="{{ $title }}"
-                  class="hero-image img-fluid"
-                />
               </div>
             </div>
           </div>
@@ -56,7 +51,12 @@
     .hero-slider {
       overflow: hidden;
       background: linear-gradient(135deg, #f5f9ff 0%, #e9f1ff 100%);
-      padding: 3rem 0 2.5rem;
+      padding: 0;
+    }
+    .hero-container-fluid {
+      max-width: 100%;
+      padding-left: 0;
+      padding-right: 0;
     }
     .hero-swiper {
       position: relative;
@@ -64,6 +64,34 @@
     .hero h1,
     .hero .lead {
       color: #0f172a;
+    }
+    .hero-slide {
+      position: relative;
+      min-height: 420px;
+      border-radius: 0;
+      overflow: hidden;
+      background-size: cover;
+      background-position: center;
+      background-repeat: no-repeat;
+      display: flex;
+      align-items: center;
+      justify-content: flex-start;
+      padding: 40px 6vw;
+    }
+    .hero-content {
+      width: 100%;
+      max-width: 1200px;
+      margin: 0 auto;
+      display: flex;
+      justify-content: flex-start;
+    }
+    .hero-overlay {
+      background: linear-gradient(90deg, rgba(255,255,255,0.9) 0%, rgba(255,255,255,0.75) 60%, rgba(255,255,255,0.35) 100%);
+      padding: 48px;
+      max-width: 640px;
+      border-radius: 0;
+      margin: 24px;
+      box-shadow: 0 14px 30px rgba(0,0,0,0.08);
     }
     .hero-pagination {
       margin-top: 1.5rem;
@@ -78,6 +106,14 @@
     }
     @media (max-width: 991px) {
       .hero-slider { padding-top: 2.5rem; }
+      .hero-slide { min-height: 360px; padding: 32px 5vw; }
+      .hero-overlay { margin: 0; width: 100%; }
+    }
+    @media (max-width: 767px) {
+      .hero-slide { min-height: 320px; padding: 28px 20px; }
+      .hero-overlay { padding: 32px; }
+      .hero-overlay h1 { font-size: 2rem; }
+      .hero-overlay .lead { font-size: 1rem; }
     }
   </style>
 @endpushOnce

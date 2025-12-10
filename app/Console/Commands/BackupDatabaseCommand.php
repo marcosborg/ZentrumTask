@@ -129,21 +129,23 @@ class BackupDatabaseCommand extends Command
     {
         $command = [
             $binary,
+            '--protocol=TCP',
             '--host='.$configuration['host'],
             '--port='.(string) $configuration['port'],
             '--user='.$configuration['username'],
+            '--password='.(string) ($configuration['password'] ?? ''),
             '--result-file='.$outputFile,
             '--single-transaction',
             '--routines',
             '--events',
             $configuration['database'],
         ];
-
         if (! empty($configuration['unix_socket'])) {
             $command[] = '--socket='.$configuration['unix_socket'];
         }
 
         $process = new Process($command);
+        // Keep MYSQL_PWD too, for compatibility
         $process->setEnv([
             'MYSQL_PWD' => (string) ($configuration['password'] ?? ''),
         ]);
