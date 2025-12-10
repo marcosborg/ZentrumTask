@@ -2,7 +2,7 @@
   <div class="row g-4">
     @php
         $fleetItems = collect($fleets ?? []);
-        if ($fleetItems->isEmpty()) {
+        if ($fleetItems->isEmpty() && \Illuminate\Support\Facades\Schema::hasTable('fleets')) {
             $fleetItems = \App\Models\Fleet::query()->latest('id')->get();
         }
     @endphp

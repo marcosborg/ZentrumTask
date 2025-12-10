@@ -5,11 +5,13 @@
         $loginUrl = $adminPanel?->getLoginUrl() ?? url('/admin/login');
         $dashboardUrl = $adminPanel?->getUrl() ?? url('/admin');
         $logoutUrl = $adminPanel?->getLogoutUrl() ?? url('/admin/logout');
-        $menuItems = \App\Models\WebsiteMenuItem::query()
-            ->with(['children'])
-            ->whereNull('parent_id')
-            ->orderBy('position')
-            ->get(['id', 'label', 'url', 'position']);
+        $menuItems = \Illuminate\Support\Facades\Schema::hasTable('website_menu_items')
+            ? \App\Models\WebsiteMenuItem::query()
+                ->with(['children'])
+                ->whereNull('parent_id')
+                ->orderBy('position')
+                ->get(['id', 'label', 'url', 'position'])
+            : collect();
     @endphp
     <a class="navbar-brand d-flex align-items-center gap-2" href="{{ url('/') }}">
       <img src="/website/assets/logo.png" alt="Zentrum TVDE" class="logo" />

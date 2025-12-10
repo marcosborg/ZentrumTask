@@ -5,21 +5,29 @@ namespace App\View\Components;
 use App\Models\Stat;
 use App\Models\Testimonial;
 use Illuminate\Contracts\View\View;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\View\Component;
 
 class StatsTestimonial extends Component
 {
-    public $stats;
-    public $testimonials;
+    public Collection $stats;
+
+    public Collection $testimonials;
 
     public function __construct()
     {
-        $this->stats = Stat::query()
-            ->orderBy('id')
-            ->get();
-        $this->testimonials = Testimonial::query()
-            ->latest('id')
-            ->get();
+        $this->stats = Schema::hasTable('stats')
+            ? Stat::query()
+                ->orderBy('id')
+                ->get()
+            : (new Stat)->newCollection();
+
+        $this->testimonials = Schema::hasTable('testimonials')
+            ? Testimonial::query()
+                ->latest('id')
+                ->get()
+            : (new Testimonial)->newCollection();
     }
 
     public function render(): View

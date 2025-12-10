@@ -180,4 +180,10 @@ return [
 
     ],
 
+    'backup' => [
+        'disk' => env('DB_BACKUP_DISK', 'local'),
+        'path' => env('DB_BACKUP_PATH', 'backups/database'),
+        'binary' => env('DB_BACKUP_BINARY', null),
+    ],
+
 ];

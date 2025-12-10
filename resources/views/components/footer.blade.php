@@ -16,11 +16,13 @@
 
       <div class="col-md-6">
         @php
-            $footerMenu = \App\Models\WebsiteMenuItem::query()
-                ->with(['children'])
-                ->whereNull('parent_id')
-                ->orderBy('position')
-                ->get(['id', 'label', 'url', 'position']);
+            $footerMenu = \Illuminate\Support\Facades\Schema::hasTable('website_menu_items')
+                ? \App\Models\WebsiteMenuItem::query()
+                    ->with(['children'])
+                    ->whereNull('parent_id')
+                    ->orderBy('position')
+                    ->get(['id', 'label', 'url', 'position'])
+                : collect();
         @endphp
         <h6 class="footer-title">Menu</h6>
         <ul class="list-unstyled footer-links">
