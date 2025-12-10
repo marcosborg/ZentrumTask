@@ -10,11 +10,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const hasConsent = () => {
     try {
-      return localStorage.getItem(consentKey) === 'accepted';
+      if (localStorage.getItem(consentKey) === 'accepted') {
+        return true;
+      }
     } catch (error) {
       console.warn('Storage indisponivel para consentimento de cookies.', error);
-      return false;
     }
+
+    return document.cookie.split(';').some((cookie) => cookie.trim().startsWith(`${consentKey}=accepted`));
   };
 
   const saveConsent = () => {
@@ -23,6 +26,8 @@ document.addEventListener('DOMContentLoaded', () => {
     } catch (error) {
       console.warn('Nao foi possivel guardar o consentimento de cookies.', error);
     }
+
+    document.cookie = `${consentKey}=accepted; path=/; max-age=${60 * 60 * 24 * 365}`;
   };
 
   const hideBanner = () => {
