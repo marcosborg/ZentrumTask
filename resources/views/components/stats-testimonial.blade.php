@@ -3,7 +3,7 @@
     $testimonials = collect($testimonials ?? []);
 @endphp
 
-<section class="container pb-5">
+<section class="container pb-4 section-gap">
   <div class="row g-4 align-items-stretch">
     <div class="col-lg-6">
       <div class="row g-3">

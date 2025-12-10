@@ -2,7 +2,7 @@
     $items = collect($services ?? []);
 @endphp
 
-<section class="container py-5">
+<section class="container py-4 section-gap">
   <div class="row g-4">
     @forelse ($items as $service)
       <div class="col-md-4">

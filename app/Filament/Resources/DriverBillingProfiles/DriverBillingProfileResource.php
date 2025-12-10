@@ -23,6 +23,8 @@ class DriverBillingProfileResource extends Resource
 
     protected static UnitEnum|string|null $navigationGroup = 'TVDE';
 
+    protected static ?int $navigationSort = 20;
+
     protected static ?string $recordTitleAttribute = 'id';
 
     public static function form(Schema $schema): Schema

@@ -54,7 +54,7 @@ class WebsiteController extends Controller
             ]);
         });
 
-        return back()->with('contact_success', 'Pedido enviado com sucesso. Sera contactado brevemente.');
+        return back()->with('contact_success', 'Obrigado! CriÇ­mos uma tarefa no Kanban.');
     }
 
     public function showCms(CmsPage $page, ?string $slug = null)
@@ -77,6 +77,4 @@ class WebsiteController extends Controller
         ]);
     }
 }
-
-
 

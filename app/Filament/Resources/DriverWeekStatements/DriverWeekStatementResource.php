@@ -26,6 +26,8 @@ class DriverWeekStatementResource extends Resource
 
     protected static UnitEnum|string|null $navigationGroup = 'TVDE';
 
+    protected static ?int $navigationSort = 30;
+
     protected static ?string $recordTitleAttribute = 'week_label';
 
     public static function form(Schema $schema): Schema
