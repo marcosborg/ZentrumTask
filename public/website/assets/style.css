@@ -316,3 +316,103 @@ h1,
     padding: 4rem 0 3rem;
   }
 }
+
+/* Cookie banner */
+.cookie-banner {
+  position: fixed;
+  left: 50%;
+  bottom: 18px;
+  transform: translateX(-50%);
+  width: min(1100px, calc(100% - 2rem));
+  background: #1f5aa3;
+  color: #ffffff;
+  border-radius: 18px;
+  box-shadow: 0 18px 36px rgba(15, 23, 42, 0.35);
+  padding: 1rem 1.25rem;
+  z-index: 1100;
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+.cookie-banner--hidden {
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, 12px);
+}
+.cookie-banner__wrapper {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+.cookie-banner__content {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  flex: 1;
+  min-width: 260px;
+}
+.cookie-banner__icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.14);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.25rem;
+}
+.cookie-banner__title {
+  font-weight: 700;
+  color: #ffffff;
+}
+.cookie-banner__body {
+  color: #e2e8f0;
+  font-size: 0.95rem;
+}
+.cookie-banner__link {
+  color: #ffffff;
+  font-weight: 600;
+  text-decoration: underline;
+}
+.cookie-banner__link:hover {
+  color: #dbeafe;
+}
+.cookie-banner__actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.cookie-banner__policy {
+  color: #0f172a;
+  font-weight: 600;
+  border: none;
+}
+.btn-accept {
+  background-color: #2dc38a;
+  color: #ffffff;
+  border: none;
+  font-weight: 700;
+  box-shadow: 0 12px 18px rgba(45, 195, 138, 0.35);
+}
+.btn-accept:hover {
+  background-color: #25a075;
+  color: #ffffff;
+}
+@media (max-width: 768px) {
+  .cookie-banner {
+    width: min(100%, calc(100% - 1.25rem));
+    padding: 1rem;
+  }
+  .cookie-banner__wrapper {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .cookie-banner__actions {
+    width: 100%;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+  .cookie-banner__actions .btn {
+    flex: 1;
+    min-width: 140px;
+  }
+}

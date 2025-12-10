@@ -24,6 +24,7 @@
     <x-navigation />
     @yield('content')
     <x-footer />
+    <x-cookie-banner />
 
     <!-- Bootstrap JS (optional) -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>

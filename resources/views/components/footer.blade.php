@@ -1,4 +1,4 @@
-<footer class="footer-section mt-5 pt-5 pb-4">
+﻿<footer class="footer-section mt-5 pt-5 pb-4">
   <div class="container">
     <div class="row g-4 align-items-start">
       <div class="col-md-6">
@@ -8,10 +8,7 @@
         <p class="text-light-subtle mb-3">
           Ajudamos motoristas e empresas a crescerem no universo TVDE com frota, suporte e tecnologia.
         </p>
-        <div class="footer-legal text-light-subtle">
-          © 2025 Zentrum TVDE. Todos os direitos reservados.<br />
-          Política de Privacidade · Termos e Condições
-        </div>
+        <div class="footer-legal text-light-subtle">&copy; 2025 Zentrum TVDE. Todos os direitos reservados.<br /><a href="https://zentrum-tvde.com/cms/7/politica-de-privacidade" class="text-white">Politica de Privacidade</a> &middot; <a href="https://zentrum-tvde.com/cms/6/termos-e-condicoes-de-utilizacao" class="text-white">Termos e Condicoes</a></div>
       </div>
 
       <div class="col-md-6">
@@ -57,3 +54,7 @@
     </div>
   </div>
 </footer>
+
+
+
+
