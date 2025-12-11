@@ -1,2 +1,8 @@
 User-agent: *
-Disallow:
+Disallow: /admin
+Disallow: /horizon
+Disallow: /telescope
+Disallow: /debugbar
+Disallow: /storage
+
+Sitemap: https://zentrum-tvde.com/sitemap.xml
