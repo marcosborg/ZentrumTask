@@ -3,6 +3,17 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- Google tag (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=AW-17802026959"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag() {
+        dataLayer.push(arguments);
+      }
+      gtag('js', new Date());
+
+      gtag('config', 'AW-17802026959');
+    </script>
     <link rel="icon" href="{{ asset('website/assets/favicon.ico') }}" type="image/x-icon" />
     <title>@yield('title', 'Plataforma TVDE')</title>
     @stack('head')
