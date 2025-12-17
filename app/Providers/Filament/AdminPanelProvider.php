@@ -29,6 +29,7 @@ class AdminPanelProvider extends PanelProvider
             NavigationGroup::make('Dashboards'),
             NavigationGroup::make('Kanban')->collapsed(),
             NavigationGroup::make('TVDE')->collapsed(),
+            NavigationGroup::make('Entradas TVDE')->collapsed(),
             NavigationGroup::make('Website')->collapsed(),
             NavigationGroup::make('Administracao')->collapsed(),
         ];
