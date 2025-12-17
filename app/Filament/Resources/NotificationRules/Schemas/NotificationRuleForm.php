@@ -2,9 +2,9 @@
 
 namespace App\Filament\Resources\NotificationRules\Schemas;
 
+use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
-use Filament\Forms\Components\Select;
 use Filament\Schemas\Schema;
 
 class NotificationRuleForm
@@ -25,9 +25,13 @@ class NotificationRuleForm
                     ->preload(),
                 Select::make('recipient_list_id')
                     ->relationship('recipientList', 'name')
-                    ->required()
                     ->searchable()
-                    ->preload(),
+                    ->preload()
+                    ->nullable(),
+                Toggle::make('send_to_task_email')
+                    ->label('Enviar para email do candidato (meta.email)')
+                    ->helperText('Usa o email guardado em meta.email da task.')
+                    ->default(false),
                 Select::make('trigger')
                     ->options([
                         'on_enter_stage' => 'On Enter Stage',

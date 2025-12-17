@@ -2,6 +2,35 @@
 
 use Illuminate\Support\Str;
 
+$databaseMode = env('DB_MODE', 'sandbox');
+
+$databaseProfiles = [
+    'sandbox' => [
+        'driver' => env('DB_DRIVER_SANDBOX', env('DB_CONNECTION', 'mysql')),
+        'host' => env('DB_HOST_SANDBOX', '127.0.0.1'),
+        'port' => env('DB_PORT_SANDBOX', '3306'),
+        'database' => env('DB_DATABASE_SANDBOX', 'laravel'),
+        'username' => env('DB_USERNAME_SANDBOX', 'root'),
+        'password' => env('DB_PASSWORD_SANDBOX', ''),
+    ],
+    'production' => [
+        'driver' => env('DB_DRIVER_PRODUCTION', env('DB_CONNECTION', 'mysql')),
+        'host' => env('DB_HOST_PRODUCTION', '127.0.0.1'),
+        'port' => env('DB_PORT_PRODUCTION', '3306'),
+        'database' => env('DB_DATABASE_PRODUCTION', 'laravel'),
+        'username' => env('DB_USERNAME_PRODUCTION', 'root'),
+        'password' => env('DB_PASSWORD_PRODUCTION', ''),
+    ],
+];
+
+$currentProfile = $databaseProfiles[$databaseMode] ?? $databaseProfiles['sandbox'];
+
+$databaseHost = $currentProfile['host'];
+$databasePort = $currentProfile['port'];
+$databaseName = $currentProfile['database'];
+$databaseUsername = $currentProfile['username'];
+$databasePassword = $currentProfile['password'];
+
 return [
 
     /*
@@ -46,11 +75,11 @@ return [
         'mysql' => [
             'driver' => 'mysql',
             'url' => env('DB_URL'),
-            'host' => env('DB_HOST', '127.0.0.1'),
-            'port' => env('DB_PORT', '3306'),
-            'database' => env('DB_DATABASE', 'laravel'),
-            'username' => env('DB_USERNAME', 'root'),
-            'password' => env('DB_PASSWORD', ''),
+            'host' => $databaseHost,
+            'port' => $databasePort,
+            'database' => $databaseName,
+            'username' => $databaseUsername,
+            'password' => $databasePassword,
             'unix_socket' => env('DB_SOCKET', ''),
             'charset' => env('DB_CHARSET', 'utf8mb4'),
             'collation' => env('DB_COLLATION', 'utf8mb4_unicode_ci'),
@@ -66,11 +95,11 @@ return [
         'mariadb' => [
             'driver' => 'mariadb',
             'url' => env('DB_URL'),
-            'host' => env('DB_HOST', '127.0.0.1'),
-            'port' => env('DB_PORT', '3306'),
-            'database' => env('DB_DATABASE', 'laravel'),
-            'username' => env('DB_USERNAME', 'root'),
-            'password' => env('DB_PASSWORD', ''),
+            'host' => $databaseHost,
+            'port' => $databasePort,
+            'database' => $databaseName,
+            'username' => $databaseUsername,
+            'password' => $databasePassword,
             'unix_socket' => env('DB_SOCKET', ''),
             'charset' => env('DB_CHARSET', 'utf8mb4'),
             'collation' => env('DB_COLLATION', 'utf8mb4_unicode_ci'),
@@ -86,11 +115,11 @@ return [
         'pgsql' => [
             'driver' => 'pgsql',
             'url' => env('DB_URL'),
-            'host' => env('DB_HOST', '127.0.0.1'),
-            'port' => env('DB_PORT', '5432'),
-            'database' => env('DB_DATABASE', 'laravel'),
-            'username' => env('DB_USERNAME', 'root'),
-            'password' => env('DB_PASSWORD', ''),
+            'host' => $databaseHost,
+            'port' => $databasePort,
+            'database' => $databaseName,
+            'username' => $databaseUsername,
+            'password' => $databasePassword,
             'charset' => env('DB_CHARSET', 'utf8'),
             'prefix' => '',
             'prefix_indexes' => true,
@@ -101,11 +130,11 @@ return [
         'sqlsrv' => [
             'driver' => 'sqlsrv',
             'url' => env('DB_URL'),
-            'host' => env('DB_HOST', 'localhost'),
-            'port' => env('DB_PORT', '1433'),
-            'database' => env('DB_DATABASE', 'laravel'),
-            'username' => env('DB_USERNAME', 'root'),
-            'password' => env('DB_PASSWORD', ''),
+            'host' => $databaseHost,
+            'port' => $databasePort,
+            'database' => $databaseName,
+            'username' => $databaseUsername,
+            'password' => $databasePassword,
             'charset' => env('DB_CHARSET', 'utf8'),
             'prefix' => '',
             'prefix_indexes' => true,
@@ -185,5 +214,13 @@ return [
         'path' => env('DB_BACKUP_PATH', 'backups/database'),
         'binary' => env('DB_BACKUP_BINARY', null),
     ],
+
+    'restore' => [
+        'binary' => env('DB_RESTORE_BINARY', null),
+    ],
+
+    'mode' => $databaseMode,
+
+    'profiles' => $databaseProfiles,
 
 ];

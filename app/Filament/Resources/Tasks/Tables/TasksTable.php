@@ -10,6 +10,8 @@ use Filament\Actions\RestoreBulkAction;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\TrashedFilter;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 
 class TasksTable
 {
@@ -18,6 +20,13 @@ class TasksTable
         return $table
             ->reorderable('position')
             ->defaultSort('position')
+            ->modifyQueryUsing(function (Builder $query): void {
+                $query->withExists([
+                    'notificationLogs as email_sent' => function (Builder $subQuery): void {
+                        $subQuery->where('status', 'sent');
+                    },
+                ]);
+            })
             ->columns([
                 TextColumn::make('board.name')
                     ->sortable(),
@@ -27,8 +36,16 @@ class TasksTable
                     ->sortable(),
                 TextColumn::make('title')
                     ->searchable(),
+                TextColumn::make('email_sent')
+                    ->label('Email')
+                    ->badge()
+                    ->state(fn (Model $record): string => $record->email_sent ? 'Enviado' : 'Por enviar')
+                    ->colors([
+                        'success' => fn (Model $record): bool => (bool) $record->email_sent,
+                        'warning' => fn (Model $record): bool => ! (bool) $record->email_sent,
+                    ]),
                 TextColumn::make('priority')
-                    ->formatStateUsing(fn(string $state) => match ($state) {
+                    ->formatStateUsing(fn (string $state) => match ($state) {
                         'normal' => 'Normal',
                         'medium' => 'Medium',
                         'high' => 'High',

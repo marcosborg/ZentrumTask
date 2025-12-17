@@ -514,6 +514,7 @@ class KanbanBoard extends Page
             'send_mode' => 'always',
             'cooldown_hours' => null,
             'also_send_to_assigned_user' => false,
+            'send_to_task_email' => false,
             'is_active' => true,
         ];
 
@@ -526,6 +527,7 @@ class KanbanBoard extends Page
                 'send_mode' => $rule->send_mode,
                 'cooldown_hours' => $rule->cooldown_hours,
                 'also_send_to_assigned_user' => (bool) $rule->also_send_to_assigned_user,
+                'send_to_task_email' => (bool) $rule->send_to_task_email,
                 'is_active' => (bool) $rule->is_active,
             ]);
         }
@@ -533,7 +535,8 @@ class KanbanBoard extends Page
 
     public function saveRule(): void
     {
-        $data = validator($this->ruleForm, [
+        $validator = validator($this->ruleForm, [
+            'id' => ['nullable', 'exists:notification_rules,id'],
             'stage_id' => ['required', 'exists:stages,id'],
             'message_template_id' => ['required', 'exists:message_templates,id'],
             'recipient_list_id' => ['nullable', 'exists:recipient_lists,id'],
@@ -541,14 +544,26 @@ class KanbanBoard extends Page
             'send_mode' => ['required', Rule::in(['always', 'first_time', 'cooldown'])],
             'cooldown_hours' => ['nullable', 'integer', 'min:1'],
             'also_send_to_assigned_user' => ['boolean'],
+            'send_to_task_email' => ['boolean'],
             'is_active' => ['boolean'],
-        ])->validate();
+        ]);
+
+        $validator->after(function ($validator) {
+            $data = $validator->getData();
+            $hasRecipient = ! empty($data['recipient_list_id']) || ! empty($data['also_send_to_assigned_user']) || ! empty($data['send_to_task_email']);
+
+            if (! $hasRecipient) {
+                $validator->errors()->add('recipient_list_id', 'Selecione um destinatario (lista, atribuicao ou email do candidato).');
+            }
+        });
+
+        $data = $validator->validate();
 
         if ($data['send_mode'] !== 'cooldown') {
             $data['cooldown_hours'] = null;
         }
 
-        if ($data['id']) {
+        if (! empty($data['id'])) {
             $rule = NotificationRule::findOrFail($data['id']);
             $rule->update($data);
         } else {

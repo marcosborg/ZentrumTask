@@ -1,12 +1,11 @@
 <x-filament-panels::page>
     <div class="space-y-4">
         <p class="text-sm text-gray-600 dark:text-gray-300">
-            Use os botões acima para gerar e descarregar backups guardados em
-            <code>{{ config('database.backup.path', 'backups/database') }}</code> no disco
-            <code>{{ config('database.backup.disk', 'local') }}</code>.
+            Utilize os botes acima para copiar dados entre a base externa (producao) e a interna (sandbox),
+            ou para alternar a variavel <code>DB_MODE</code> no ficheiro <code>.env</code>.
         </p>
         <p class="text-sm text-gray-600 dark:text-gray-300">
-            Os backups são criados pelo comando <code>php artisan db:backup</code>.
+            Confirme que as credenciais de sandbox e producao estao corretas antes de iniciar uma copia.
         </p>
     </div>
 </x-filament-panels::page>

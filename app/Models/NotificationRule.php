@@ -2,8 +2,8 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class NotificationRule extends Model
@@ -18,6 +18,7 @@ class NotificationRule extends Model
         'send_mode',
         'cooldown_hours',
         'also_send_to_assigned_user',
+        'send_to_task_email',
         'is_active',
     ];
 
@@ -39,5 +40,18 @@ class NotificationRule extends Model
     public function logs()
     {
         return $this->hasMany(NotificationLog::class);
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return [
+            'also_send_to_assigned_user' => 'boolean',
+            'send_to_task_email' => 'boolean',
+            'is_active' => 'boolean',
+            'cooldown_hours' => 'integer',
+        ];
     }
 }

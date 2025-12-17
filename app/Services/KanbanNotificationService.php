@@ -2,12 +2,11 @@
 
 namespace App\Services;
 
-use App\Models\Task;
-use App\Models\NotificationRule;
 use App\Models\NotificationLog;
+use App\Models\NotificationRule;
+use App\Models\Task;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
-use Carbon\Carbon;
 
 class KanbanNotificationService
 {
@@ -46,7 +45,7 @@ class KanbanNotificationService
         $context = $this->buildContext($task);
 
         $subject = $this->renderTemplate($template->subject, $context);
-        $body    = $this->renderTemplate($template->body, $context);
+        $body = $this->renderTemplate($template->body, $context);
 
         foreach ($recipients as $email) {
             if (! $this->shouldSendToRecipient($rule, $task, $email)) {
@@ -73,6 +72,14 @@ class KanbanNotificationService
 
         if ($rule->also_send_to_assigned_user && $task->assignedTo?->email) {
             $emails[] = $task->assignedTo->email;
+        }
+
+        if ($rule->send_to_task_email) {
+            $taskEmail = $this->taskEmail($task);
+
+            if ($taskEmail !== null) {
+                $emails[] = $taskEmail;
+            }
         }
 
         // remover duplicados e vazios
@@ -113,10 +120,10 @@ class KanbanNotificationService
     {
         $log = new NotificationLog([
             'notification_rule_id' => $rule->id,
-            'task_id'              => $task->id,
-            'to_email'             => $email,
-            'subject'              => $subject,
-            'status'               => 'pending',
+            'task_id' => $task->id,
+            'to_email' => $email,
+            'subject' => $subject,
+            'status' => 'pending',
         ]);
         $log->save();
 
@@ -134,12 +141,12 @@ class KanbanNotificationService
             }
 
             $log->update([
-                'status'  => 'sent',
+                'status' => 'sent',
                 'sent_at' => now(),
             ]);
         } catch (\Throwable $e) {
             $log->update([
-                'status'        => 'failed',
+                'status' => 'failed',
                 'error_message' => Str::limit($e->getMessage(), 1000),
             ]);
         }
@@ -151,16 +158,17 @@ class KanbanNotificationService
     protected function buildContext(Task $task): array
     {
         return [
-            'task.id'          => $task->id,
-            'task.title'       => $task->title,
+            'task.id' => $task->id,
+            'task.title' => $task->title,
             'task.description' => $task->description,
-            'task.priority'    => $task->priority,
-            'task.due_at'      => optional($task->due_at)->format('Y-m-d H:i'),
-            'board.name'       => $task->board?->name,
-            'stage.name'       => $task->stage?->name,
-            'user.name'        => $task->assignedTo?->name,
-            'user.email'       => $task->assignedTo?->email,
-            'app.url'          => config('app.url'),
+            'task.priority' => $task->priority,
+            'task.due_at' => optional($task->due_at)->format('Y-m-d H:i'),
+            'board.name' => $task->board?->name,
+            'stage.name' => $task->stage?->name,
+            'user.name' => $task->assignedTo?->name,
+            'user.email' => $task->assignedTo?->email,
+            'task.email' => $this->taskEmail($task),
+            'app.url' => config('app.url'),
         ];
     }
 
@@ -171,9 +179,22 @@ class KanbanNotificationService
     {
         $replace = [];
         foreach ($context as $key => $value) {
-            $replace['{{' . $key . '}}'] = $value ?? '';
+            $replace['{{'.$key.'}}'] = $value ?? '';
         }
 
         return strtr($text, $replace);
+    }
+
+    protected function taskEmail(Task $task): ?string
+    {
+        $email = $task->meta['email'] ?? null;
+
+        if (! is_string($email)) {
+            return null;
+        }
+
+        $email = trim($email);
+
+        return filter_var($email, FILTER_VALIDATE_EMAIL) ? $email : null;
     }
 }
