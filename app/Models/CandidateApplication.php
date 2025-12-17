@@ -38,6 +38,7 @@ class CandidateApplication extends Model
         'legal_confirmed_at',
         'legal_ip',
         'legal_version',
+        'vehicle_type_id',
     ];
 
     /**
@@ -61,6 +62,7 @@ class CandidateApplication extends Model
             'contact_authorization' => 'boolean',
             'platforms' => 'array',
             'documents' => 'array',
+            'vehicle_type_id' => 'integer',
         ];
     }
 

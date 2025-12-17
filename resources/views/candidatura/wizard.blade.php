@@ -68,6 +68,7 @@
         return {
             steps: [
                 { name: 'welcome', title: 'Boas-vindas', subtitle: 'Modelo Zentrum TVDE' },
+                { name: 'vehicle', title: 'Escolha de viatura', subtitle: 'Selecione o tipo de viatura pretendido' },
                 { name: 'rental', title: 'Condições de aluguer', subtitle: 'Leia e aceite' },
                 { name: 'eligibility', title: 'Elegibilidade TVDE', subtitle: 'Requisitos' },
                 { name: 'personal', title: 'Dados pessoais', subtitle: 'Contacto e identificação' },
@@ -75,6 +76,7 @@
                 { name: 'legal', title: 'Confirmações legais', subtitle: 'RGPD e autorizações' },
                 { name: 'summary', title: 'Conclusão', subtitle: 'Revisão final' },
             ],
+            vehicleTypes: config.vehicleTypes || [],
             documentFields: [
                 { field: 'document_id', label: 'Documento de identificação' },
                 { field: 'driver_license', label: 'Carta de condução' },
@@ -113,6 +115,7 @@
                     email: config.initial.email ?? '',
                     phone: config.initial.phone ?? '',
                     nif: config.initial.nif ?? '',
+                    vehicle_type_id: config.initial.vehicle_type_id ?? '',
                     rgpd: Boolean(config.initial.rgpd),
                     truth_declaration: Boolean(config.initial.truth_declaration),
                     contact_authorization: Boolean(config.initial.contact_authorization),
@@ -128,6 +131,9 @@
                 }
                 if (step === 'rental') {
                     return this.form.rental_terms_read && this.form.rental_terms_accept;
+                }
+                if (step === 'vehicle') {
+                    return Boolean(this.form.vehicle_type_id);
                 }
                 if (step === 'eligibility') {
                     return (
@@ -274,6 +280,7 @@
                     x-data="wizard({
                         token: '{{ $application->token }}',
                         initial: @js($application),
+                        vehicleTypes: @js($vehicleTypes),
                         uploadEndpoint: '{{ $uploadEndpoint }}',
                         saveEndpoint: '{{ $saveEndpoint }}',
                         submitEndpoint: '{{ $submitEndpoint }}'
@@ -324,6 +331,26 @@
                                                 <label class="form-check-label" for="independent_driver">
                                                     Pretendo avançar como motorista independente
                                                 </label>
+                                            </div>
+                                        </div>
+                                    </template>
+
+                                    <template x-if="s.name === 'vehicle'">
+                                        <div class="col-12">
+                                            <p class="text-muted mb-3">Escolha a viatura pretendida. A disponibilidade pode variar; se não existir stock no momento, será encomendada após validação do seu processo.</p>
+                                            <div class="row g-3">
+                                                <template x-for="type in vehicleTypes" :key="type.id">
+                                                    <div class="col-md-6">
+                                                        <label class="d-flex align-items-start gap-3 p-3 border rounded-3 hover-shadow-sm w-100">
+                                                            <input type="radio" class="form-check-input mt-1" :value="type.id" x-model="form.vehicle_type_id">
+                                                            <div>
+                                                                <div class="fw-semibold" x-text="`${type.brand} ${type.model}`"></div>
+                                                                <div class="text-muted small" x-text="type.version ? type.version : 'Versão padrão'"></div>
+                                                                <div class="text-success fw-semibold" x-text="`Aluguer semanal: €${Number(type.weekly_rental_price).toFixed(2)}`"></div>
+                                                            </div>
+                                                        </label>
+                                                    </div>
+                                                </template>
                                             </div>
                                         </div>
                                     </template>
@@ -484,6 +511,9 @@
                                                 <li class="mb-1"><span class="wizard-label">Email:</span> <span x-text="form.email"></span></li>
                                                 <li class="mb-1"><span class="wizard-label">Telemóvel:</span> <span x-text="form.phone"></span></li>
                                                 <li class="mb-1"><span class="wizard-label">NIF:</span> <span x-text="form.nif"></span></li>
+                                                <li class="mb-1"><span class="wizard-label">Viatura escolhida:</span>
+                                                    <span x-text="vehicleTypes.find((t) => Number(t.id) === Number(form.vehicle_type_id)) ? `${vehicleTypes.find((t) => Number(t.id) === Number(form.vehicle_type_id)).brand} ${vehicleTypes.find((t) => Number(t.id) === Number(form.vehicle_type_id)).model}` : '-'"></span>
+                                                </li>
                                             </ul>
                                         </div>
                                     </template>

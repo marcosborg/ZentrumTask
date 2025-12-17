@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\CandidateApplication;
+use App\Models\VehicleType;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -19,6 +20,7 @@ class CandidateApplicationController extends Controller
             'uploadEndpoint' => route('candidatura.upload'),
             'saveEndpoint' => route('candidatura.save'),
             'submitEndpoint' => route('candidatura.submit'),
+            'vehicleTypes' => VehicleType::orderBy('brand')->orderBy('model')->get(),
         ]);
     }
 
@@ -61,6 +63,7 @@ class CandidateApplicationController extends Controller
             'experience' => ['required', 'string', 'max:255'],
             'platforms' => ['required', 'array', 'min:1'],
             'platforms.*' => ['string', 'max:50'],
+            'vehicle_type_id' => ['required', 'exists:vehicle_types,id'],
             'rgpd' => ['accepted'],
             'truth_declaration' => ['accepted'],
             'contact_authorization' => ['accepted'],
@@ -175,6 +178,9 @@ class CandidateApplicationController extends Controller
             'welcome' => $request->validate([
                 'accepts_model' => ['accepted'],
                 'independent_driver' => ['accepted'],
+            ]),
+            'vehicle' => $request->validate([
+                'vehicle_type_id' => ['required', 'exists:vehicle_types,id'],
             ]),
             'rental' => $request->validate([
                 'rental_terms_read' => ['accepted'],
