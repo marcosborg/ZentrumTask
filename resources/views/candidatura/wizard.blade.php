@@ -206,8 +206,8 @@
                 this.stepIndex -= 1;
             },
 
-            async uploadFile(event, field) {
-                const file = event.target.files[0];
+            async uploadFile(event, field, fileOverride = null) {
+                const file = fileOverride ?? event?.target?.files?.[0];
                 if (!file) return;
                 const formData = new FormData();
                 formData.append('file', file);
@@ -226,6 +226,13 @@
                 } else {
                     this.saveMessage = 'Erro no upload';
                 }
+            },
+
+            handleDrop(event, field) {
+                event.preventDefault();
+                const file = event.dataTransfer?.files?.[0];
+                if (!file) return;
+                this.uploadFile(null, field, file);
             },
 
             async submit() {
@@ -255,7 +262,17 @@
                     return;
                 }
                 this.status = 'submitted';
-                this.saveMessage = 'Candidatura submetida com sucesso';
+                this.saveMessage = 'Candidatura submetida com sucesso. Será redirecionado em 5 segundos...';
+
+                let seconds = 5;
+                const interval = setInterval(() => {
+                    seconds -= 1;
+                    this.saveMessage = `Candidatura submetida com sucesso. Será redirecionado em ${seconds} segundos...`;
+                    if (seconds <= 0) {
+                        clearInterval(interval);
+                        window.location.href = '/';
+                    }
+                }, 1000);
             },
         };
     }
@@ -463,10 +480,15 @@
 
                                     <template x-if="s.name === 'documents'">
                                         <div class="col-12">
+                                            <p class="text-muted mb-3">Uploads obrigatórios. Limite 10MB por ficheiro. Pode arrastar e largar diretamente nas caixas.</p>
                                             <div class="row g-3">
                                                 <template x-for="doc in documentFields" :key="doc.field">
                                                     <div class="col-md-6">
-                                                        <div class="p-3 rounded-3 border border-dashed border-secondary bg-light h-100 text-dark">
+                                                        <div
+                                                            class="p-3 rounded-3 border border-dashed border-secondary bg-light h-100 text-dark"
+                                                            @dragover.prevent
+                                                            @drop="handleDrop($event, doc.field)"
+                                                        >
                                                             <p class="fw-semibold mb-1" x-text="doc.label"></p>
                                                             <p class="small text-muted mb-2">Arraste e largue ou clique para selecionar.</p>
                                                             <label class="w-100">
