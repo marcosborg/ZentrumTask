@@ -15,11 +15,14 @@ use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Resources\Resource;
 use Filament\Schemas\Components\Grid;
+use Filament\Schemas\Components\Html;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Text;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\HtmlString;
 use UnitEnum;
 
 class CandidateApplicationResource extends Resource
@@ -147,76 +150,54 @@ class CandidateApplicationResource extends Resource
                 Section::make('Estado')
                     ->columns(3)
                     ->components([
-                        Text::make('status_label', 'Estado')
-                            ->state(fn (CandidateApplication $record): string => match ($record->status) {
-                                'submitted' => 'Submetida',
-                                'incomplete' => 'Incompleta',
-                                default => 'Rascunho',
-                            })
+                        Text::make(fn (CandidateApplication $record): string => 'Estado: '.match ($record->status) {
+                            'submitted' => 'Submetida',
+                            'incomplete' => 'Incompleta',
+                            default => 'Rascunho',
+                        })
                             ->color(fn (CandidateApplication $record): string => match ($record->status) {
                                 'submitted' => 'success',
                                 'incomplete' => 'warning',
                                 default => 'gray',
                             })
                             ->weight('semibold'),
-                        Text::make('current_step_label', 'Passo atual')
-                            ->state(fn (CandidateApplication $record): string => (string) ($record->current_step ?? '-')),
-                        Text::make('ip_label', 'IP')
-                            ->state(fn (CandidateApplication $record): string => (string) ($record->last_ip ?? '-')),
-                        Text::make('created_label', 'Criada em')
-                            ->state(fn (CandidateApplication $record): string => optional($record->created_at)->format('Y-m-d H:i') ?? '-'),
-                        Text::make('submitted_label', 'Submetida em')
-                            ->state(fn (CandidateApplication $record): string => optional($record->submitted_at)->format('Y-m-d H:i') ?? '-'),
-                        Text::make('last_saved_label', 'Ultimo guardar')
-                            ->state(fn (CandidateApplication $record): string => optional($record->last_saved_at)->format('Y-m-d H:i') ?? '-'),
+                        Text::make(fn (CandidateApplication $record): string => 'Passo atual: '.($record->current_step ?? '-')),
+                        Text::make(fn (CandidateApplication $record): string => 'IP: '.($record->last_ip ?? '-')),
+                        Text::make(fn (CandidateApplication $record): string => 'Criada em: '.(optional($record->created_at)->format('Y-m-d H:i') ?? '-')),
+                        Text::make(fn (CandidateApplication $record): string => 'Submetida em: '.(optional($record->submitted_at)->format('Y-m-d H:i') ?? '-')),
+                        Text::make(fn (CandidateApplication $record): string => 'Ultimo guardar: '.(optional($record->last_saved_at)->format('Y-m-d H:i') ?? '-')),
                     ]),
                 Section::make('Dados pessoais')
                     ->columns(2)
                     ->components([
-                        Text::make('full_name_label', 'Nome')
-                            ->state(fn (CandidateApplication $record): string => (string) ($record->full_name ?? '-')),
-                        Text::make('email_label', 'Email')
-                            ->state(fn (CandidateApplication $record): string => (string) ($record->email ?? '-')),
-                        Text::make('phone_label', 'Telemovel')
-                            ->state(fn (CandidateApplication $record): string => (string) ($record->phone ?? '-')),
-                        Text::make('nif_label', 'NIF')
-                            ->state(fn (CandidateApplication $record): string => (string) ($record->nif ?? '-')),
+                        Text::make(fn (CandidateApplication $record): string => 'Nome: '.((string) ($record->full_name ?? '-'))),
+                        Text::make(fn (CandidateApplication $record): string => 'Email: '.((string) ($record->email ?? '-'))),
+                        Text::make(fn (CandidateApplication $record): string => 'Telemovel: '.((string) ($record->phone ?? '-'))),
+                        Text::make(fn (CandidateApplication $record): string => 'NIF: '.((string) ($record->nif ?? '-'))),
                     ]),
                 Section::make('Elegibilidade')
                     ->columns(2)
                     ->components([
-                        Text::make('has_tvde_course_label', 'Tem curso TVDE?')
-                            ->state(fn (CandidateApplication $record): string => $record->has_tvde_course ? 'Sim' : 'Nao'),
-                        Text::make('certificate_valid_label', 'Certificado valido?')
-                            ->state(fn (CandidateApplication $record): string => $record->certificate_valid ? 'Sim' : 'Nao'),
-                        Text::make('experience_label', 'Experiencia anterior')
-                            ->state(fn (CandidateApplication $record): string => (string) ($record->experience ?? '-')),
-                        Text::make('platforms_label', 'Plataformas')
-                            ->state(fn (CandidateApplication $record): string => ($record->platforms && is_array($record->platforms)) ? implode(', ', $record->platforms) : '-'),
+                        Text::make(fn (CandidateApplication $record): string => 'Tem curso TVDE?: '.($record->has_tvde_course ? 'Sim' : 'Nao')),
+                        Text::make(fn (CandidateApplication $record): string => 'Certificado valido?: '.($record->certificate_valid ? 'Sim' : 'Nao')),
+                        Text::make(fn (CandidateApplication $record): string => 'Experiencia anterior: '.((string) ($record->experience ?? '-'))),
+                        Text::make(fn (CandidateApplication $record): string => 'Plataformas: '.(($record->platforms && is_array($record->platforms)) ? implode(', ', $record->platforms) : '-')),
                     ]),
                 Section::make('Confirmacoes')
                     ->columns(3)
                     ->components([
-                        Text::make('rental_terms_accept_label', 'Aceitou condicoes')
-                            ->state(fn (CandidateApplication $record): string => $record->rental_terms_accept ? 'Sim' : 'Nao'),
-                        Text::make('rgpd_label', 'RGPD')
-                            ->state(fn (CandidateApplication $record): string => $record->rgpd ? 'Sim' : 'Nao'),
-                        Text::make('truth_declaration_label', 'Declaracao de veracidade')
-                            ->state(fn (CandidateApplication $record): string => $record->truth_declaration ? 'Sim' : 'Nao'),
-                        Text::make('contact_authorization_label', 'Autorizou contacto')
-                            ->state(fn (CandidateApplication $record): string => $record->contact_authorization ? 'Sim' : 'Nao'),
+                        Text::make(fn (CandidateApplication $record): string => 'Aceitou condicoes: '.($record->rental_terms_accept ? 'Sim' : 'Nao')),
+                        Text::make(fn (CandidateApplication $record): string => 'RGPD: '.($record->rgpd ? 'Sim' : 'Nao')),
+                        Text::make(fn (CandidateApplication $record): string => 'Declaracao de veracidade: '.($record->truth_declaration ? 'Sim' : 'Nao')),
+                        Text::make(fn (CandidateApplication $record): string => 'Autorizou contacto: '.($record->contact_authorization ? 'Sim' : 'Nao')),
                     ]),
                 Section::make('Documentos')
                     ->components([
                         Grid::make(2)->components([
-                            Text::make('document_id_label', 'Documento de identificacao')
-                                ->state(fn (CandidateApplication $record): string => self::documentName($record, 'document_id')),
-                            Text::make('driver_license_label', 'Carta de conducao')
-                                ->state(fn (CandidateApplication $record): string => self::documentName($record, 'driver_license')),
-                            Text::make('tvde_certificate_label', 'Certificado TVDE')
-                                ->state(fn (CandidateApplication $record): string => self::documentName($record, 'tvde_certificate')),
-                            Text::make('criminal_record_label', 'Registo criminal')
-                                ->state(fn (CandidateApplication $record): string => self::documentName($record, 'criminal_record')),
+                            Html::make(fn (CandidateApplication $record): HtmlString => self::documentLink('Documento de identificacao', $record, 'document_id')),
+                            Html::make(fn (CandidateApplication $record): HtmlString => self::documentLink('Carta de conducao', $record, 'driver_license')),
+                            Html::make(fn (CandidateApplication $record): HtmlString => self::documentLink('Certificado TVDE', $record, 'tvde_certificate')),
+                            Html::make(fn (CandidateApplication $record): HtmlString => self::documentLink('Registo criminal', $record, 'criminal_record')),
                         ]),
                     ]),
             ]);
@@ -276,5 +257,30 @@ class CandidateApplicationResource extends Resource
             'path' => $path,
             'name' => basename($path),
         ];
+    }
+
+    private static function documentLink(string $label, CandidateApplication $record, string $key): HtmlString
+    {
+        $value = $record->documents[$key] ?? null;
+
+        if (is_array($value)) {
+            $path = $value['path'] ?? null;
+            $name = $value['name'] ?? basename((string) ($path ?? ''));
+        } elseif (is_string($value) && $value !== '') {
+            $path = $value;
+            $name = basename($value);
+        } else {
+            $path = null;
+            $name = '-';
+        }
+
+        if (! $path) {
+            return new HtmlString("{$label}: -");
+        }
+
+        $url = Storage::disk('public')->url($path);
+        $link = '<a href="'.e($url).'" class="underline text-primary" target="_blank" rel="noopener">'.$name.'</a>';
+
+        return new HtmlString("{$label}: {$link}");
     }
 }
