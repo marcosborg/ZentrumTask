@@ -95,6 +95,7 @@ class CandidateApplicationResource extends Resource
                             ->disk('public')
                             ->directory(fn (?CandidateApplication $record): string => $record ? "applications/{$record->token}" : 'applications')
                             ->visibility('public')
+                            ->fetchFileInformation(false)
                             ->downloadable()
                             ->formatStateUsing(fn ($state, ?CandidateApplication $record): ?string => self::documentPath($record, $state))
                             ->default(fn (?CandidateApplication $record): ?string => self::documentPath($record, $record?->documents['document_id'] ?? null)),
@@ -103,6 +104,7 @@ class CandidateApplicationResource extends Resource
                             ->disk('public')
                             ->directory(fn (?CandidateApplication $record): string => $record ? "applications/{$record->token}" : 'applications')
                             ->visibility('public')
+                            ->fetchFileInformation(false)
                             ->downloadable()
                             ->formatStateUsing(fn ($state, ?CandidateApplication $record): ?string => self::documentPath($record, $state))
                             ->default(fn (?CandidateApplication $record): ?string => self::documentPath($record, $record?->documents['driver_license'] ?? null)),
@@ -111,6 +113,7 @@ class CandidateApplicationResource extends Resource
                             ->disk('public')
                             ->directory(fn (?CandidateApplication $record): string => $record ? "applications/{$record->token}" : 'applications')
                             ->visibility('public')
+                            ->fetchFileInformation(false)
                             ->downloadable()
                             ->formatStateUsing(fn ($state, ?CandidateApplication $record): ?string => self::documentPath($record, $state))
                             ->default(fn (?CandidateApplication $record): ?string => self::documentPath($record, $record?->documents['tvde_certificate'] ?? null)),
@@ -119,6 +122,7 @@ class CandidateApplicationResource extends Resource
                             ->disk('public')
                             ->directory(fn (?CandidateApplication $record): string => $record ? "applications/{$record->token}" : 'applications')
                             ->visibility('public')
+                            ->fetchFileInformation(false)
                             ->downloadable()
                             ->formatStateUsing(fn ($state, ?CandidateApplication $record): ?string => self::documentPath($record, $state))
                             ->default(fn (?CandidateApplication $record): ?string => self::documentPath($record, $record?->documents['criminal_record'] ?? null)),
