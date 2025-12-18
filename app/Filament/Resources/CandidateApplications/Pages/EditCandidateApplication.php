@@ -91,11 +91,19 @@ class EditCandidateApplication extends EditRecord
             return null;
         }
 
-        if (str_contains($path, '/')) {
-            return $path;
+        $withDir = str_contains($path, '/') ? $path : "applications/{$this->record->token}/{$path}";
+
+        if (Storage::disk('public')->exists($withDir)) {
+            return $withDir;
         }
 
-        return "applications/{$this->record->token}/{$path}";
+        $fallback = "applications/{$this->record->token}/".basename($path);
+
+        if (Storage::disk('public')->exists($fallback)) {
+            return $fallback;
+        }
+
+        return $withDir;
     }
 
     protected function safeMimeType(string $path, ?string $fallback): ?string

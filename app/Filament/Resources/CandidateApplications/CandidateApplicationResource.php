@@ -96,32 +96,32 @@ class CandidateApplicationResource extends Resource
                             ->directory(fn (?CandidateApplication $record): string => $record ? "applications/{$record->token}" : 'applications')
                             ->visibility('public')
                             ->downloadable()
-                            ->formatStateUsing(fn ($state): ?string => self::documentPath($state))
-                            ->default(fn (?CandidateApplication $record): ?string => self::documentPath($record?->documents['document_id'] ?? null)),
+                            ->formatStateUsing(fn ($state, ?CandidateApplication $record): ?string => self::documentPath($record, $state))
+                            ->default(fn (?CandidateApplication $record): ?string => self::documentPath($record, $record?->documents['document_id'] ?? null)),
                         FileUpload::make('documents.driver_license')
                             ->label('Carta de conducao')
                             ->disk('public')
                             ->directory(fn (?CandidateApplication $record): string => $record ? "applications/{$record->token}" : 'applications')
                             ->visibility('public')
                             ->downloadable()
-                            ->formatStateUsing(fn ($state): ?string => self::documentPath($state))
-                            ->default(fn (?CandidateApplication $record): ?string => self::documentPath($record?->documents['driver_license'] ?? null)),
+                            ->formatStateUsing(fn ($state, ?CandidateApplication $record): ?string => self::documentPath($record, $state))
+                            ->default(fn (?CandidateApplication $record): ?string => self::documentPath($record, $record?->documents['driver_license'] ?? null)),
                         FileUpload::make('documents.tvde_certificate')
                             ->label('Certificado TVDE')
                             ->disk('public')
                             ->directory(fn (?CandidateApplication $record): string => $record ? "applications/{$record->token}" : 'applications')
                             ->visibility('public')
                             ->downloadable()
-                            ->formatStateUsing(fn ($state): ?string => self::documentPath($state))
-                            ->default(fn (?CandidateApplication $record): ?string => self::documentPath($record?->documents['tvde_certificate'] ?? null)),
+                            ->formatStateUsing(fn ($state, ?CandidateApplication $record): ?string => self::documentPath($record, $state))
+                            ->default(fn (?CandidateApplication $record): ?string => self::documentPath($record, $record?->documents['tvde_certificate'] ?? null)),
                         FileUpload::make('documents.criminal_record')
                             ->label('Registo criminal')
                             ->disk('public')
                             ->directory(fn (?CandidateApplication $record): string => $record ? "applications/{$record->token}" : 'applications')
                             ->visibility('public')
                             ->downloadable()
-                            ->formatStateUsing(fn ($state): ?string => self::documentPath($state))
-                            ->default(fn (?CandidateApplication $record): ?string => self::documentPath($record?->documents['criminal_record'] ?? null)),
+                            ->formatStateUsing(fn ($state, ?CandidateApplication $record): ?string => self::documentPath($record, $state))
+                            ->default(fn (?CandidateApplication $record): ?string => self::documentPath($record, $record?->documents['criminal_record'] ?? null)),
                     ]),
                 Section::make('Confirmacoes')
                     ->columns(3)
@@ -232,13 +232,13 @@ class CandidateApplicationResource extends Resource
         return '-';
     }
 
-    private static function documentPath(mixed $state): ?string
+    private static function documentPath(?CandidateApplication $record, mixed $state): ?string
     {
         if (is_array($state)) {
-            return $state['path'] ?? null;
+            return self::resolveDocumentPath($record, $state['path'] ?? null);
         }
 
-        return $state ?: null;
+        return self::resolveDocumentPath($record, $state ?: null);
     }
 
     private static function dehydrateDocument(mixed $state): ?array
@@ -264,10 +264,10 @@ class CandidateApplicationResource extends Resource
         $value = $record->documents[$key] ?? null;
 
         if (is_array($value)) {
-            $path = self::normalizeDocumentPath($record, $value['path'] ?? null);
+            $path = self::resolveDocumentPath($record, $value['path'] ?? null);
             $name = $value['name'] ?? basename((string) ($path ?? ''));
         } elseif (is_string($value) && $value !== '') {
-            $path = self::normalizeDocumentPath($record, $value);
+            $path = self::resolveDocumentPath($record, $value);
             $name = basename($value);
         } else {
             $path = null;
@@ -295,5 +295,26 @@ class CandidateApplicationResource extends Resource
         }
 
         return "applications/{$record->token}/{$path}";
+    }
+
+    private static function resolveDocumentPath(CandidateApplication $record, ?string $path): ?string
+    {
+        $normalized = self::normalizeDocumentPath($record, $path);
+
+        if ($normalized === null) {
+            return null;
+        }
+
+        if (Storage::disk('public')->exists($normalized)) {
+            return $normalized;
+        }
+
+        $fallback = "applications/{$record->token}/".basename($normalized);
+
+        if (Storage::disk('public')->exists($fallback)) {
+            return $fallback;
+        }
+
+        return $normalized;
     }
 }
