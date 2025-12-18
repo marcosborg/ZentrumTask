@@ -25,6 +25,7 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\HtmlString;
 use UnitEnum;
 
+
 class CandidateApplicationResource extends Resource
 {
     protected static ?string $model = CandidateApplication::class;
