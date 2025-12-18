@@ -97,7 +97,7 @@ class CandidateApplicationResource extends Resource
                             ->visibility('public')
                             ->downloadable()
                             ->formatStateUsing(fn ($state): ?string => self::documentPath($state))
-                            ->dehydrateStateUsing(fn ($state): ?array => self::dehydrateDocument($state)),
+                            ->default(fn (?CandidateApplication $record): ?string => self::documentPath($record?->documents['document_id'] ?? null)),
                         FileUpload::make('documents.driver_license')
                             ->label('Carta de conducao')
                             ->disk('public')
@@ -105,7 +105,7 @@ class CandidateApplicationResource extends Resource
                             ->visibility('public')
                             ->downloadable()
                             ->formatStateUsing(fn ($state): ?string => self::documentPath($state))
-                            ->dehydrateStateUsing(fn ($state): ?array => self::dehydrateDocument($state)),
+                            ->default(fn (?CandidateApplication $record): ?string => self::documentPath($record?->documents['driver_license'] ?? null)),
                         FileUpload::make('documents.tvde_certificate')
                             ->label('Certificado TVDE')
                             ->disk('public')
@@ -113,7 +113,7 @@ class CandidateApplicationResource extends Resource
                             ->visibility('public')
                             ->downloadable()
                             ->formatStateUsing(fn ($state): ?string => self::documentPath($state))
-                            ->dehydrateStateUsing(fn ($state): ?array => self::dehydrateDocument($state)),
+                            ->default(fn (?CandidateApplication $record): ?string => self::documentPath($record?->documents['tvde_certificate'] ?? null)),
                         FileUpload::make('documents.criminal_record')
                             ->label('Registo criminal')
                             ->disk('public')
@@ -121,7 +121,7 @@ class CandidateApplicationResource extends Resource
                             ->visibility('public')
                             ->downloadable()
                             ->formatStateUsing(fn ($state): ?string => self::documentPath($state))
-                            ->dehydrateStateUsing(fn ($state): ?array => self::dehydrateDocument($state)),
+                            ->default(fn (?CandidateApplication $record): ?string => self::documentPath($record?->documents['criminal_record'] ?? null)),
                     ]),
                 Section::make('Confirmacoes')
                     ->columns(3)

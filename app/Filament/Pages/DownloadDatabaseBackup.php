@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Symfony\Component\Process\Process;
+use Throwable;
 use UnitEnum;
 
 class DownloadDatabaseBackup extends Page
@@ -119,9 +120,29 @@ class DownloadDatabaseBackup extends Page
             return;
         }
 
+        if (! $this->ensureDatabaseExists($targetProfile, $importBinary)) {
+            return;
+        }
+
         $importProcess = $this->buildImportProcess($targetProfile, $importBinary);
         $importProcess->setInput($dumpContents);
-        $importProcess->run();
+        try {
+            $importProcess->run();
+        } catch (Throwable $exception) {
+            Log::error('Database import crashed', [
+                'target' => $targetMode,
+                'command' => $importProcess->getCommandLine(),
+                'exception' => $exception->getMessage(),
+            ]);
+
+            Notification::make()
+                ->danger()
+                ->title('Erro a importar base de dados')
+                ->body("A importacao foi interrompida: {$exception->getMessage()}")
+                ->send();
+
+            return;
+        }
 
         if (! $importProcess->isSuccessful()) {
             Log::error('Database import failed', [
@@ -209,6 +230,54 @@ class DownloadDatabaseBackup extends Page
         $process->setTimeout(300);
 
         return $process;
+    }
+
+    /**
+     * @param  array{
+     *     driver: string,
+     *     host: string,
+     *     port: string|int,
+     *     database: string,
+     *     username: string,
+     *     password: string|null
+     * }  $configuration
+     */
+    protected function ensureDatabaseExists(array $configuration, string $binary): bool
+    {
+        $command = [
+            $binary,
+            '--protocol=TCP',
+            '--host='.$configuration['host'],
+            '--port='.(string) $configuration['port'],
+            '--user='.$configuration['username'],
+            '--password='.(string) ($configuration['password'] ?? ''),
+            '--execute=CREATE DATABASE IF NOT EXISTS `'.$configuration['database'].'` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci',
+        ];
+
+        $process = new Process($command, base_path());
+        $process->setEnv($this->processEnvironment((string) ($configuration['password'] ?? '')));
+        $process->setTimeout(60);
+        $process->run();
+
+        if ($process->isSuccessful()) {
+            return true;
+        }
+
+        Log::error('Database create failed', [
+            'database' => $configuration['database'],
+            'command' => $process->getCommandLine(),
+            'exit_code' => $process->getExitCode(),
+            'error_output' => $process->getErrorOutput(),
+            'output' => $process->getOutput(),
+        ]);
+
+        Notification::make()
+            ->danger()
+            ->title('Erro a preparar base de dados')
+            ->body('Nao consegui preparar a base de dados de destino: '.trim($process->getErrorOutput() ?: $process->getOutput()))
+            ->send();
+
+        return false;
     }
 
     protected function toggleLabel(): string
