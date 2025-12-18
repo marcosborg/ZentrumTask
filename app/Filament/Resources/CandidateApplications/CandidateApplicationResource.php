@@ -21,7 +21,6 @@ use Filament\Schemas\Components\Text;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\HtmlString;
 use UnitEnum;
 
@@ -278,7 +277,7 @@ class CandidateApplicationResource extends Resource
             return new HtmlString("{$label}: -");
         }
 
-        $url = Storage::disk('public')->url($path);
+        $url = url('storage/'.ltrim($path, '/'));
         $link = '<a href="'.e($url).'" class="underline text-primary" target="_blank" rel="noopener">'.$name.'</a>';
 
         return new HtmlString("{$label}: {$link}");

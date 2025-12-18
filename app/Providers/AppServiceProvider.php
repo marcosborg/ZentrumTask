@@ -4,6 +4,7 @@ namespace App\Providers;
 
 use App\Http\Responses\FilamentLogoutResponse;
 use Filament\Auth\Http\Responses\Contracts\LogoutResponse;
+use Illuminate\Support\Facades\URL;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -21,6 +22,10 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        //
+        if ($this->app->bound('request')) {
+            $storageUrl = URL::to('/storage');
+
+            config()->set('filesystems.disks.public.url', $storageUrl);
+        }
     }
 }
