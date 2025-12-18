@@ -60,6 +60,7 @@ class EditCandidateApplication extends EditRecord
             }
 
             $path = is_array($state) ? ($state['path'] ?? null) : (string) $state;
+            $path = $this->normalizeDocumentPath($path);
 
             if ($path === null || $path === '') {
                 $incoming[$key] = $existing[$key] ?? null;
@@ -82,6 +83,19 @@ class EditCandidateApplication extends EditRecord
         }
 
         return $incoming;
+    }
+
+    protected function normalizeDocumentPath(?string $path): ?string
+    {
+        if ($path === null || $path === '') {
+            return null;
+        }
+
+        if (str_contains($path, '/')) {
+            return $path;
+        }
+
+        return "applications/{$this->record->token}/{$path}";
     }
 
     protected function safeMimeType(string $path, ?string $fallback): ?string

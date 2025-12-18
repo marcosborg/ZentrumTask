@@ -264,10 +264,10 @@ class CandidateApplicationResource extends Resource
         $value = $record->documents[$key] ?? null;
 
         if (is_array($value)) {
-            $path = $value['path'] ?? null;
+            $path = self::normalizeDocumentPath($record, $value['path'] ?? null);
             $name = $value['name'] ?? basename((string) ($path ?? ''));
         } elseif (is_string($value) && $value !== '') {
-            $path = $value;
+            $path = self::normalizeDocumentPath($record, $value);
             $name = basename($value);
         } else {
             $path = null;
@@ -282,5 +282,18 @@ class CandidateApplicationResource extends Resource
         $link = '<a href="'.e($url).'" class="underline text-primary" target="_blank" rel="noopener">'.$name.'</a>';
 
         return new HtmlString("{$label}: {$link}");
+    }
+
+    private static function normalizeDocumentPath(CandidateApplication $record, ?string $path): ?string
+    {
+        if ($path === null || $path === '') {
+            return null;
+        }
+
+        if (str_contains($path, '/')) {
+            return $path;
+        }
+
+        return "applications/{$record->token}/{$path}";
     }
 }
