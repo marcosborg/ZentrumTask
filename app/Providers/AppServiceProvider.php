@@ -22,10 +22,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        if ($this->app->bound('request')) {
-            $storageUrl = URL::to('/storage');
+        $storageUrl = rtrim((string) config('app.url', URL::to('/')), '/').'/storage';
 
-            config()->set('filesystems.disks.public.url', $storageUrl);
-        }
+        config()->set('filesystems.disks.public.url', $storageUrl);
     }
 }

@@ -277,7 +277,7 @@ class CandidateApplicationResource extends Resource
             return new HtmlString("{$label}: -");
         }
 
-        $url = url('storage/'.ltrim($path, '/'));
+        $url = Storage::disk('public')->url($path);
         $link = '<a href="'.e($url).'" class="underline text-primary" target="_blank" rel="noopener">'.$name.'</a>';
 
         return new HtmlString("{$label}: {$link}");
