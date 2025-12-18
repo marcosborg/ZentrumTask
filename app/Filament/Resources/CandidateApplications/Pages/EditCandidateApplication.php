@@ -22,6 +22,35 @@ class EditCandidateApplication extends EditRecord
      * @param  array<string, mixed>  $data
      * @return array<string, mixed>
      */
+    protected function mutateFormDataBeforeFill(array $data): array
+    {
+        $documents = $data['documents'] ?? [];
+        $keys = [
+            'document_id',
+            'driver_license',
+            'tvde_certificate',
+            'criminal_record',
+        ];
+
+        foreach ($keys as $key) {
+            $value = $documents[$key] ?? null;
+
+            if (is_array($value)) {
+                $documents[$key] = $this->normalizeDocumentPath($value['path'] ?? null);
+            } else {
+                $documents[$key] = $this->normalizeDocumentPath($value);
+            }
+        }
+
+        $data['documents'] = $documents;
+
+        return $data;
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
     protected function mutateFormDataBeforeSave(array $data): array
     {
         $existingDocuments = $this->record->documents ?? [];
