@@ -25,7 +25,7 @@ class ContactResource extends Resource
 
     protected static UnitEnum|string|null $navigationGroup = 'Kanban';
 
-    protected static ?string $recordTitleAttribute = 'Contact';
+    protected static ?string $recordTitleAttribute = 'name';
 
     public static function form(Schema $schema): Schema
     {

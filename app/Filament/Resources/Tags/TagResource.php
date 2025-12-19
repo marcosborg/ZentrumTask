@@ -25,7 +25,7 @@ class TagResource extends Resource
 
     protected static UnitEnum|string|null $navigationGroup = 'Kanban';
 
-    protected static ?string $recordTitleAttribute = 'Tag';
+    protected static ?string $recordTitleAttribute = 'name';
 
     public static function form(Schema $schema): Schema
     {

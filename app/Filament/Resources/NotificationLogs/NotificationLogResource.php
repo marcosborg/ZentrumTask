@@ -23,7 +23,7 @@ class NotificationLogResource extends Resource
 
     protected static UnitEnum|string|null $navigationGroup = 'Kanban';
 
-    protected static ?string $recordTitleAttribute = 'NotificationLog';
+    protected static ?string $recordTitleAttribute = 'subject';
 
     public static function shouldRegisterNavigation(): bool
     {

@@ -20,7 +20,7 @@ class TaskCommentResource extends Resource
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedChatBubbleLeftRight;
 
-    protected static ?string $recordTitleAttribute = 'TaskComment';
+    protected static ?string $recordTitleAttribute = 'id';
 
     public static function shouldRegisterNavigation(): bool
     {

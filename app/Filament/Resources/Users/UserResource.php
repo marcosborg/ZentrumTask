@@ -27,7 +27,7 @@ class UserResource extends Resource
 
     protected static ?int $navigationSort = 999;
 
-    protected static ?string $recordTitleAttribute = 'User';
+    protected static ?string $recordTitleAttribute = 'name';
 
     public static function form(Schema $schema): Schema
     {

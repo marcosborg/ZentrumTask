@@ -25,7 +25,7 @@ class StageResource extends Resource
 
     protected static UnitEnum|string|null $navigationGroup = 'Kanban';
 
-    protected static ?string $recordTitleAttribute = 'Stage';
+    protected static ?string $recordTitleAttribute = 'name';
 
     public static function form(Schema $schema): Schema
     {

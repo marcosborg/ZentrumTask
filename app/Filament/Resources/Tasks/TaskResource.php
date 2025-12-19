@@ -25,7 +25,7 @@ class TaskResource extends Resource
 
     protected static UnitEnum|string|null $navigationGroup = 'Kanban';
 
-    protected static ?string $recordTitleAttribute = 'Task';
+    protected static ?string $recordTitleAttribute = 'title';
 
     public static function form(Schema $schema): Schema
     {

@@ -23,7 +23,7 @@ class TaskAttachmentResource extends Resource
 
     protected static UnitEnum|string|null $navigationGroup = 'Kanban';
 
-    protected static ?string $recordTitleAttribute = 'TaskAttachment';
+    protected static ?string $recordTitleAttribute = 'original_name';
 
     public static function shouldRegisterNavigation(): bool
     {
