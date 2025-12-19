@@ -73,6 +73,9 @@ class CandidateApplicationResource extends Resource
                             ->maxLength(30),
                         TextInput::make('nif')
                             ->maxLength(30),
+                        TextInput::make('iban')
+                            ->label('IBAN')
+                            ->maxLength(34),
                     ]),
                 Section::make('Elegibilidade')
                     ->columns(2)
@@ -178,6 +181,7 @@ class CandidateApplicationResource extends Resource
                         Text::make(fn (CandidateApplication $record): string => 'Email: '.((string) ($record->email ?? '-'))),
                         Text::make(fn (CandidateApplication $record): string => 'Telemovel: '.((string) ($record->phone ?? '-'))),
                         Text::make(fn (CandidateApplication $record): string => 'NIF: '.((string) ($record->nif ?? '-'))),
+                        Text::make(fn (CandidateApplication $record): string => 'IBAN: '.((string) ($record->iban ?? '-'))),
                     ]),
                 Section::make('Elegibilidade')
                     ->columns(2)

@@ -28,6 +28,10 @@ class CandidateApplicationsTable
                     ->label('Telemovel')
                     ->searchable()
                     ->sortable(),
+                TextColumn::make('iban')
+                    ->searchable()
+                    ->toggleable()
+                    ->sortable(),
                 TextColumn::make('status')
                     ->badge()
                     ->colors([

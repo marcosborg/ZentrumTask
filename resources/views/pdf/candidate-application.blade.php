@@ -49,6 +49,7 @@
                         <div><div class="muted">Email</div><div class="value">{{ $record->email ?? '-' }}</div></div>
                         <div><div class="muted">Telemovel</div><div class="value">{{ $record->phone ?? '-' }}</div></div>
                         <div><div class="muted">NIF</div><div class="value">{{ $record->nif ?? '-' }}</div></div>
+                        <div><div class="muted">IBAN</div><div class="value">{{ $record->iban ?? '-' }}</div></div>
                     </div>
                 </div>
                 <div class="section">

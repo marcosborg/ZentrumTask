@@ -115,6 +115,7 @@
                     email: config.initial.email ?? '',
                     phone: config.initial.phone ?? '',
                     nif: config.initial.nif ?? '',
+                    iban: config.initial.iban ?? '',
                     vehicle_type_id: config.initial.vehicle_type_id ?? '',
                     rgpd: Boolean(config.initial.rgpd),
                     truth_declaration: Boolean(config.initial.truth_declaration),
@@ -149,7 +150,8 @@
                         (this.form.full_name || '').trim() !== '' &&
                         (this.form.email || '').trim() !== '' &&
                         (this.form.phone || '').trim() !== '' &&
-                        (this.form.nif || '').trim() !== ''
+                        (this.form.nif || '').trim() !== '' &&
+                        (this.form.iban || '').trim() !== ''
                     );
                 }
                 if (step === 'documents') {
@@ -296,7 +298,7 @@
                 <div
                     x-data="wizard({
                         token: '{{ $application->token }}',
-                        initial: @js($application),
+                        initial: @js($application->toArray()),
                         vehicleTypes: @js($vehicleTypes),
                         uploadEndpoint: '{{ $uploadEndpoint }}',
                         saveEndpoint: '{{ $saveEndpoint }}',
@@ -474,6 +476,10 @@
                                                     <label class="form-label small wizard-label">NIF</label>
                                                     <input type="text" class="form-control" x-model="form.nif">
                                                 </div>
+                                                <div class="col-md-6">
+                                                    <label class="form-label small wizard-label">IBAN</label>
+                                                    <input type="text" class="form-control" x-model="form.iban" placeholder="PT50 0000 0000 0000 0000 0000 0">
+                                                </div>
                                             </div>
                                         </div>
                                     </template>
@@ -533,6 +539,7 @@
                                                 <li class="mb-1"><span class="wizard-label">Email:</span> <span x-text="form.email"></span></li>
                                                 <li class="mb-1"><span class="wizard-label">Telemóvel:</span> <span x-text="form.phone"></span></li>
                                                 <li class="mb-1"><span class="wizard-label">NIF:</span> <span x-text="form.nif"></span></li>
+                                                <li class="mb-1"><span class="wizard-label">IBAN:</span> <span x-text="form.iban"></span></li>
                                                 <li class="mb-1"><span class="wizard-label">Viatura escolhida:</span>
                                                     <span x-text="vehicleTypes.find((t) => Number(t.id) === Number(form.vehicle_type_id)) ? `${vehicleTypes.find((t) => Number(t.id) === Number(form.vehicle_type_id)).brand} ${vehicleTypes.find((t) => Number(t.id) === Number(form.vehicle_type_id)).model}` : '-'"></span>
                                                 </li>
@@ -564,3 +571,4 @@
     </div>
 </section>
 @endsection
+

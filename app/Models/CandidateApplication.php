@@ -31,6 +31,7 @@ class CandidateApplication extends Model
         'email',
         'phone',
         'nif',
+        'iban',
         'documents',
         'rgpd',
         'truth_declaration',

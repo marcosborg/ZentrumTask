@@ -63,6 +63,7 @@ class CandidateApplicationController extends Controller
             'experience' => ['required', 'string', 'max:255'],
             'platforms' => ['required', 'array', 'min:1'],
             'platforms.*' => ['string', 'max:50'],
+            'iban' => ['required', 'string', 'max:34'],
             'vehicle_type_id' => ['required', 'exists:vehicle_types,id'],
             'rgpd' => ['accepted'],
             'truth_declaration' => ['accepted'],
@@ -201,6 +202,7 @@ class CandidateApplicationController extends Controller
                 'email' => ['required', 'email'],
                 'phone' => ['required', 'string', 'max:30'],
                 'nif' => ['required', 'string', 'max:30'],
+                'iban' => ['required', 'string', 'max:34'],
             ]),
             'legal' => $request->validate([
                 'rgpd' => ['accepted'],
