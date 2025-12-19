@@ -22,8 +22,9 @@
         .doc-card { border: 1px solid #e2e8f0; border-radius: 8px; padding: 8px 10px; background: #fff; box-shadow: inset 0 1px 0 rgba(255,255,255,0.7); }
         .doc-card h3 { margin: 0 0 4px; font-size: 12px; color: #0f172a; }
         .page-break { page-break-before: always; }
-        .doc-gallery { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; align-items: start; }
-        .doc-image { width: 50%; max-width: 100%; max-height: 420px; object-fit: contain; border: 1px solid #e5e7eb; border-radius: 8px; background: #fff; padding: 6px; }
+        .doc-gallery { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-start; }
+        .doc-item { width: 48%; }
+        .doc-image { width: 100%; max-width: 100%; max-height: 380px; object-fit: contain; border: 1px solid #e5e7eb; border-radius: 8px; background: #fff; padding: 6px; }
         .missing { color: #b91c1c; font-size: 11px; font-weight: 600; }
         .meta { color: #0ea5e9; font-size: 10px; margin-top: 2px; }
     </style>
@@ -91,7 +92,7 @@
         <h2>Documentos anexos</h2>
         <div class="doc-gallery">
             @foreach ($documents as $doc)
-                <div>
+                <div class="doc-item">
                     <h3 style="margin: 0 0 6px; font-size: 12px;">{{ $doc['label'] }}</h3>
                     @if (! $doc['exists'])
                         <div class="missing">Ficheiro nao encontrado.</div>
@@ -99,7 +100,7 @@
                         <img class="doc-image" src="{{ $doc['data_uri'] }}" alt="{{ $doc['label'] }}">
                     @else
                         <div class="muted">Conteudo incorporado.</div>
-                        <object data="{{ $doc['data_uri'] }}" type="{{ $doc['mime'] }}" style="width:100%; height:620px;">
+                        <object data="{{ $doc['data_uri'] }}" type="{{ $doc['mime'] }}" style="width:100%; height:380px;">
                             <p>Visualizacao nao suportada.</p>
                         </object>
                     @endif
