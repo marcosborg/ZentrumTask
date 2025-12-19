@@ -25,7 +25,6 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\HtmlString;
 use UnitEnum;
 
-
 class CandidateApplicationResource extends Resource
 {
     protected static ?string $model = CandidateApplication::class;
@@ -295,11 +294,17 @@ class CandidateApplicationResource extends Resource
             return null;
         }
 
-        if (str_contains($path, '/')) {
-            return $path;
+        $path = str_replace('\\', '/', $path);
+
+        if (preg_match('#applications/.+$#', $path, $matches)) {
+            return $matches[0];
         }
 
-        return "applications/{$record->token}/{$path}";
+        if (! str_contains($path, '/')) {
+            return "applications/{$record->token}/{$path}";
+        }
+
+        return "applications/{$record->token}/".basename($path);
     }
 
     private static function resolveDocumentPath(CandidateApplication $record, ?string $path): ?string
