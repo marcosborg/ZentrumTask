@@ -22,8 +22,8 @@
         .doc-card { border: 1px solid #e2e8f0; border-radius: 8px; padding: 8px 10px; background: #fff; box-shadow: inset 0 1px 0 rgba(255,255,255,0.7); }
         .doc-card h3 { margin: 0 0 4px; font-size: 12px; color: #0f172a; }
         .page-break { page-break-before: always; }
-        .doc-gallery { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
-        .doc-image { width: 50%; max-height: 620px; object-fit: contain; border: 1px solid #e5e7eb; border-radius: 8px; background: #fff; padding: 6px; }
+        .doc-gallery { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; align-items: start; }
+        .doc-image { width: 100%; max-height: 460px; object-fit: contain; border: 1px solid #e5e7eb; border-radius: 8px; background: #fff; padding: 6px; }
         .missing { color: #b91c1c; font-size: 11px; font-weight: 600; }
         .meta { color: #0ea5e9; font-size: 10px; margin-top: 2px; }
     </style>
