@@ -6,24 +6,24 @@
     <style>
         * { box-sizing: border-box; }
         body { font-family: DejaVu Sans, Arial, sans-serif; color: #0f172a; margin: 0; padding: 0; background: #f8fafc; }
-        .page { padding: 26px 30px; }
-        .card { background: #fff; border-radius: 12px; border: 1px solid #e2e8f0; box-shadow: 0 6px 18px rgba(15, 23, 42, 0.07); padding: 16px 18px; }
-        .header { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 14px; }
+        .page { padding: 22px 26px; }
+        .card { background: #fff; border-radius: 10px; border: 1px solid #e2e8f0; box-shadow: 0 4px 14px rgba(15, 23, 42, 0.06); padding: 14px 16px; }
+        .header { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 12px; }
         .logo { height: 46px; }
-        h1 { margin: 0; font-size: 22px; letter-spacing: 0.2px; color: #0f172a; }
-        h2 { margin: 0 0 8px; font-size: 14px; color: #0f172a; letter-spacing: 0.2px; }
-        .card-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; align-items: start; }
+        h1 { margin: 0; font-size: 21px; letter-spacing: 0.2px; color: #0f172a; }
+        h2 { margin: 0 0 8px; font-size: 13px; color: #0f172a; letter-spacing: 0.2px; }
+        .card-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; align-items: start; }
         .section { padding: 6px 0 0; }
-        .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px 18px; }
-        .muted { color: #64748b; font-size: 11px; margin-bottom: 1px; }
-        .value { font-weight: 700; color: #0f172a; font-size: 12px; }
-        .pill { display: inline-block; padding: 5px 10px; border-radius: 999px; font-size: 10px; background: #e0f2fe; color: #075985; font-weight: 700; }
-        .docs { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
-        .doc-card { border: 1px solid #e2e8f0; border-radius: 10px; padding: 10px 12px; background: #fff; box-shadow: inset 0 1px 0 rgba(255,255,255,0.7); }
-        .doc-card h3 { margin: 0 0 4px; font-size: 13px; color: #0f172a; }
+        .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px 14px; }
+        .muted { color: #64748b; font-size: 10px; margin-bottom: 1px; }
+        .value { font-weight: 700; color: #0f172a; font-size: 11px; }
+        .pill { display: inline-block; padding: 4px 9px; border-radius: 999px; font-size: 9px; background: #e0f2fe; color: #075985; font-weight: 700; }
+        .docs { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+        .doc-card { border: 1px solid #e2e8f0; border-radius: 8px; padding: 8px 10px; background: #fff; box-shadow: inset 0 1px 0 rgba(255,255,255,0.7); }
+        .doc-card h3 { margin: 0 0 4px; font-size: 12px; color: #0f172a; }
         .page-break { page-break-before: always; }
         .doc-gallery { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
-        .doc-image { width: 100%; max-height: 620px; object-fit: contain; border: 1px solid #e5e7eb; border-radius: 8px; background: #fff; padding: 6px; }
+        .doc-image { width: 50%; max-height: 620px; object-fit: contain; border: 1px solid #e5e7eb; border-radius: 8px; background: #fff; padding: 6px; }
         .missing { color: #b91c1c; font-size: 11px; font-weight: 600; }
         .meta { color: #0ea5e9; font-size: 10px; margin-top: 2px; }
     </style>
