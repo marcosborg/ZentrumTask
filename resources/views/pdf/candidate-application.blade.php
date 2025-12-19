@@ -22,7 +22,8 @@
         .doc-card { border: 1px solid #e2e8f0; border-radius: 10px; padding: 10px 12px; background: #fff; box-shadow: inset 0 1px 0 rgba(255,255,255,0.7); }
         .doc-card h3 { margin: 0 0 4px; font-size: 13px; color: #0f172a; }
         .page-break { page-break-before: always; }
-        .doc-image { width: 100%; max-height: 820px; object-fit: contain; border: 1px solid #e5e7eb; border-radius: 8px; }
+        .doc-gallery { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+        .doc-image { width: 100%; max-height: 620px; object-fit: contain; border: 1px solid #e5e7eb; border-radius: 8px; background: #fff; padding: 6px; }
         .missing { color: #b91c1c; font-size: 11px; font-weight: 600; }
         .meta { color: #0ea5e9; font-size: 10px; margin-top: 2px; }
     </style>
@@ -86,20 +87,25 @@
         </div>
     </div>
 
-    @foreach ($documents as $doc)
-        <div class="page page-break">
-            <h2>{{ $doc['label'] }}</h2>
-            @if (! $doc['exists'])
-                <div class="missing">Ficheiro nao encontrado.</div>
-            @elseif ($doc['is_image'])
-                <img class="doc-image" src="{{ $doc['data_uri'] }}" alt="{{ $doc['label'] }}">
-            @else
-                <div class="muted">Conteudo incorporado.</div>
-                <object data="{{ $doc['data_uri'] }}" type="{{ $doc['mime'] }}" style="width:100%; height:900px;">
-                    <p>Visualizacao nao suportada.</p>
-                </object>
-            @endif
+    <div class="page page-break">
+        <h2>Documentos anexos</h2>
+        <div class="doc-gallery">
+            @foreach ($documents as $doc)
+                <div>
+                    <h3 style="margin: 0 0 6px; font-size: 12px;">{{ $doc['label'] }}</h3>
+                    @if (! $doc['exists'])
+                        <div class="missing">Ficheiro nao encontrado.</div>
+                    @elseif ($doc['is_image'])
+                        <img class="doc-image" src="{{ $doc['data_uri'] }}" alt="{{ $doc['label'] }}">
+                    @else
+                        <div class="muted">Conteudo incorporado.</div>
+                        <object data="{{ $doc['data_uri'] }}" type="{{ $doc['mime'] }}" style="width:100%; height:620px;">
+                            <p>Visualizacao nao suportada.</p>
+                        </object>
+                    @endif
+                </div>
+            @endforeach
         </div>
-    @endforeach
+    </div>
 </body>
 </html>
