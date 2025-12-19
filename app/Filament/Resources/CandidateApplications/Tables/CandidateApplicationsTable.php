@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\CandidateApplications\Tables;
 
 use Filament\Actions\DeleteAction;
+use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
 use Filament\Actions\ViewAction;
 use Filament\Tables\Columns\TextColumn;
@@ -64,6 +65,8 @@ class CandidateApplicationsTable
                 EditAction::make(),
                 DeleteAction::make(),
             ])
-            ->bulkActions([]);
+            ->bulkActions([
+                DeleteBulkAction::make(),
+            ]);
     }
 }

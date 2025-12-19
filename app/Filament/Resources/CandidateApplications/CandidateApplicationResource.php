@@ -307,7 +307,7 @@ class CandidateApplicationResource extends Resource
         return "applications/{$record->token}/".basename($path);
     }
 
-    private static function resolveDocumentPath(CandidateApplication $record, ?string $path): ?string
+    public static function resolveDocumentPath(CandidateApplication $record, ?string $path): ?string
     {
         $normalized = self::normalizeDocumentPath($record, $path);
 
