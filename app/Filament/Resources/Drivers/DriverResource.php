@@ -91,6 +91,16 @@ class DriverResource extends Resource
                             ->preserveFilenames()
                             ->columnSpan(2),
                     ]),
+                Section::make('Empresa')
+                    ->columns(2)
+                    ->components([
+                        Select::make('company_id')
+                            ->label('Empresa')
+                            ->relationship('company', 'name')
+                            ->searchable()
+                            ->placeholder('Sem empresa')
+                            ->native(false),
+                    ]),
                 Section::make('Documento de Identificacao')
                     ->columns(2)
                     ->components([

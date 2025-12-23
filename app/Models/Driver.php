@@ -14,6 +14,7 @@ class Driver extends Model
 
     protected $fillable = [
         'candidate_application_id',
+        'company_id',
         'name',
         'email',
         'phone',
@@ -57,6 +58,11 @@ class Driver extends Model
     public function candidateApplication(): \Illuminate\Database\Eloquent\Relations\BelongsTo
     {
         return $this->belongsTo(CandidateApplication::class);
+    }
+
+    public function company(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    {
+        return $this->belongsTo(Company::class);
     }
 
     protected function hasActiveBillingProfile(): Attribute
