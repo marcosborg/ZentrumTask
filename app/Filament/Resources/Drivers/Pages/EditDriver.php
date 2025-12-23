@@ -74,7 +74,9 @@ class EditDriver extends EditRecord
 
                     $html = $this->renderTemplate($template);
 
-                    $pdf = Pdf::loadHTML($html)->setPaper('a4');
+                    $pdf = Pdf::loadHTML($html)
+                        ->setPaper('a4')
+                        ->setOption('isRemoteEnabled', true);
 
                     return response()->streamDownload(
                         fn () => print ($pdf->output()),
