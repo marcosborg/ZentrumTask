@@ -13,6 +13,7 @@ class Driver extends Model
     use HasFactory;
 
     protected $fillable = [
+        'candidate_application_id',
         'name',
         'email',
         'phone',
@@ -38,6 +39,8 @@ class Driver extends Model
         'deposit_amount',
         'deposit_paid_at',
         'deposit_payment_method',
+        'contract_file',
+        'other_documents',
         'notes',
     ];
 
@@ -49,6 +52,11 @@ class Driver extends Model
     public function weekStatements(): HasMany
     {
         return $this->hasMany(DriverWeekStatement::class);
+    }
+
+    public function candidateApplication(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    {
+        return $this->belongsTo(CandidateApplication::class);
     }
 
     protected function hasActiveBillingProfile(): Attribute
@@ -79,6 +87,7 @@ class Driver extends Model
             'deposit_paid_at' => 'date',
             'tvde_platforms' => 'array',
             'deposit_amount' => 'decimal:2',
+            'other_documents' => 'array',
         ];
     }
 }

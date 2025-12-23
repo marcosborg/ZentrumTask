@@ -1720,13 +1720,16 @@ namespace App\Models {
 	 * @property string|null $phone
 	 * @property string|null $email
 	 * @property string $name
+	 * @property mixed $candidate_application_id
 	 * @property int $id
 	 * @property-read mixed $has_active_billing_profile
 	 * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\DriverBillingProfile> $billingProfiles
 	 * @property-read int|null $billingProfiles_count
 	 * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\DriverWeekStatement> $weekStatements
 	 * @property-read int|null $weekStatements_count
+	 * @property-read \App\Models\CandidateApplication $candidateApplication
 	 * @method static \Illuminate\Database\Eloquent\Builder<Driver>|Driver whereId($value)
+	 * @method static \Illuminate\Database\Eloquent\Builder<Driver>|Driver whereCandidateApplicationId($value)
 	 * @method static \Illuminate\Database\Eloquent\Builder<Driver>|Driver whereName($value)
 	 * @method static \Illuminate\Database\Eloquent\Builder<Driver>|Driver whereEmail($value)
 	 * @method static \Illuminate\Database\Eloquent\Builder<Driver>|Driver wherePhone($value)

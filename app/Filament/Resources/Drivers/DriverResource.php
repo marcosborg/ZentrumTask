@@ -10,6 +10,8 @@ use App\Models\Driver;
 use BackedEnum;
 use Filament\Forms\Components\CheckboxList;
 use Filament\Forms\Components\DatePicker;
+use Filament\Forms\Components\FileUpload;
+use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Resources\Resource;
@@ -65,6 +67,29 @@ class DriverResource extends Resource
                         Textarea::make('notes')
                             ->label('Notas')
                             ->columnSpanFull(),
+                    ]),
+                Section::make('Documentos do Contrato')
+                    ->columns(2)
+                    ->components([
+                        FileUpload::make('contract_file')
+                            ->label('Contrato digitalizado')
+                            ->disk('public')
+                            ->directory(fn ($record): string => $record ? "drivers/{$record->id}/contract" : 'drivers/contracts')
+                            ->visibility('public')
+                            ->downloadable()
+                            ->openable()
+                            ->preserveFilenames(),
+                        FileUpload::make('other_documents')
+                            ->label('Outros documentos')
+                            ->disk('public')
+                            ->directory(fn ($record): string => $record ? "drivers/{$record->id}/documents" : 'drivers/documents')
+                            ->visibility('public')
+                            ->multiple()
+                            ->downloadable()
+                            ->openable()
+                            ->reorderable()
+                            ->preserveFilenames()
+                            ->columnSpan(2),
                     ]),
                 Section::make('Documento de Identificacao')
                     ->columns(2)
@@ -143,6 +168,16 @@ class DriverResource extends Resource
                             ->label('Metodo de pagamento')
                             ->maxLength(255),
                     ]),
+                Section::make('Candidatura')
+                    ->columns(2)
+                    ->components([
+                        Select::make('candidate_application_id')
+                            ->label('Candidatura')
+                            ->relationship('candidateApplication', 'full_name')
+                            ->searchable()
+                            ->placeholder('Sem candidatura')
+                            ->native(false),
+                    ]),
             ]);
     }
 
@@ -156,6 +191,7 @@ class DriverResource extends Resource
         return [
             RelationManagers\BillingProfilesRelationManager::class,
             RelationManagers\WeekStatementsRelationManager::class,
+            RelationManagers\CandidateApplicationRelationManager::class,
         ];
     }
 

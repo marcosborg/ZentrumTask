@@ -15,7 +15,6 @@ use Filament\Schemas\Schema;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
-use Illuminate\Database\Eloquent\Model;
 
 class BillingProfilesRelationManager extends RelationManager
 {
@@ -146,8 +145,7 @@ class BillingProfilesRelationManager extends RelationManager
             ])
             ->headerActions([
                 Actions\CreateAction::make()
-                    ->visible(fn (): bool => $this->getOwnerRecord()?->billingProfiles()->doesntExist() ?? true)
-                    ->after(fn (Model $record) => $this->refreshTable()),
+                    ->visible(fn (): bool => $this->getOwnerRecord()?->billingProfiles()->doesntExist() ?? true),
             ])
             ->actions([
                 Actions\EditAction::make(),

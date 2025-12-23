@@ -1,0 +1,23 @@
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    public function up(): void
+    {
+        Schema::table('drivers', function (Blueprint $table): void {
+            $table->string('contract_file')->nullable()->after('deposit_payment_method');
+            $table->json('other_documents')->nullable()->after('contract_file');
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::table('drivers', function (Blueprint $table): void {
+            $table->dropColumn(['contract_file', 'other_documents']);
+        });
+    }
+};

@@ -48,6 +48,8 @@ class ViewCandidateApplication extends ViewRecord
                         'email' => $this->record->email,
                         'phone' => $this->record->phone,
                         'nif' => $this->record->nif,
+                        'iban' => $this->record->iban,
+                        'candidate_application_id' => $this->record->id,
                         'notes' => 'Criado a partir da candidatura '.$this->record->id,
                     ]);
 
