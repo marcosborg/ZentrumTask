@@ -126,8 +126,11 @@ class EditDriver extends EditRecord
         $data['candidateApplication'] = $candidateData;
         $content = $template->content;
 
-        $rendered = preg_replace_callback('/{{\s*([\w\.]+)\s*}}/', function (array $matches) use ($data): string {
+        $rendered = preg_replace_callback('/{{([^}]+)}}/', function (array $matches) use ($data): string {
             $key = $matches[1];
+            $key = str_replace("\u{00A0}", ' ', $key);
+            $key = trim($key);
+
             $value = data_get($data, $key, '');
 
             return e((string) $value);
