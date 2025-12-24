@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\Drivers\Pages;
 
 use App\Filament\Resources\Drivers\DriverResource;
+use App\Models\Company;
 use App\Models\DocumentTemplate;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Filament\Actions\Action;
@@ -119,7 +120,8 @@ class EditDriver extends EditRecord
             $candidateData[$field] = $this->formatDate($driver->candidateApplication?->{$field});
         }
 
-        $companyData = $driver->company?->toArray() ?? [];
+        $company = $driver->company ?: Company::query()->first();
+        $companyData = $company?->toArray() ?? [];
 
         $data['company'] = $companyData;
         $data['candidate_application'] = $candidateData;
