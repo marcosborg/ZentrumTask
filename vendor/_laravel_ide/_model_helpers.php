@@ -2025,8 +2025,10 @@ namespace App\Models {
      * @property \Illuminate\Support\Carbon|null $created_at
      * @property string $content
      * @property string $name
+     * @property string|null $internal_name
      * @property int $id
      * @method static \Illuminate\Database\Eloquent\Builder<DocumentTemplate>|DocumentTemplate whereId($value)
+     * @method static \Illuminate\Database\Eloquent\Builder<DocumentTemplate>|DocumentTemplate whereInternalName($value)
      * @method static \Illuminate\Database\Eloquent\Builder<DocumentTemplate>|DocumentTemplate whereName($value)
      * @method static \Illuminate\Database\Eloquent\Builder<DocumentTemplate>|DocumentTemplate whereContent($value)
      * @method static \Illuminate\Database\Eloquent\Builder<DocumentTemplate>|DocumentTemplate whereCreatedAt($value)
@@ -2360,6 +2362,8 @@ namespace App\Models {
      * @property \Illuminate\Support\Carbon|null $date_of_birth
      * @property string|null $license_number
      * @property string|null $iban
+     * @property string|null $niss_number
+     * @property string|null $sns_number
      * @property string|null $nif
      * @property string|null $phone
      * @property string|null $email
@@ -2381,6 +2385,8 @@ namespace App\Models {
      * @method static \Illuminate\Database\Eloquent\Builder<Driver>|Driver whereEmail($value)
      * @method static \Illuminate\Database\Eloquent\Builder<Driver>|Driver wherePhone($value)
      * @method static \Illuminate\Database\Eloquent\Builder<Driver>|Driver whereNif($value)
+     * @method static \Illuminate\Database\Eloquent\Builder<Driver>|Driver whereSnsNumber($value)
+     * @method static \Illuminate\Database\Eloquent\Builder<Driver>|Driver whereNissNumber($value)
      * @method static \Illuminate\Database\Eloquent\Builder<Driver>|Driver whereIban($value)
      * @method static \Illuminate\Database\Eloquent\Builder<Driver>|Driver whereLicenseNumber($value)
      * @method static \Illuminate\Database\Eloquent\Builder<Driver>|Driver whereDateOfBirth($value)
