@@ -85,6 +85,8 @@ class DocumentTemplateResource extends Resource
                                             'identity_document_expires_at',
                                             'emergency_contact_name',
                                             'emergency_contact_phone',
+                                            'sns_number',
+                                            'niss_number',
                                             'license_issued_at',
                                             'license_expires_at',
                                             'license_category',
@@ -105,13 +107,67 @@ class DocumentTemplateResource extends Resource
                                             'company.postal_code',
                                             'company.country',
                                             'company.iban',
+                                            'id',
+                                            'candidate_application.full_name',
+                                            'candidate_application.email',
+                                            'candidate_application.phone',
+                                            'candidate_application.nif',
+                                            'candidate_application.iban',
+                                            'candidate_application.experience',
+                                            'candidate_application.platforms',
                                         ];
 
                                         $items = collect($tokens)
-                                            ->map(fn (string $token): string => '<code>{{'.$token.'}}</code>')
-                                            ->implode('<br>');
+                                            ->map(function (string $token): string {
+                                                $display = '{{'.$token.'}}';
 
-                                        return '<div class="text-sm leading-5 text-gray-600 dark:text-gray-300">Copie e cole os tokens abaixo no conteudo. Campos de candidatura aninhada podem ser usados como {{candidateApplication.full_name}} se existir a ligacao. Campos de empresa usam {{company.campo}}.</div><div class="mt-2 space-y-1">'.$items.'</div>';
+                                                return '<div data-token="'.$display.'" style="cursor:pointer;padding:2px 0;"><code>'.$display.'</code></div>';
+                                            })
+                                            ->implode('');
+
+                                        $script = <<<'HTML'
+<script>
+(function() {
+    const feedback = document.getElementById('token-copy-feedback');
+    document.querySelectorAll('[data-token]').forEach(function(el) {
+        el.addEventListener('click', function() {
+            const text = el.getAttribute('data-token');
+            const done = function(msg) {
+                if (feedback) {
+                    feedback.textContent = msg;
+                    feedback.style.display = 'block';
+                    setTimeout(function() { feedback.style.display = 'none'; }, 1200);
+                }
+                el.style.color = '#2563eb';
+                setTimeout(function() { el.style.color = ''; }, 600);
+            };
+
+            if (navigator?.clipboard?.writeText) {
+                navigator.clipboard.writeText(text).then(function() {
+                    done('Token copiado: ' + text);
+                }).catch(function() {
+                    done('Falha ao copiar');
+                });
+            } else {
+                try {
+                    const t = document.createElement('textarea');
+                    t.value = text;
+                    document.body.appendChild(t);
+                    t.select();
+                    document.execCommand('copy');
+                    document.body.removeChild(t);
+                    done('Token copiado: ' + text);
+                } catch (e) {
+                    done('Falha ao copiar');
+                }
+            }
+        });
+    });
+})();
+</script>
+HTML;
+
+                                        return '<div class="text-sm leading-5 text-gray-600 dark:text-gray-300">Copie e cole os tokens abaixo no conteudo. Campos de candidatura aninhada podem ser usados como {{candidate_application.full_name}} ou {{candidateApplication.full_name}} se existir a ligacao. Campos de empresa usam {{company.campo}}.</div><div class="mt-2 space-y-1">'.$items.'<div id="token-copy-feedback" class="text-xs text-emerald-600 dark:text-emerald-400 mt-2" style="display:none;"></div></div>'.$script;
                                     }),
                             ]),
                     ]),

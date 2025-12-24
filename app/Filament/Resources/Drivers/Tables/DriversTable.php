@@ -2,8 +2,6 @@
 
 namespace App\Filament\Resources\Drivers\Tables;
 
-use App\Filament\Resources\DriverBillingProfiles\DriverBillingProfileResource;
-use Filament\Actions\Action;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
@@ -15,7 +13,7 @@ class DriversTable
 {
     public static function configure(Table $table): Table
     {
-        $configured = $table
+        return $table
             ->modifyQueryUsing(fn ($query) => $query->withExists([
                 'billingProfiles as has_active_billing_profile' => fn ($q) => $q->active(),
             ]))
@@ -52,20 +50,6 @@ class DriversTable
             ])
             ->recordActions([
                 EditAction::make(),
-                Action::make('billing_profiles')
-                    ->label('Perfis de faturação')
-                    ->color('info')
-                    ->url(fn ($record) => DriverBillingProfileResource::getUrl('index', [
-                        'tableFilters[driver_id][value]' => $record->id,
-                    ]))
-                    ->openUrlInNewTab(),
-                Action::make('new_billing_profile')
-                    ->label('Novo perfil')
-                    ->color('success')
-                    ->url(fn ($record) => DriverBillingProfileResource::getUrl('create', [
-                        'driver_id' => $record->id,
-                    ]))
-                    ->openUrlInNewTab(),
             ])
             ->toolbarActions([
                 BulkActionGroup::make([
@@ -73,7 +57,5 @@ class DriversTable
                 ]),
             ])
             ->defaultSort('name');
-
-        return $configured;
     }
 }

@@ -19,6 +19,8 @@ class Driver extends Model
         'email',
         'phone',
         'nif',
+        'sns_number',
+        'niss_number',
         'iban',
         'license_number',
         'date_of_birth',

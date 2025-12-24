@@ -112,6 +112,12 @@ class DriverResource extends Resource
                             ->maxLength(255),
                         DatePicker::make('identity_document_expires_at')
                             ->label('Validade do documento'),
+                        TextInput::make('sns_number')
+                            ->label('Numero SNS')
+                            ->maxLength(50),
+                        TextInput::make('niss_number')
+                            ->label('Numero NISS')
+                            ->maxLength(50),
                     ]),
                 Section::make('Carta de Conducao')
                     ->columns(2)

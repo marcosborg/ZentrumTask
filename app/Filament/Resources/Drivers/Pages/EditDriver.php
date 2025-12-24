@@ -90,6 +90,37 @@ class EditDriver extends EditRecord
     {
         $driver = $this->record->loadMissing('company', 'candidateApplication');
         $data = $driver->toArray();
+
+        $driverDateFields = [
+            'date_of_birth',
+            'identity_document_expires_at',
+            'license_issued_at',
+            'license_expires_at',
+            'tvde_certificate_expires_at',
+            'deposit_paid_at',
+            'created_at',
+            'updated_at',
+        ];
+
+        foreach ($driverDateFields as $field) {
+            $data[$field] = $this->formatDate($driver->{$field});
+        }
+
+        $candidateData = $driver->candidateApplication?->toArray() ?? [];
+
+        $candidateDateFields = [
+            'submitted_at',
+            'last_saved_at',
+            'rental_terms_accepted_at',
+            'legal_confirmed_at',
+        ];
+
+        foreach ($candidateDateFields as $field) {
+            $candidateData[$field] = $this->formatDate($driver->candidateApplication?->{$field});
+        }
+
+        $data['candidate_application'] = $candidateData;
+        $data['candidateApplication'] = $candidateData;
         $content = $template->content;
 
         $rendered = preg_replace_callback('/{{\s*([\w\.]+)\s*}}/', function (array $matches) use ($data): string {
@@ -125,7 +156,20 @@ class EditDriver extends EditRecord
     <h1>{$title}</h1>
     {$rendered}
 </body>
-</html>
+    </html>
 HTML;
+    }
+
+    private function formatDate($value): ?string
+    {
+        if (! $value) {
+            return null;
+        }
+
+        try {
+            return \Illuminate\Support\Carbon::parse($value)->format('d-m-Y');
+        } catch (\Throwable $e) {
+            return (string) $value;
+        }
     }
 }
