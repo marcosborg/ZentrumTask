@@ -119,6 +119,9 @@ class EditDriver extends EditRecord
             $candidateData[$field] = $this->formatDate($driver->candidateApplication?->{$field});
         }
 
+        $companyData = $driver->company?->toArray() ?? [];
+
+        $data['company'] = $companyData;
         $data['candidate_application'] = $candidateData;
         $data['candidateApplication'] = $candidateData;
         $content = $template->content;
