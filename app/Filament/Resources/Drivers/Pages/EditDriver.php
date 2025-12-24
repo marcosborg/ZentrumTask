@@ -129,6 +129,8 @@ class EditDriver extends EditRecord
         $rendered = preg_replace_callback('/{{\s*(.+?)\s*}}/s', function (array $matches) use ($data): string {
             $key = $matches[1];
             $key = str_replace(["\u{00A0}", "\n", "\r"], ' ', $key);
+            $key = strip_tags($key);
+            $key = html_entity_decode($key, ENT_QUOTES | ENT_HTML5);
             $key = trim(preg_replace('/\s+/', ' ', $key));
 
             $value = data_get($data, $key, '');
