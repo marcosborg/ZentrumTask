@@ -37,11 +37,13 @@ class CandidateApplicationsTable
                     ->colors([
                         'success' => 'submitted',
                         'warning' => 'incomplete',
+                        'info' => 'converted',
                         'gray' => 'draft',
                     ])
                     ->formatStateUsing(fn (string $state): string => match ($state) {
                         'submitted' => 'Submetida',
                         'incomplete' => 'Incompleta',
+                        'converted' => 'Convertida',
                         default => 'Rascunho',
                     }),
                 TextColumn::make('current_step')
@@ -62,6 +64,7 @@ class CandidateApplicationsTable
                         'submitted' => 'Submetida',
                         'incomplete' => 'Incompleta',
                         'draft' => 'Rascunho',
+                        'converted' => 'Convertida',
                     ]),
             ])
             ->recordActions([

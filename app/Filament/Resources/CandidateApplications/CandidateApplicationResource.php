@@ -49,6 +49,7 @@ class CandidateApplicationResource extends Resource
                                 'draft' => 'Rascunho',
                                 'incomplete' => 'Incompleta',
                                 'submitted' => 'Submetida',
+                                'converted' => 'Convertida',
                             ])
                             ->required(),
                         TextInput::make('current_step')
@@ -160,11 +161,13 @@ class CandidateApplicationResource extends Resource
                         Text::make(fn (CandidateApplication $record): string => 'Estado: '.match ($record->status) {
                             'submitted' => 'Submetida',
                             'incomplete' => 'Incompleta',
+                            'converted' => 'Convertida',
                             default => 'Rascunho',
                         })
                             ->color(fn (CandidateApplication $record): string => match ($record->status) {
                                 'submitted' => 'success',
                                 'incomplete' => 'warning',
+                                'converted' => 'info',
                                 default => 'gray',
                             })
                             ->weight('semibold'),

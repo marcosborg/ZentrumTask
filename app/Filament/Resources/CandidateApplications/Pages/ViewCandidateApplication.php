@@ -7,9 +7,11 @@ use App\Filament\Resources\Drivers\DriverResource;
 use App\Models\Driver;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Filament\Actions\Action;
+use Filament\Forms\Components\Select;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ViewRecord;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 
 class ViewCandidateApplication extends ViewRecord
@@ -43,15 +45,23 @@ class ViewCandidateApplication extends ViewRecord
                 ->icon('heroicon-o-user-plus')
                 ->visible(fn (): bool => $this->record?->status === 'submitted')
                 ->action(function (): void {
-                    $driver = Driver::create([
-                        'name' => $this->record->full_name,
-                        'email' => $this->record->email,
-                        'phone' => $this->record->phone,
-                        'nif' => $this->record->nif,
-                        'iban' => $this->record->iban,
-                        'candidate_application_id' => $this->record->id,
-                        'notes' => 'Criado a partir da candidatura '.$this->record->id,
-                    ]);
+                    $driver = DB::transaction(function (): Driver {
+                        $driver = Driver::create([
+                            'name' => $this->record->full_name,
+                            'email' => $this->record->email,
+                            'phone' => $this->record->phone,
+                            'nif' => $this->record->nif,
+                            'iban' => $this->record->iban,
+                            'candidate_application_id' => $this->record->id,
+                            'notes' => 'Criado a partir da candidatura '.$this->record->id,
+                        ]);
+
+                        $this->record->update([
+                            'status' => 'converted',
+                        ]);
+
+                        return $driver;
+                    });
 
                     Notification::make()
                         ->success()
@@ -60,6 +70,35 @@ class ViewCandidateApplication extends ViewRecord
                         ->send();
 
                     $this->redirect(DriverResource::getUrl('edit', ['record' => $driver]));
+                }),
+            Action::make('updateStatus')
+                ->label('Alterar estado')
+                ->icon('heroicon-o-pencil-square')
+                ->form([
+                    Select::make('status')
+                        ->label('Estado')
+                        ->options([
+                            'draft' => 'Rascunho',
+                            'incomplete' => 'Incompleta',
+                            'submitted' => 'Submetida',
+                            'converted' => 'Convertida',
+                        ])
+                        ->required(),
+                ])
+                ->fillForm(fn (): array => [
+                    'status' => $this->record?->status,
+                ])
+                ->action(function (array $data): void {
+                    $this->record->update([
+                        'status' => $data['status'],
+                    ]);
+
+                    $this->record->refresh();
+
+                    Notification::make()
+                        ->success()
+                        ->title('Estado atualizado')
+                        ->send();
                 }),
         ];
     }
