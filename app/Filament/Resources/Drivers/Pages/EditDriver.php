@@ -5,6 +5,7 @@ namespace App\Filament\Resources\Drivers\Pages;
 use App\Filament\Resources\Drivers\DriverResource;
 use App\Models\Company;
 use App\Models\DocumentTemplate;
+use App\Models\VehicleAllocation;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Filament\Actions\Action;
 use Filament\Actions\DeleteAction;
@@ -120,12 +121,48 @@ class EditDriver extends EditRecord
             $candidateData[$field] = $this->formatDate($driver->candidateApplication?->{$field});
         }
 
+        $allocation = VehicleAllocation::query()
+            ->with('vehicle')
+            ->where('driver_id', $driver->id)
+            ->where('status', 'active')
+            ->whereNull('ends_at')
+            ->latest('starts_at')
+            ->first();
+
+        $vehicleData = $allocation?->vehicle?->toArray() ?? [];
+
+        $vehicleDateFields = [
+            'acquisition_date',
+            'created_at',
+            'updated_at',
+        ];
+
+        foreach ($vehicleDateFields as $field) {
+            $vehicleData[$field] = $this->formatDate($vehicleData[$field] ?? null);
+        }
+
+        $allocationData = $allocation?->toArray() ?? [];
+
+        $allocationDateFields = [
+            'starts_at',
+            'ends_at',
+            'created_at',
+            'updated_at',
+        ];
+
+        foreach ($allocationDateFields as $field) {
+            $allocationData[$field] = $this->formatDate($allocationData[$field] ?? null);
+        }
+
         $company = $driver->company ?: Company::query()->first();
         $companyData = $company?->toArray() ?? [];
 
         $data['company'] = $companyData;
         $data['candidate_application'] = $candidateData;
         $data['candidateApplication'] = $candidateData;
+        $data['vehicle'] = $vehicleData;
+        $data['vehicle_allocation'] = $allocationData;
+        $data['vehicleAllocation'] = $allocationData;
         $content = $template->content;
 
         $rendered = preg_replace_callback('/{{\s*(.+?)\s*}}/s', function (array $matches) use ($data): string {
