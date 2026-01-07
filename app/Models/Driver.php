@@ -14,6 +14,8 @@ class Driver extends Model
 
     protected $fillable = [
         'candidate_application_id',
+        'bolt_driver_uuid',
+        'uber_driver_uuid',
         'company_id',
         'name',
         'email',

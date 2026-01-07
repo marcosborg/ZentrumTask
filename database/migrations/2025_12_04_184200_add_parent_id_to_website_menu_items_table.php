@@ -13,12 +13,17 @@ return new class extends Migration
     {
         Schema::table('website_menu_items', function (Blueprint $table) {
             $table->string('url')->nullable()->change();
-            $table->foreignId('parent_id')
-                ->nullable()
-                ->after('url')
-                ->constrained('website_menu_items')
-                ->cascadeOnDelete();
         });
+
+        if (! Schema::hasColumn('website_menu_items', 'parent_id')) {
+            Schema::table('website_menu_items', function (Blueprint $table) {
+                $table->foreignId('parent_id')
+                    ->nullable()
+                    ->after('url')
+                    ->constrained('website_menu_items')
+                    ->cascadeOnDelete();
+            });
+        }
     }
 
     /**
@@ -26,8 +31,13 @@ return new class extends Migration
      */
     public function down(): void
     {
+        if (Schema::hasColumn('website_menu_items', 'parent_id')) {
+            Schema::table('website_menu_items', function (Blueprint $table) {
+                $table->dropConstrainedForeignId('parent_id');
+            });
+        }
+
         Schema::table('website_menu_items', function (Blueprint $table) {
-            $table->dropConstrainedForeignId('parent_id');
             $table->string('url')->nullable(false)->change();
         });
     }
