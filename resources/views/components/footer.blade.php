@@ -1,7 +1,7 @@
 ﻿<footer class="footer-section mt-5 pt-5 pb-4">
   <div class="container">
     <div class="row g-4 align-items-start">
-      <div class="col-md-6">
+      <div class="col-md-4">
         <div class="d-flex align-items-center gap-2 mb-3">
           <img src="/website/assets/logo.png" alt="Zentrum TVDE" class="footer-logo" />
         </div>
@@ -11,7 +11,7 @@
         <div class="footer-legal text-light-subtle">&copy; 2025 Zentrum TVDE. Todos os direitos reservados.<br /><a href="https://zentrum-tvde.com/cms/7/politica-de-privacidade" class="text-white">Politica de Privacidade</a> &middot; <a href="https://zentrum-tvde.com/cms/6/termos-e-condicoes-de-utilizacao" class="text-white">Termos e Condicoes</a></div>
       </div>
 
-      <div class="col-md-6">
+      <div class="col-md-4">
         @php
             $footerMenu = \Illuminate\Support\Facades\Schema::hasTable('website_menu_items')
                 ? \App\Models\WebsiteMenuItem::query()
@@ -50,6 +50,21 @@
             <li><a href="#contactos">Contactos</a></li>
           @endforelse
         </ul>
+      </div>
+      <div class="col-md-4 text-md-end">
+        <a
+          href="https://www.livroreclamacoes.pt/Inicio/"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="d-inline-block"
+        >
+          <img
+            src="/website/assets/livro-reclamacoes.png"
+            alt="Livro de reclamacoes"
+            class="img-fluid"
+            style="max-width: 200px;"
+          />
+        </a>
       </div>
     </div>
   </div>
