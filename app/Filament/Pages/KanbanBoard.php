@@ -57,6 +57,8 @@ class KanbanBoard extends Page
         'due_at' => null,
         'external_reference' => null,
         'meta_raw' => null,
+        'meta_badge_key' => '',
+        'meta_badge_value' => '',
         'tags' => [],
     ];
 
@@ -193,6 +195,8 @@ class KanbanBoard extends Page
             'due_at' => null,
             'external_reference' => null,
             'meta_raw' => null,
+            'meta_badge_key' => '',
+            'meta_badge_value' => '',
             'tags' => [],
         ];
         $this->activeTaskId = null;
@@ -245,8 +249,45 @@ class KanbanBoard extends Page
             'due_at' => optional($task->due_at)?->format('Y-m-d\TH:i'),
             'external_reference' => $task->external_reference,
             'meta_raw' => $task->meta ? json_encode($task->meta, JSON_PRETTY_PRINT) : null,
+            'meta_badge_key' => '',
+            'meta_badge_value' => '',
             'tags' => $task->tags->pluck('id')->all(),
         ];
+    }
+
+    public function addMetaBadge(): void
+    {
+        $key = trim((string) ($this->taskForm['meta_badge_key'] ?? ''));
+        $value = trim((string) ($this->taskForm['meta_badge_value'] ?? ''));
+
+        if ($key === '') {
+            return;
+        }
+
+        $meta = $this->decodeMetaRaw();
+
+        if ($meta === null) {
+            return;
+        }
+
+        $meta[$key] = $value === '' ? null : $value;
+
+        $this->taskForm['meta_raw'] = $meta === [] ? null : $this->encodeMetaRaw($meta);
+        $this->taskForm['meta_badge_key'] = '';
+        $this->taskForm['meta_badge_value'] = '';
+    }
+
+    public function removeMetaBadge(string $key): void
+    {
+        $meta = $this->decodeMetaRaw();
+
+        if ($meta === null) {
+            return;
+        }
+
+        unset($meta[$key]);
+
+        $this->taskForm['meta_raw'] = $meta === [] ? null : $this->encodeMetaRaw($meta);
     }
 
     public function saveTask(): void
@@ -262,6 +303,8 @@ class KanbanBoard extends Page
             'due_at' => ['nullable', 'date'],
             'external_reference' => ['nullable', 'string', 'max:255'],
             'meta_raw' => ['nullable', 'string'],
+            'meta_badge_key' => ['nullable', 'string', 'max:60'],
+            'meta_badge_value' => ['nullable', 'string', 'max:255'],
             'tags' => ['array'],
             'tags.*' => ['integer', 'exists:tags,id'],
         ])->validate();
@@ -448,6 +491,63 @@ class KanbanBoard extends Page
                 'url' => $a->url,
                 'created_at' => optional($a->created_at)?->format('d/m H:i'),
             ])->values()->all();
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function formatMetaBadges(?array $meta): array
+    {
+        if (! is_array($meta)) {
+            return [];
+        }
+
+        $badges = [];
+
+        foreach ($meta as $key => $value) {
+            if (is_array($value)) {
+                $value = json_encode($value, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+            } elseif (is_bool($value)) {
+                $value = $value ? 'true' : 'false';
+            } elseif ($value === null) {
+                $value = 'null';
+            }
+
+            if (is_string($key)) {
+                $badges[] = trim($key.': '.$value);
+            } else {
+                $badges[] = trim((string) $value);
+            }
+        }
+
+        return array_values(array_filter($badges, fn (string $badge): bool => $badge !== ''));
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    private function decodeMetaRaw(): ?array
+    {
+        $raw = $this->taskForm['meta_raw'] ?? null;
+
+        if (! is_string($raw) || trim($raw) === '') {
+            return [];
+        }
+
+        $decoded = json_decode($raw, true);
+
+        if (! is_array($decoded)) {
+            Notification::make()->title('Meta deve ser JSON valido')->danger()->send();
+
+            return null;
+        }
+
+        return $decoded;
+    }
+
+    private function encodeMetaRaw(array $meta): string
+    {
+        return json_encode($meta, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?: '{}';
     }
 
     public function addComment(): void

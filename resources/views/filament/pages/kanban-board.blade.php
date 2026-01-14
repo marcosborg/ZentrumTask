@@ -182,6 +182,16 @@
                                         <div style="font-weight:700;">#{{ $task->id }} - {{ $task->title }}</div>
                                         <span class="kb-badge">{{ strtoupper($task->priority) }}</span>
                                     </div>
+                                    @php
+                                        $metaBadges = $this->formatMetaBadges($task->meta);
+                                    @endphp
+                                    @if ($metaBadges)
+                                        <div class="kb-row" style="gap:6px;margin-top:6px;flex-wrap:wrap;">
+                                            @foreach ($metaBadges as $badge)
+                                                <span class="kb-badge">{{ $badge }}</span>
+                                            @endforeach
+                                        </div>
+                                    @endif
                                     <div class="kb-muted" style="margin-top:4px;">
                                         @if($task->assignedTo) Responsável: {{ $task->assignedTo->name }} @endif
                                         @if($task->due_at) · Prazo: {{ $task->due_at->format('d/m H:i') }} @endif
@@ -283,10 +293,44 @@
                                 @endforeach
                             </select>
                         </label>
-                        <label style="flex:1.5;min-width:320px;display:flex;flex-direction:column;gap:4px;">
-                            <span class="kb-muted">Descrição detalhada / Meta (JSON)</span>
-                            <textarea class="kb-input" rows="4" wire:model="taskForm.meta_raw" placeholder='Texto livre ou JSON: {"custom":"valor"}'></textarea>
-                        </label>
+                        <input type="hidden" wire:model="taskForm.meta_raw">
+                        <div style="flex:1;min-width:220px;display:flex;flex-direction:column;gap:6px;">
+                            <span class="kb-muted">Badges (preview)</span>
+                            @php
+                                $metaPreview = json_decode($taskForm['meta_raw'] ?? '', true);
+                            @endphp
+                            <div class="kb-row" style="gap:6px;flex-wrap:wrap;">
+                                @if (is_array($metaPreview))
+                                    @forelse ($metaPreview as $key => $value)
+                                        @php
+                                            if (is_array($value)) {
+                                                $value = json_encode($value, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+                                            } elseif (is_bool($value)) {
+                                                $value = $value ? 'true' : 'false';
+                                            } elseif ($value === null) {
+                                                $value = 'null';
+                                            }
+
+                                            $label = is_string($key) ? $key : (string) $key;
+                                            $badgeLabel = trim($label.': '.$value);
+                                        @endphp
+                                        <span class="kb-badge" style="display:flex;gap:6px;align-items:center;">
+                                            {{ $badgeLabel }}
+                                            <button type="button" class="kb-btn" style="padding:2px 6px;font-size:10px;" wire:click="removeMetaBadge('{{ $label }}')">x</button>
+                                        </span>
+                                    @empty
+                                        <span class="kb-muted">Sem badges.</span>
+                                    @endforelse
+                                @else
+                                    <span class="kb-muted">JSON invalido.</span>
+                                @endif
+                            </div>
+                            <div class="kb-row" style="gap:6px;">
+                                <input type="text" class="kb-input" wire:model.defer="taskForm.meta_badge_key" placeholder="Chave">
+                                <input type="text" class="kb-input" wire:model.defer="taskForm.meta_badge_value" placeholder="Valor">
+                                <button type="button" class="kb-btn kb-btn-primary" wire:click="addMetaBadge">Adicionar</button>
+                            </div>
+                        </div>
                     </div>
 
                     <div style="grid-column:1/-1;display:flex;justify-content:flex-end;gap:8px;">
@@ -355,3 +399,4 @@
         @endif
     </div>
 </x-filament::page>
+
