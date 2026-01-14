@@ -44,6 +44,11 @@ class TaskResource extends Resource
         ];
     }
 
+    public static function getGloballySearchableAttributes(): array
+    {
+        return ['title', 'description', 'external_reference', 'meta'];
+    }
+
     public static function getPages(): array
     {
         return [
