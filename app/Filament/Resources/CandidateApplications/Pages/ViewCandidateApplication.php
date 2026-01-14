@@ -10,7 +10,6 @@ use Filament\Actions\Action;
 use Filament\Forms\Components\Select;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ViewRecord;
-use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 
@@ -110,7 +109,6 @@ class ViewCandidateApplication extends ViewRecord
     {
         $record = $this->record;
         $documents = $record->documents ?? [];
-        $token = $record->token;
 
         $labels = [
             'document_id' => 'Documento de identificacao',
@@ -122,39 +120,46 @@ class ViewCandidateApplication extends ViewRecord
         $resolved = [];
 
         foreach ($labels as $key => $label) {
-            $value = $documents[$key] ?? null;
-            $rawPath = is_array($value) ? ($value['path'] ?? null) : (string) $value;
-            if ($rawPath !== null && $rawPath !== '' && ! str_contains($rawPath, '/')) {
-                $rawPath = "applications/{$token}/{$rawPath}";
+            $entries = CandidateApplicationResource::normalizeDocumentItems($record, $documents[$key] ?? null);
+
+            if ($entries === []) {
+                $resolved[] = [
+                    'key' => $key,
+                    'label' => $label,
+                    'path' => null,
+                    'exists' => false,
+                    'mime' => null,
+                    'name' => null,
+                    'data_uri' => null,
+                    'is_image' => false,
+                ];
+
+                continue;
             }
 
-            $path = CandidateApplicationResource::resolveDocumentPath($record, $rawPath);
-            $exists = $path !== null && Storage::disk('public')->exists($path);
+            foreach ($entries as $entry) {
+                $path = $entry['path'] ?? null;
+                $exists = $path !== null && Storage::disk('public')->exists($path);
 
-            $mime = $exists ? (Storage::disk('public')->mimeType($path) ?: 'application/octet-stream') : null;
-            $dataUri = null;
+                $mime = $exists ? (Storage::disk('public')->mimeType($path) ?: 'application/octet-stream') : null;
+                $dataUri = null;
 
-            if ($exists) {
-                $contents = Storage::disk('public')->get($path);
-                $dataUri = 'data:'.($mime ?? 'application/octet-stream').';base64,'.base64_encode($contents);
+                if ($exists) {
+                    $contents = Storage::disk('public')->get($path);
+                    $dataUri = 'data:'.($mime ?? 'application/octet-stream').';base64,'.base64_encode($contents);
+                }
+
+                $resolved[] = [
+                    'key' => $key,
+                    'label' => $label,
+                    'path' => $path,
+                    'exists' => $exists,
+                    'mime' => $mime,
+                    'name' => $entry['name'] ?? basename((string) ($path ?? $label)),
+                    'data_uri' => $dataUri,
+                    'is_image' => is_string($mime) && str_starts_with($mime, 'image/'),
+                ];
             }
-
-            $name = match (true) {
-                is_array($value) => Arr::get($value, 'name', basename((string) ($path ?? $label))),
-                is_string($value) && $value !== '' => basename($value),
-                default => $label,
-            };
-
-            $resolved[] = [
-                'key' => $key,
-                'label' => $label,
-                'path' => $path,
-                'exists' => $exists,
-                'mime' => $mime,
-                'name' => $name,
-                'data_uri' => $dataUri,
-                'is_image' => is_string($mime) && str_starts_with($mime, 'image/'),
-            ];
         }
 
         return $resolved;

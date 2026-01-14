@@ -100,36 +100,52 @@ class CandidateApplicationResource extends Resource
                             ->directory(fn (?CandidateApplication $record): string => $record ? "applications/{$record->token}" : 'applications')
                             ->visibility('public')
                             ->fetchFileInformation(false)
+                            ->multiple()
+                            ->reorderable()
                             ->downloadable()
-                            ->formatStateUsing(fn ($state, ?CandidateApplication $record): ?string => self::documentPath($record, $state))
-                            ->default(fn (?CandidateApplication $record): ?string => self::documentPath($record, $record?->documents['document_id'] ?? null)),
+                            ->afterStateHydrated(function (FileUpload $component, $state, ?CandidateApplication $record): void {
+                                $component->state(self::documentPaths($record, $state));
+                            })
+                            ->dehydrateStateUsing(fn ($state): array => self::dehydrateDocumentList($state)),
                         FileUpload::make('documents.driver_license')
                             ->label('Carta de conducao')
                             ->disk('public')
                             ->directory(fn (?CandidateApplication $record): string => $record ? "applications/{$record->token}" : 'applications')
                             ->visibility('public')
                             ->fetchFileInformation(false)
+                            ->multiple()
+                            ->reorderable()
                             ->downloadable()
-                            ->formatStateUsing(fn ($state, ?CandidateApplication $record): ?string => self::documentPath($record, $state))
-                            ->default(fn (?CandidateApplication $record): ?string => self::documentPath($record, $record?->documents['driver_license'] ?? null)),
+                            ->afterStateHydrated(function (FileUpload $component, $state, ?CandidateApplication $record): void {
+                                $component->state(self::documentPaths($record, $state));
+                            })
+                            ->dehydrateStateUsing(fn ($state): array => self::dehydrateDocumentList($state)),
                         FileUpload::make('documents.tvde_certificate')
                             ->label('Certificado TVDE')
                             ->disk('public')
                             ->directory(fn (?CandidateApplication $record): string => $record ? "applications/{$record->token}" : 'applications')
                             ->visibility('public')
                             ->fetchFileInformation(false)
+                            ->multiple()
+                            ->reorderable()
                             ->downloadable()
-                            ->formatStateUsing(fn ($state, ?CandidateApplication $record): ?string => self::documentPath($record, $state))
-                            ->default(fn (?CandidateApplication $record): ?string => self::documentPath($record, $record?->documents['tvde_certificate'] ?? null)),
+                            ->afterStateHydrated(function (FileUpload $component, $state, ?CandidateApplication $record): void {
+                                $component->state(self::documentPaths($record, $state));
+                            })
+                            ->dehydrateStateUsing(fn ($state): array => self::dehydrateDocumentList($state)),
                         FileUpload::make('documents.criminal_record')
                             ->label('Registo criminal')
                             ->disk('public')
                             ->directory(fn (?CandidateApplication $record): string => $record ? "applications/{$record->token}" : 'applications')
                             ->visibility('public')
                             ->fetchFileInformation(false)
+                            ->multiple()
+                            ->reorderable()
                             ->downloadable()
-                            ->formatStateUsing(fn ($state, ?CandidateApplication $record): ?string => self::documentPath($record, $state))
-                            ->default(fn (?CandidateApplication $record): ?string => self::documentPath($record, $record?->documents['criminal_record'] ?? null)),
+                            ->afterStateHydrated(function (FileUpload $component, $state, ?CandidateApplication $record): void {
+                                $component->state(self::documentPaths($record, $state));
+                            })
+                            ->dehydrateStateUsing(fn ($state): array => self::dehydrateDocumentList($state)),
                     ]),
                 Section::make('Confirmacoes')
                     ->columns(3)
@@ -230,17 +246,13 @@ class CandidateApplicationResource extends Resource
 
     private static function documentName(CandidateApplication $record, string $key): string
     {
-        $value = $record->documents[$key] ?? null;
+        $entries = self::normalizeDocumentItems($record, $record->documents[$key] ?? null);
 
-        if (is_array($value)) {
-            return $value['name'] ?? basename((string) ($value['path'] ?? '')) ?: '-';
+        if ($entries === []) {
+            return '-';
         }
 
-        if (is_string($value) && $value !== '') {
-            return basename($value);
-        }
-
-        return '-';
+        return $entries[0]['name'] ?? basename($entries[0]['path']);
     }
 
     private static function documentPath(?CandidateApplication $record, mixed $state): ?string
@@ -270,29 +282,44 @@ class CandidateApplicationResource extends Resource
         ];
     }
 
-    private static function documentLink(string $label, CandidateApplication $record, string $key): HtmlString
+    /**
+     * @return array<int, array{path: string, name: string}>
+     */
+    private static function dehydrateDocumentList(mixed $state): array
     {
-        $value = $record->documents[$key] ?? null;
+        $paths = [];
 
-        if (is_array($value)) {
-            $path = self::resolveDocumentPath($record, $value['path'] ?? null);
-            $name = $value['name'] ?? basename((string) ($path ?? ''));
-        } elseif (is_string($value) && $value !== '') {
-            $path = self::resolveDocumentPath($record, $value);
-            $name = basename($value);
-        } else {
-            $path = null;
-            $name = '-';
+        foreach ((array) $state as $value) {
+            if (! is_string($value) || $value === '') {
+                continue;
+            }
+
+            $paths[] = [
+                'path' => $value,
+                'name' => basename($value),
+            ];
         }
 
-        if (! $path) {
+        return $paths;
+    }
+
+    private static function documentLink(string $label, CandidateApplication $record, string $key): HtmlString
+    {
+        $entries = self::normalizeDocumentItems($record, $record->documents[$key] ?? null);
+
+        if ($entries === []) {
             return new HtmlString("{$label}: -");
         }
 
-        $url = Storage::disk('public')->url($path);
-        $link = '<a href="'.e($url).'" class="underline text-primary" target="_blank" rel="noopener">'.$name.'</a>';
+        $links = [];
 
-        return new HtmlString("{$label}: {$link}");
+        foreach ($entries as $entry) {
+            $url = Storage::disk('public')->url($entry['path']);
+            $name = $entry['name'] ?? basename($entry['path']);
+            $links[] = '<a href="'.e($url).'" class="underline text-primary" target="_blank" rel="noopener">'.$name.'</a>';
+        }
+
+        return new HtmlString("{$label}: ".implode('<br>', $links));
     }
 
     private static function normalizeDocumentPath(CandidateApplication $record, ?string $path): ?string
@@ -333,5 +360,83 @@ class CandidateApplicationResource extends Resource
         }
 
         return $normalized;
+    }
+
+    /**
+     * @return array<int, array{path: string, name: string}>
+     */
+    public static function normalizeDocumentItems(CandidateApplication $record, mixed $value): array
+    {
+        if ($value === null || $value === '') {
+            return [];
+        }
+
+        $items = [];
+
+        if (is_array($value)) {
+            $candidates = array_is_list($value) ? $value : [$value];
+
+            foreach ($candidates as $candidate) {
+                if (is_array($candidate)) {
+                    $path = $candidate['path'] ?? null;
+                    if (! is_string($path) || $path === '') {
+                        continue;
+                    }
+
+                    $resolved = self::resolveDocumentPath($record, $path);
+                    if (! $resolved) {
+                        continue;
+                    }
+
+                    $items[] = [
+                        'path' => $resolved,
+                        'name' => $candidate['name'] ?? basename($resolved),
+                    ];
+
+                    continue;
+                }
+
+                if (is_string($candidate) && $candidate !== '') {
+                    $resolved = self::resolveDocumentPath($record, $candidate);
+                    if (! $resolved) {
+                        continue;
+                    }
+
+                    $items[] = [
+                        'path' => $resolved,
+                        'name' => basename($resolved),
+                    ];
+                }
+            }
+
+            return $items;
+        }
+
+        if (is_string($value)) {
+            $resolved = self::resolveDocumentPath($record, $value);
+
+            return $resolved
+                ? [[
+                    'path' => $resolved,
+                    'name' => basename($resolved),
+                ]]
+                : [];
+        }
+
+        return [];
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private static function documentPaths(?CandidateApplication $record, mixed $state): array
+    {
+        if (! $record) {
+            return [];
+        }
+
+        $items = self::normalizeDocumentItems($record, $state);
+
+        return array_values(array_map(fn (array $item): string => $item['path'], $items));
     }
 }

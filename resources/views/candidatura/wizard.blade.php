@@ -122,8 +122,49 @@
                     contact_authorization: Boolean(config.initial.contact_authorization),
                 };
                 this.documents = config.initial.documents ?? {};
+                this.documentFields.forEach((doc) => {
+                    this.documents[doc.field] = this.normalizeDocumentList(this.documents[doc.field]);
+                });
                 const foundStep = this.steps.findIndex((s) => s.name === (config.initial.current_step || 'welcome'));
                 this.stepIndex = foundStep >= 0 ? foundStep : 0;
+            },
+
+            normalizeDocumentList(value) {
+                if (!value) {
+                    return [];
+                }
+
+                if (Array.isArray(value)) {
+                    if (value.length === 0) {
+                        return [];
+                    }
+
+                    if (typeof value[0] === 'string') {
+                        return value.map((path) => ({
+                            path,
+                            name: (path || '').split('/').pop(),
+                        }));
+                    }
+
+                    if (typeof value[0] === 'object') {
+                        return value;
+                    }
+
+                    return [];
+                }
+
+                if (typeof value === 'string') {
+                    return [{
+                        path: value,
+                        name: (value || '').split('/').pop(),
+                    }];
+                }
+
+                if (typeof value === 'object') {
+                    return [value];
+                }
+
+                return [];
             },
 
             validateStep(step) {
@@ -155,7 +196,7 @@
                     );
                 }
                 if (step === 'documents') {
-                    return this.documentFields.every((doc) => Boolean(this.documents[doc.field]));
+                    return this.documentFields.every((doc) => Array.isArray(this.documents[doc.field]) && this.documents[doc.field].length > 0);
                 }
                 if (step === 'legal') {
                     return this.form.rgpd && this.form.truth_declaration && this.form.contact_authorization;
@@ -208,33 +249,43 @@
                 this.stepIndex -= 1;
             },
 
-            async uploadFile(event, field, fileOverride = null) {
-                const file = fileOverride ?? event?.target?.files?.[0];
-                if (!file) return;
-                const formData = new FormData();
-                formData.append('file', file);
-                formData.append('field', field);
-                formData.append('token', this.token);
-                formData.append('_token', '{{ csrf_token() }}');
-                this.saveMessage = 'A enviar ficheiro...';
-                const res = await fetch(this.uploadEndpoint, {
-                    method: 'POST',
-                    body: formData,
-                });
-                if (res.ok) {
-                    const json = await res.json();
-                    this.documents[field] = json.document;
-                    this.saveMessage = 'Ficheiro enviado';
-                } else {
-                    this.saveMessage = 'Erro no upload';
+            async uploadFiles(files, field) {
+                if (!files?.length) return;
+
+                for (const file of files) {
+                    const formData = new FormData();
+                    formData.append('file', file);
+                    formData.append('field', field);
+                    formData.append('token', this.token);
+                    formData.append('_token', '{{ csrf_token() }}');
+                    this.saveMessage = 'A enviar ficheiro...';
+                    const res = await fetch(this.uploadEndpoint, {
+                        method: 'POST',
+                        body: formData,
+                    });
+                    if (res.ok) {
+                        const json = await res.json();
+                        if (!Array.isArray(this.documents[field])) {
+                            this.documents[field] = [];
+                        }
+                        this.documents[field].push(json.document);
+                        this.saveMessage = 'Ficheiro enviado';
+                    } else {
+                        this.saveMessage = 'Erro no upload';
+                    }
                 }
+            },
+
+            async uploadFile(event, field, fileOverride = null) {
+                const files = fileOverride ? [fileOverride] : Array.from(event?.target?.files ?? []);
+
+                await this.uploadFiles(files, field);
             },
 
             handleDrop(event, field) {
                 event.preventDefault();
-                const file = event.dataTransfer?.files?.[0];
-                if (!file) return;
-                this.uploadFile(null, field, file);
+                const files = Array.from(event.dataTransfer?.files ?? []);
+                this.uploadFiles(files, field);
             },
 
             async submit() {
@@ -498,13 +549,13 @@
                                                             <p class="fw-semibold mb-1" x-text="doc.label"></p>
                                                             <p class="small text-muted mb-2">Arraste e largue ou clique para selecionar.</p>
                                                             <label class="w-100">
-                                                                <input type="file" class="d-none" @change="uploadFile($event, doc.field)">
+                                                                <input type="file" class="d-none" multiple @change="uploadFile($event, doc.field)">
                                                                 <div class="d-flex align-items-center justify-content-between rounded-3 border border-secondary p-2 text-secondary bg-white">
-                                                                    <span class="small" x-text="documents[doc.field]?.name ?? 'Selecionar ficheiro'"></span>
+                                                                    <span class="small" x-text="documents[doc.field]?.length ? `${documents[doc.field].length} ficheiro(s)` : 'Selecionar ficheiro'"></span>
                                                                     <i class="fa fa-upload text-success"></i>
                                                                 </div>
                                                             </label>
-                                                            <template x-if="documents[doc.field]">
+                                                            <template x-if="documents[doc.field]?.length">
                                                                 <p class="small text-success mt-2">Submetido</p>
                                                             </template>
                                                         </div>

@@ -75,7 +75,7 @@ class CandidateApplicationController extends Controller
         $documents = $application->documents ?? [];
 
         foreach (['document_id', 'driver_license', 'tvde_certificate', 'criminal_record'] as $docKey) {
-            if (! isset($documents[$docKey])) {
+            if (! $this->hasDocuments($documents[$docKey] ?? null)) {
                 return response()->json([
                     'message' => 'Falta enviar todos os documentos obrigatorios.',
                 ], 422);
@@ -112,13 +112,16 @@ class CandidateApplicationController extends Controller
         $path = $file->store("applications/{$application->token}", 'public');
 
         $documents = $application->documents ?? [];
-        $documents[$field] = [
+        $current = $this->normalizeDocumentEntries($documents[$field] ?? null);
+        $document = [
             'path' => $path,
             'name' => $file->getClientOriginalName(),
             'mime' => $file->getClientMimeType(),
             'size' => $file->getSize(),
             'uploaded_at' => now()->toIso8601String(),
         ];
+        $current[] = $document;
+        $documents[$field] = $current;
 
         $application->documents = $documents;
         $application->status = $application->submitted_at ? 'submitted' : 'incomplete';
@@ -128,7 +131,8 @@ class CandidateApplicationController extends Controller
         return response()->json([
             'status' => 'ok',
             'field' => $field,
-            'document' => $documents[$field],
+            'document' => $document,
+            'documents' => $documents[$field],
             'url' => Storage::disk('public')->url($path),
         ]);
     }
@@ -215,5 +219,75 @@ class CandidateApplicationController extends Controller
             ],
             default => $request->validate([]),
         };
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    protected function normalizeDocumentEntries(mixed $value): array
+    {
+        if ($value === null || $value === '') {
+            return [];
+        }
+
+        $items = [];
+
+        if (is_array($value)) {
+            $candidates = array_is_list($value) ? $value : [$value];
+
+            foreach ($candidates as $candidate) {
+                if (is_array($candidate)) {
+                    $path = $candidate['path'] ?? null;
+                    if (! is_string($path) || $path === '') {
+                        continue;
+                    }
+
+                    $items[] = [
+                        'path' => $path,
+                        'name' => $candidate['name'] ?? basename($path),
+                        'mime' => $candidate['mime'] ?? null,
+                        'size' => $candidate['size'] ?? null,
+                        'uploaded_at' => $candidate['uploaded_at'] ?? null,
+                    ];
+
+                    continue;
+                }
+
+                if (is_string($candidate) && $candidate !== '') {
+                    $items[] = [
+                        'path' => $candidate,
+                        'name' => basename($candidate),
+                    ];
+                }
+            }
+
+            return $items;
+        }
+
+        if (is_string($value)) {
+            return [[
+                'path' => $value,
+                'name' => basename($value),
+            ]];
+        }
+
+        return [];
+    }
+
+    protected function hasDocuments(mixed $value): bool
+    {
+        if (is_string($value)) {
+            return trim($value) !== '';
+        }
+
+        if (is_array($value)) {
+            if (array_is_list($value)) {
+                return count($value) > 0;
+            }
+
+            return ! empty($value);
+        }
+
+        return false;
     }
 }
