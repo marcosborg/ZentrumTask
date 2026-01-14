@@ -2,8 +2,16 @@
 
 namespace App\Filament\Pages;
 
+use App\Models\Driver;
 use App\Models\Vehicle;
+use App\Models\VehicleAllocation;
 use BackedEnum;
+use Filament\Actions\Action;
+use Filament\Forms\Components\DateTimePicker;
+use Filament\Forms\Components\Select;
+use Filament\Forms\Components\Textarea;
+use Filament\Forms\Components\TextInput;
+use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Support\Carbon;
@@ -36,6 +44,95 @@ class VehicleAllocationTimeline extends Page
     public array $utilization = [];
 
     public function mount(): void
+    {
+        $this->loadData();
+    }
+
+    /**
+     * @return array<int, Action>
+     */
+    protected function getHeaderActions(): array
+    {
+        return [
+            Action::make('createAllocation')
+                ->label('Adicionar alocacao')
+                ->icon(Heroicon::OutlinedPlusCircle)
+                ->modalHeading('Nova alocacao de viatura')
+                ->form([
+                    Select::make('vehicle_id')
+                        ->label('Viatura')
+                        ->options(fn (): array => Vehicle::query()
+                            ->orderBy('license_plate')
+                            ->pluck('license_plate', 'id')
+                            ->all())
+                        ->searchable()
+                        ->required()
+                        ->native(false),
+                    Select::make('driver_id')
+                        ->label('Motorista')
+                        ->options(fn (): array => Driver::query()
+                            ->orderBy('name')
+                            ->pluck('name', 'id')
+                            ->all())
+                        ->searchable()
+                        ->required()
+                        ->native(false),
+                    DateTimePicker::make('starts_at')
+                        ->label('Inicio')
+                        ->required()
+                        ->native(false),
+                    DateTimePicker::make('ends_at')
+                        ->label('Fim')
+                        ->native(false),
+                    Select::make('status')
+                        ->label('Estado')
+                        ->options([
+                            'active' => 'Ativa',
+                            'closed' => 'Fechada',
+                            'planned' => 'Planeada',
+                        ])
+                        ->default('active')
+                        ->required()
+                        ->native(false),
+                    TextInput::make('start_odometer')
+                        ->label('Odometro inicial')
+                        ->numeric()
+                        ->minValue(0),
+                    TextInput::make('end_odometer')
+                        ->label('Odometro final')
+                        ->numeric()
+                        ->minValue(0),
+                    TextInput::make('handover_location')
+                        ->label('Local de entrega')
+                        ->maxLength(255),
+                    Textarea::make('notes')
+                        ->label('Notas')
+                        ->columnSpanFull(),
+                ])
+                ->action(function (array $data): void {
+                    VehicleAllocation::query()->create([
+                        'vehicle_id' => $data['vehicle_id'],
+                        'driver_id' => $data['driver_id'],
+                        'starts_at' => $data['starts_at'],
+                        'ends_at' => $data['ends_at'] ?? null,
+                        'status' => $data['status'],
+                        'start_odometer' => $data['start_odometer'] ?? null,
+                        'end_odometer' => $data['end_odometer'] ?? null,
+                        'handover_location' => $data['handover_location'] ?? null,
+                        'notes' => $data['notes'] ?? null,
+                    ]);
+
+                    $this->loadData();
+
+                    Notification::make()
+                        ->title('Alocacao criada')
+                        ->success()
+                        ->send();
+                }),
+        ];
+    }
+
+    protected function loadData(): void
     {
         $rangeEnd = Carbon::today()->endOfDay();
         $rangeStart = $rangeEnd->copy()->subDays($this->rangeDays - 1)->startOfDay();

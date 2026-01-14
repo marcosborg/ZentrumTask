@@ -1,0 +1,25 @@
+@import '../../../../vendor/filament/filament/resources/css/theme.css';
+
+@source '../../../../app/Filament/**/*.php';
+@source '../../../../resources/views/filament/**/*.blade.php';
+
+.vehicle-photo-upload .filepond--root[data-style-panel-layout='grid'] .filepond--item {
+    width: calc(50% - 0.5rem);
+}
+
+@media (min-width: 768px) {
+    .vehicle-photo-upload .filepond--root[data-style-panel-layout='grid'] .filepond--item {
+        width: calc(16.66% - 0.5rem);
+    }
+}
+
+@media (min-width: 1024px) {
+    .vehicle-photo-upload .filepond--root[data-style-panel-layout='grid'] .filepond--item {
+        width: calc(8.33% - 0.5rem);
+    }
+}
+
+.vehicle-photo-upload .filepond--file-info,
+.vehicle-photo-upload .filepond--file-status {
+    display: none;
+}

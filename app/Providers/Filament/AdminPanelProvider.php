@@ -53,6 +53,7 @@ class AdminPanelProvider extends PanelProvider
             ->colors([
                 'primary' => Color::Amber,
             ])
+            ->viteTheme('resources/css/filament/admin/theme.css')
             ->navigationGroups($navigationGroups)
             ->renderHook(
                 PanelsRenderHook::SIDEBAR_NAV_START,

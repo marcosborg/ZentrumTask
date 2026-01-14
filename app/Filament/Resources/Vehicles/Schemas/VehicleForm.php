@@ -118,12 +118,21 @@ class VehicleForm
                             ->prefix('EUR'),
                     ]),
                 Section::make('Fotos')
+                    ->columnSpanFull()
                     ->columns(1)
                     ->components([
                         SpatieMediaLibraryFileUpload::make('vehicle_photos')
                             ->label('Fotos')
                             ->collection('vehicle_photos')
                             ->multiple()
+                            ->columnSpanFull()
+                            ->panelLayout('grid')
+                            ->itemPanelAspectRatio(1)
+                            ->imagePreviewHeight('96')
+                            ->imageResizeMode('cover')
+                            ->extraAttributes([
+                                'class' => 'vehicle-photo-upload',
+                            ])
                             ->downloadable()
                             ->openable()
                             ->reorderable()
