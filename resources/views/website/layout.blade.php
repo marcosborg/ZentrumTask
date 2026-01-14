@@ -16,6 +16,12 @@
     </script>
     <link rel="icon" href="{{ asset('website/assets/favicon.ico') }}" type="image/x-icon" />
     <title>@yield('title', 'Plataforma TVDE')</title>
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="@yield('title', 'Plataforma TVDE')" />
+    <meta property="og:url" content="{{ url()->current() }}" />
+    <meta property="og:image" content="https://zentrum-tvde.com/storage/fleets/01KC4P8BKJX9YAWBRPJ3BBG4AN.png" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:image" content="https://zentrum-tvde.com/storage/fleets/01KC4P8BKJX9YAWBRPJ3BBG4AN.png" />
     @stack('head')
     <!-- Bootstrap CSS -->
     <link
