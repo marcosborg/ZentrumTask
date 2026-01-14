@@ -37,23 +37,11 @@ class VehicleAllocationTimeline extends Page
 
     public string $rangeEndLabel = '';
 
-    /** @var array<int, array<string, mixed>> */
-    public array $timeline = [];
+    /** @var array<string, array<int, array<string, mixed>>> */
+    public array $timelineBySource = [];
 
-    /** @var array<int, array<string, mixed>> */
-    public array $utilization = [];
-
-    /** @var array<int, array<string, mixed>> */
-    public array $timelineTvde = [];
-
-    /** @var array<int, array<string, mixed>> */
-    public array $timelineOther = [];
-
-    /** @var array<int, array<string, mixed>> */
-    public array $utilizationTvde = [];
-
-    /** @var array<int, array<string, mixed>> */
-    public array $utilizationOther = [];
+    /** @var array<string, array<int, array<string, mixed>>> */
+    public array $utilizationBySource = [];
 
     public function mount(): void
     {
@@ -174,103 +162,22 @@ class VehicleAllocationTimeline extends Page
             ->orderBy('license_plate')
             ->get();
 
-        $this->timeline = $vehicles->map(function (Vehicle $vehicle) use ($rangeStart, $rangeEnd, $totalSeconds) {
-            $segments = [];
-            $allocatedSeconds = 0;
-            $currentDriver = null;
+        $sources = ['tvde', 'outsource', 'company', 'private'];
 
-            foreach ($vehicle->allocations as $allocation) {
-                $start = Carbon::parse($allocation->starts_at);
-                $end = $allocation->ends_at ? Carbon::parse($allocation->ends_at) : $rangeEnd;
+        $this->timelineBySource = [];
+        $this->utilizationBySource = [];
 
-                $segmentStart = $start->copy()->max($rangeStart);
-                $segmentEnd = $end->copy()->min($rangeEnd);
+        foreach ($sources as $source) {
+            $sourceVehicles = $vehicles->filter(fn (Vehicle $vehicle): bool => $vehicle->source === $source);
 
-                if ($segmentEnd->lt($rangeStart) || $segmentStart->gt($rangeEnd)) {
-                    continue;
-                }
+            $this->timelineBySource[$source] = $sourceVehicles->map(function (Vehicle $vehicle) use ($rangeStart, $rangeEnd, $totalSeconds) {
+                return $this->buildTimelineRow($vehicle, $rangeStart, $rangeEnd, $totalSeconds);
+            })->values()->all();
 
-                $left = $segmentStart->diffInSeconds($rangeStart) / $totalSeconds * 100;
-                $width = max(0.5, $segmentEnd->diffInSeconds($segmentStart) / $totalSeconds * 100);
-
-                $segments[] = [
-                    'left' => $left,
-                    'width' => $width,
-                    'label' => $allocation->driver?->name ?? 'Motorista',
-                    'status' => $allocation->status,
-                ];
-
-                $allocatedSeconds += $segmentEnd->diffInSeconds($segmentStart);
-
-                if ($allocation->status === 'active' && $allocation->ends_at === null) {
-                    $currentDriver = $allocation->driver?->name;
-                }
-            }
-
-            $utilization = (int) round(($allocatedSeconds / $totalSeconds) * 100);
-
-            return [
-                'license_plate' => $vehicle->license_plate,
-                'make' => $vehicle->make,
-                'model' => $vehicle->model,
-                'current_driver' => $currentDriver,
-                'segments' => $segments,
-                'utilization' => $utilization,
-            ];
-        })->values()->all();
-
-        $this->utilization = $vehicles->map(function (Vehicle $vehicle) use ($rangeStart, $rangeEnd, $totalSeconds) {
-            $allocatedSeconds = 0;
-            $currentAllocation = null;
-
-            foreach ($vehicle->allocations as $allocation) {
-                $start = Carbon::parse($allocation->starts_at);
-                $end = $allocation->ends_at ? Carbon::parse($allocation->ends_at) : $rangeEnd;
-
-                $segmentStart = $start->copy()->max($rangeStart);
-                $segmentEnd = $end->copy()->min($rangeEnd);
-
-                if ($segmentEnd->lt($rangeStart) || $segmentStart->gt($rangeEnd)) {
-                    continue;
-                }
-
-                $allocatedSeconds += $segmentEnd->diffInSeconds($segmentStart);
-
-                if ($allocation->status === 'active' && $allocation->ends_at === null) {
-                    $currentAllocation = $allocation;
-                }
-            }
-
-            $utilization = (int) round(($allocatedSeconds / $totalSeconds) * 100);
-
-            return [
-                'license_plate' => $vehicle->license_plate,
-                'label' => trim($vehicle->make.' '.$vehicle->model),
-                'current_driver' => $currentAllocation?->driver?->name,
-                'current_start' => $currentAllocation?->starts_at,
-                'utilization' => $utilization,
-                'downtime' => max(0, 100 - $utilization),
-            ];
-        })->values()->all();
-
-        $tvdeVehicles = $vehicles->filter(fn (Vehicle $vehicle): bool => (bool) $vehicle->is_tvde);
-        $otherVehicles = $vehicles->reject(fn (Vehicle $vehicle): bool => (bool) $vehicle->is_tvde);
-
-        $this->timelineTvde = $tvdeVehicles->map(function (Vehicle $vehicle) use ($rangeStart, $rangeEnd, $totalSeconds) {
-            return $this->buildTimelineRow($vehicle, $rangeStart, $rangeEnd, $totalSeconds);
-        })->values()->all();
-
-        $this->timelineOther = $otherVehicles->map(function (Vehicle $vehicle) use ($rangeStart, $rangeEnd, $totalSeconds) {
-            return $this->buildTimelineRow($vehicle, $rangeStart, $rangeEnd, $totalSeconds);
-        })->values()->all();
-
-        $this->utilizationTvde = $tvdeVehicles->map(function (Vehicle $vehicle) use ($rangeStart, $rangeEnd, $totalSeconds) {
-            return $this->buildUtilizationRow($vehicle, $rangeStart, $rangeEnd, $totalSeconds);
-        })->values()->all();
-
-        $this->utilizationOther = $otherVehicles->map(function (Vehicle $vehicle) use ($rangeStart, $rangeEnd, $totalSeconds) {
-            return $this->buildUtilizationRow($vehicle, $rangeStart, $rangeEnd, $totalSeconds);
-        })->values()->all();
+            $this->utilizationBySource[$source] = $sourceVehicles->map(function (Vehicle $vehicle) use ($rangeStart, $rangeEnd, $totalSeconds) {
+                return $this->buildUtilizationRow($vehicle, $rangeStart, $rangeEnd, $totalSeconds);
+            })->values()->all();
+        }
     }
 
     /**

@@ -32,7 +32,7 @@ class Vehicle extends Model implements HasMedia
         'power_kw',
         'current_odometer',
         'status',
-        'is_tvde',
+        'source',
         'acquisition_date',
         'acquisition_cost',
         'notes',
@@ -72,7 +72,7 @@ class Vehicle extends Model implements HasMedia
             'engine_cc' => 'integer',
             'power_kw' => 'integer',
             'current_odometer' => 'integer',
-            'is_tvde' => 'boolean',
+            'source' => 'string',
             'acquisition_date' => 'date',
             'acquisition_cost' => 'decimal:2',
         ];

@@ -6,7 +6,6 @@ use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
 use Filament\Tables\Columns\TextColumn;
-use Filament\Tables\Columns\ToggleColumn;
 use Filament\Tables\Filters\Filter;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
@@ -55,8 +54,16 @@ class VehiclesTable
                         default => $state,
                     })
                     ->sortable(),
-                ToggleColumn::make('is_tvde')
-                    ->label('TVDE')
+                TextColumn::make('source')
+                    ->label('Source')
+                    ->badge()
+                    ->formatStateUsing(fn (string $state): string => match ($state) {
+                        'tvde' => 'TVDE',
+                        'outsource' => 'Outsource',
+                        'company' => 'Company',
+                        'private' => 'Private',
+                        default => $state,
+                    })
                     ->sortable(),
                 TextColumn::make('currentAllocation.driver.name')
                     ->label('Motorista atual')
