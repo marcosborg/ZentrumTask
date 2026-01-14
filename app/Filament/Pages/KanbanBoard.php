@@ -233,7 +233,8 @@ class KanbanBoard extends Page
         $this->fillTaskForm($task);
         $this->activeTaskId = $task->id;
         $this->showTaskForm = true;
-        $this->showTaskDetail = false;
+        $this->showTaskDetail = true;
+        $this->loadTaskMeta($task->load(['comments.user', 'attachments']));
     }
 
     protected function fillTaskForm(Task $task): void
@@ -466,8 +467,9 @@ class KanbanBoard extends Page
         $task = Task::with(['comments.user', 'attachments', 'stage'])->findOrFail($taskId);
         $this->activeTaskId = $taskId;
         $this->showTaskDetail = true;
-        $this->showTaskForm = false;
+        $this->showTaskForm = true;
         $this->loadTaskMeta($task);
+        $this->fillTaskForm($task);
     }
 
     protected function loadTaskMeta(Task $task): void
