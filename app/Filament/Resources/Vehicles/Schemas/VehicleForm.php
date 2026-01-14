@@ -9,6 +9,7 @@ use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
+use Spatie\MediaLibrary\MediaCollections\Models\Media;
 
 class VehicleForm
 {
@@ -126,7 +127,26 @@ class VehicleForm
                             ->downloadable()
                             ->openable()
                             ->reorderable()
-                            ->preserveFilenames(),
+                            ->preserveFilenames()
+                            ->getUploadedFileUsing(static function (SpatieMediaLibraryFileUpload $component, string $file): ?array {
+                                $media = Media::query()->where('uuid', $file)->first();
+
+                                if (! $media) {
+                                    return null;
+                                }
+
+                                $conversion = $component->getConversion();
+
+                                return [
+                                    'name' => $media->getAttributeValue('name') ?? $media->getAttributeValue('file_name'),
+                                    'size' => $media->getAttributeValue('size'),
+                                    'type' => $media->getAttributeValue('mime_type'),
+                                    'url' => route('media.proxy', [
+                                        'uuid' => $media->getAttributeValue('uuid'),
+                                        'conversion' => ($conversion && $media->hasGeneratedConversion($conversion)) ? $conversion : null,
+                                    ]),
+                                ];
+                            }),
                     ]),
             ]);
     }

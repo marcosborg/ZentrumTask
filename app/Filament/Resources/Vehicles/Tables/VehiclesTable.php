@@ -5,7 +5,6 @@ namespace App\Filament\Resources\Vehicles\Tables;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
-use Filament\Tables\Columns\SpatieMediaLibraryImageColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\Filter;
 use Filament\Tables\Filters\SelectFilter;
@@ -19,12 +18,6 @@ class VehiclesTable
     {
         return $table
             ->columns([
-                SpatieMediaLibraryImageColumn::make('vehicle_photos')
-                    ->label('Foto')
-                    ->collection('vehicle_photos')
-                    ->circular()
-                    ->height(36)
-                    ->width(36),
                 TextColumn::make('license_plate')
                     ->label('Matricula')
                     ->searchable()

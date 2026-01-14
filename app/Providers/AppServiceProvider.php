@@ -22,7 +22,11 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        $storageUrl = rtrim((string) config('app.url', URL::to('/')), '/').'/storage';
+        $storageUrl = (string) config('filesystems.disks.public.url');
+
+        if ($storageUrl === '') {
+            $storageUrl = rtrim((string) config('app.url', URL::to('/')), '/').'/storage';
+        }
 
         config()->set('filesystems.disks.public.url', $storageUrl);
     }
