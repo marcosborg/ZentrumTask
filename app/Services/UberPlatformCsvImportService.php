@@ -8,15 +8,20 @@ use Illuminate\Support\Facades\Log;
 use RuntimeException;
 use Throwable;
 
-class BoltPlatformCsvImportService
+class UberPlatformCsvImportService
 {
     /**
-     * Import Bolt CSV into platform_driver_balances.
+     * Import Uber CSV into platform_driver_balances.
      *
      * Period resolution order:
      * 1) Explicit period_start/period_end options.
      * 2) If a date column is present, use min/max dates in the file.
      * 3) Otherwise, infer from filename (YYYYMMDD-YYYYMMDD or 20YYWww).
+     *
+     * Net amount rules:
+     * - Use only "Pago a si" (Uber CSV).
+     * - Tips are mapped exclusively from "Pago a si:Os seus rendimentos:Gratificacao".
+     * - These are the only columns accepted for settlement inputs.
      *
      * @return array{
      *     total:int,
@@ -56,7 +61,7 @@ class BoltPlatformCsvImportService
             if ($driverCode === null) {
                 $skipped++;
                 $invalidRows++;
-                Log::info('Bolt CSV skip: driver_code vazio', ['row' => $row]);
+                Log::info('Uber CSV skip: driver_code vazio', ['row' => $row]);
 
                 continue;
             }
@@ -71,11 +76,11 @@ class BoltPlatformCsvImportService
             $tipsAmountCheck = $this->parseAmount($tipsRawValue);
 
             if ($netAmount !== $netAmountCheck || $tipsAmount !== $tipsAmountCheck) {
-                throw new RuntimeException('Bolt CSV invalido: valores nao correspondem as colunas de origem.');
+                throw new RuntimeException('Uber CSV invalido: valores nao correspondem as colunas de origem.');
             }
 
             $exists = PlatformDriverBalance::query()
-                ->where('platform', 'bolt')
+                ->where('platform', 'uber')
                 ->where('driver_code', $driverCode)
                 ->whereDate('period_start', $period['start'])
                 ->whereDate('period_end', $period['end'])
@@ -84,7 +89,7 @@ class BoltPlatformCsvImportService
             if ($exists) {
                 $skipped++;
                 $duplicates++;
-                Log::info('Bolt CSV skip: duplicate period', [
+                Log::info('Uber CSV skip: duplicate period', [
                     'driver_code' => $driverCode,
                     'period_start' => $period['start'],
                     'period_end' => $period['end'],
@@ -94,7 +99,7 @@ class BoltPlatformCsvImportService
             }
 
             PlatformDriverBalance::query()->create([
-                'platform' => 'bolt',
+                'platform' => 'uber',
                 'driver_code' => $driverCode,
                 'period_start' => $period['start'],
                 'period_end' => $period['end'],
@@ -200,7 +205,6 @@ class BoltPlatformCsvImportService
     private function detectDelimiter($handle): string
     {
         $line = null;
-
         while (($candidate = fgets($handle)) !== false) {
             if (trim($candidate) === '') {
                 continue;
@@ -246,34 +250,31 @@ class BoltPlatformCsvImportService
     private function resolveColumnMap(array $headers, array $headerMap): array
     {
         /**
-         * net_amount corresponde a "Ganhos liquidos|EUR" (Bolt CSV).
-         * tips_amount corresponde a "Gorjetas dos passageiros|EUR" (Bolt CSV).
+         * net_amount corresponde a "Pago a si" (Uber CSV).
+         * tips_amount corresponde a "Pago a si:Os seus rendimentos:Gratificacao" (Uber CSV).
          * Estas sao as unicas colunas aceites para settlement.
          */
         $driverCandidates = [
-            'Identificador do motorista',
-            'Identificador individual',
+            'UUID do motorista',
         ];
-
         $driverColumn = $this->findExactHeader($headers, $driverCandidates);
         if ($driverColumn === null) {
-            throw new RuntimeException('CSV Bolt invalido: falta coluna Identificador do motorista ou Identificador individual');
+            throw new RuntimeException('CSV Uber invalido: falta coluna UUID do motorista');
         }
 
-        $netLabel = "Ganhos l\u{00ED}quidos|\u{20AC}";
-        $tipsLabel = "Gorjetas dos passageiros|\u{20AC}";
+        $netLabel = 'Pago a si';
+        $tipsLabel = "Pago a si:Os seus rendimentos:Gratifica\u{00E7}\u{00E3}o";
 
         $netColumn = $this->findExactHeader($headers, [$netLabel]);
         if ($netColumn === null) {
-            throw new RuntimeException("CSV Bolt invalido: falta coluna {$netLabel}");
+            throw new RuntimeException("CSV Uber invalido: falta coluna {$netLabel}");
         }
 
         $tipsColumn = $this->findExactHeader($headers, [$tipsLabel]);
         if ($tipsColumn === null) {
-            throw new RuntimeException("CSV Bolt invalido: falta coluna {$tipsLabel}");
+            throw new RuntimeException("CSV Uber invalido: falta coluna {$tipsLabel}");
         }
 
-        $dateColumn = $this->resolveDateColumn($headers);
         $map = [
             'driver_code' => $driverColumn,
             'net_amount' => $netColumn,
@@ -283,11 +284,23 @@ class BoltPlatformCsvImportService
             'tips_source_label' => $headerMap[$tipsColumn] ?? $tipsColumn,
         ];
 
+        $dateColumn = $this->resolveDateColumn($headers);
         if ($dateColumn !== null) {
             $map['date'] = $dateColumn;
         }
 
         return $map;
+    }
+
+    private function resolveDateColumn(array $headers): ?string
+    {
+        foreach ($headers as $header) {
+            if (str_starts_with($header, 'Data') || str_starts_with($header, 'date')) {
+                return $header;
+            }
+        }
+
+        return null;
     }
 
     /**
@@ -302,17 +315,6 @@ class BoltPlatformCsvImportService
                 if ($header === $normalizedCandidate) {
                     return $header;
                 }
-            }
-        }
-
-        return null;
-    }
-
-    private function resolveDateColumn(array $headers): ?string
-    {
-        foreach ($headers as $header) {
-            if (str_starts_with($header, 'Data') || str_starts_with($header, 'date')) {
-                return $header;
             }
         }
 

@@ -32,6 +32,12 @@ class DriverForm
                 TextInput::make('license_number')
                     ->label('Carta / Licença')
                     ->maxLength(100),
+                TextInput::make('bolt_driver_code')
+                    ->label('Codigo Bolt')
+                    ->maxLength(255),
+                TextInput::make('uber_driver_code')
+                    ->label('Codigo Uber')
+                    ->maxLength(255),
                 Textarea::make('notes')
                     ->label('Notas')
                     ->columnSpanFull(),

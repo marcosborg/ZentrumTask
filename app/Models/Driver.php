@@ -16,6 +16,8 @@ class Driver extends Model
         'candidate_application_id',
         'bolt_driver_uuid',
         'uber_driver_uuid',
+        'bolt_driver_code',
+        'uber_driver_code',
         'company_id',
         'name',
         'email',

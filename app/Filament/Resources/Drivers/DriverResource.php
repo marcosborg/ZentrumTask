@@ -141,6 +141,12 @@ class DriverResource extends Resource
                             ->maxLength(255),
                         DatePicker::make('tvde_certificate_expires_at')
                             ->label('Validade certificado'),
+                        TextInput::make('bolt_driver_code')
+                            ->label('Codigo Bolt')
+                            ->maxLength(255),
+                        TextInput::make('uber_driver_code')
+                            ->label('Codigo Uber')
+                            ->maxLength(255),
                         CheckboxList::make('tvde_platforms')
                             ->label('Plataformas')
                             ->options([

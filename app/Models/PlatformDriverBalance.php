@@ -16,6 +16,9 @@ class PlatformDriverBalance extends Model
         'period_end',
         'net_amount',
         'tips_amount',
+        'net_source_column',
+        'tips_source_column',
+        'raw_row',
         'source_file',
         'imported_at',
     ];
@@ -30,6 +33,7 @@ class PlatformDriverBalance extends Model
             'period_end' => 'date',
             'net_amount' => 'decimal:2',
             'tips_amount' => 'decimal:2',
+            'raw_row' => 'array',
             'imported_at' => 'datetime',
         ];
     }

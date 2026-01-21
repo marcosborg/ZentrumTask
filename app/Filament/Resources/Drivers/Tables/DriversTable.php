@@ -36,6 +36,14 @@ class DriversTable
                 TextColumn::make('iban')
                     ->searchable()
                     ->toggleable(isToggledHiddenByDefault: true),
+                TextColumn::make('bolt_driver_code')
+                    ->label('Codigo Bolt')
+                    ->searchable()
+                    ->toggleable(),
+                TextColumn::make('uber_driver_code')
+                    ->label('Codigo Uber')
+                    ->searchable()
+                    ->toggleable(),
                 IconColumn::make('has_active_billing_profile')
                     ->label('Perfil ativo')
                     ->boolean()
