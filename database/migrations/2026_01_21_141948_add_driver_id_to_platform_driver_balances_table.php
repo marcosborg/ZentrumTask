@@ -11,13 +11,15 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('platform_driver_balances', function (Blueprint $table) {
-            $table->foreignId('driver_id')
-                ->nullable()
-                ->after('driver_code')
-                ->constrained('drivers')
-                ->nullOnDelete();
-        });
+        if (! Schema::hasColumn('platform_driver_balances', 'driver_id')) {
+            Schema::table('platform_driver_balances', function (Blueprint $table) {
+                $table->foreignId('driver_id')
+                    ->nullable()
+                    ->after('driver_code')
+                    ->constrained('drivers')
+                    ->nullOnDelete();
+            });
+        }
     }
 
     /**
@@ -25,8 +27,10 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('platform_driver_balances', function (Blueprint $table) {
-            $table->dropConstrainedForeignId('driver_id');
-        });
+        if (Schema::hasColumn('platform_driver_balances', 'driver_id')) {
+            Schema::table('platform_driver_balances', function (Blueprint $table) {
+                $table->dropConstrainedForeignId('driver_id');
+            });
+        }
     }
 };

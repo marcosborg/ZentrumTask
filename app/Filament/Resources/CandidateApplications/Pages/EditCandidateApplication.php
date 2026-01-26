@@ -33,13 +33,7 @@ class EditCandidateApplication extends EditRecord
         ];
 
         foreach ($keys as $key) {
-            $value = $documents[$key] ?? null;
-
-            if (is_array($value)) {
-                $documents[$key] = $this->normalizeDocumentPath($value['path'] ?? null);
-            } else {
-                $documents[$key] = $this->normalizeDocumentPath($value);
-            }
+            $documents[$key] = $this->normalizeDocumentPaths($documents[$key] ?? null);
         }
 
         $data['documents'] = $documents;
@@ -88,30 +82,76 @@ class EditCandidateApplication extends EditRecord
                 continue;
             }
 
-            $path = is_array($state) ? ($state['path'] ?? null) : (string) $state;
-            $path = $this->normalizeDocumentPath($path);
+            $paths = $this->normalizeDocumentPaths($state);
+            $existingItems = CandidateApplicationResource::normalizeDocumentItems($this->record, $existing[$key] ?? null);
+            $existingByPath = [];
 
-            if ($path === null || $path === '') {
-                $incoming[$key] = $existing[$key] ?? null;
-
-                continue;
+            foreach ($existingItems as $item) {
+                $existingByPath[$item['path']] = $item;
             }
 
-            $meta = [
-                'path' => $path,
-                'name' => basename($path),
-                'mime' => $this->safeMimeType($path, $existing[$key]['mime'] ?? null),
-                'size' => $this->safeFileSize($path, $existing[$key]['size'] ?? null),
-                'uploaded_at' => now()->toIso8601String(),
-            ];
+            $merged = [];
 
-            $incoming[$key] = array_filter(
-                $meta + ($existing[$key] ?? []),
-                static fn ($value): bool => $value !== null
-            );
+            foreach ($paths as $path) {
+                $path = $this->normalizeDocumentPath($path);
+
+                if ($path === null || $path === '') {
+                    continue;
+                }
+
+                $existingItem = $existingByPath[$path] ?? null;
+                $merged[] = array_filter([
+                    'path' => $path,
+                    'name' => $existingItem['name'] ?? basename($path),
+                    'mime' => $existingItem['mime'] ?? $this->safeMimeType($path, null),
+                    'size' => $existingItem['size'] ?? $this->safeFileSize($path, null),
+                    'uploaded_at' => $existingItem['uploaded_at'] ?? now()->toIso8601String(),
+                ], static fn ($value): bool => $value !== null);
+            }
+
+            $incoming[$key] = $merged;
         }
 
         return $incoming;
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    protected function normalizeDocumentPaths(mixed $value): array
+    {
+        if ($value === null || $value === '') {
+            return [];
+        }
+
+        if (is_string($value)) {
+            return [$value];
+        }
+
+        if (! is_array($value)) {
+            return [];
+        }
+
+        if (! array_is_list($value)) {
+            $path = $value['path'] ?? null;
+
+            return is_string($path) && $path !== '' ? [$path] : [];
+        }
+
+        $paths = [];
+
+        foreach ($value as $entry) {
+            if (is_string($entry) && $entry !== '') {
+                $paths[] = $entry;
+            } elseif (is_array($entry)) {
+                $path = $entry['path'] ?? null;
+                if (is_string($path) && $path !== '') {
+                    $paths[] = $path;
+                }
+            }
+        }
+
+        return $paths;
     }
 
     protected function normalizeDocumentPath(?string $path): ?string
