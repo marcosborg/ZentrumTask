@@ -1,29 +1,26 @@
 ﻿<x-filament-panels::page>
     <div class="space-y-8">
-        <section class="space-y-4">
-            <h2 class="text-xl font-semibold">Filtros</h2>
-            <div class="grid gap-4 md:grid-cols-3">
-                {{ $this->form }}
+        <x-filament::card>
+            <div class="space-y-4">
+                <h2 class="text-lg font-semibold">Filtros</h2>
+                <div class="grid gap-4 md:grid-cols-3">
+                    {{ $this->form }}
+                </div>
+                <div class="flex justify-end">
+                    <x-filament::actions :actions="[$this->applyFiltersAction()]" />
+                </div>
             </div>
-            <div class="flex flex-wrap gap-3">
-                <x-filament::button wire:click="applyFilters">
-                    Aplicar filtros
-                </x-filament::button>
-                @if (! $hasSettlementsForPeriod)
-                    <x-filament::button color="warning" wire:click="generateSettlements">
-                        Gerar settlements para este periodo
-                    </x-filament::button>
-                @endif
-                @if (($this->data['period_start'] ?? null) && ($this->data['period_end'] ?? null))
-                    <x-filament::button color="danger" x-on:click="$dispatch('open-modal', { id: 'delete-period-modal' })">
-                        Eliminar dados do periodo
-                    </x-filament::button>
-                @endif
-            </div>
-        </section>
+        </x-filament::card>
 
-        <section class="space-y-3">
-            <h2 class="text-xl font-semibold">Settlements por periodo</h2>
+        <x-filament::section heading="Ações do período">
+            <div class="flex flex-wrap items-center gap-4">
+                <x-filament::actions :actions="[$this->generateSettlementsAction()]" />
+                <span class="hidden h-6 w-px bg-gray-700 sm:inline-block" aria-hidden="true"></span>
+                <x-filament::actions :actions="[$this->deletePeriodAction()]" />
+            </div>
+        </x-filament::section>
+
+        <x-filament::section heading="Settlements por periodo">
             <div class="overflow-x-auto rounded-xl border border-gray-700 bg-gray-900">
                 <table class="min-w-full text-sm text-gray-100">
                     <thead class="bg-gray-800 text-xs uppercase text-gray-400">
@@ -78,10 +75,9 @@
                     </tbody>
                 </table>
             </div>
-        </section>
+        </x-filament::section>
 
-        <section class="space-y-3">
-            <h2 class="text-xl font-semibold">Pendentes - balances sem driver</h2>
+        <x-filament::section heading="Pendentes - balances sem driver">
             <div class="overflow-x-auto rounded-xl border border-gray-200 bg-white">
                 <table class="w-full text-sm">
                     <thead class="bg-gray-50 text-xs uppercase text-gray-500">
@@ -116,10 +112,9 @@
                     </tbody>
                 </table>
             </div>
-        </section>
+        </x-filament::section>
 
-        <section class="space-y-3">
-            <h2 class="text-xl font-semibold">Pendentes - motoristas sem perfil ativo</h2>
+        <x-filament::section heading="Pendentes - motoristas sem perfil ativo">
             <div class="overflow-x-auto rounded-xl border border-gray-200 bg-white">
                 <table class="w-full text-sm">
                     <thead class="bg-gray-50 text-xs uppercase text-gray-500">
@@ -144,10 +139,10 @@
                     </tbody>
                 </table>
             </div>
-        </section>
+        </x-filament::section>
 
-        <section class="space-y-3">
-            <h2 class="text-xl font-semibold">Auditoria de imports</h2>
+        <x-filament::section heading="Auditoria de imports">
+            <p class="text-sm text-gray-400">Apenas leitura. Valores importados tal como entraram no sistema.</p>
             <div class="overflow-x-auto rounded-xl border border-gray-700 bg-gray-900">
                 <table class="min-w-full text-sm text-gray-100">
                     <thead class="bg-gray-800 text-xs uppercase text-gray-400">
@@ -157,8 +152,6 @@
                             <th class="min-w-[220px] px-4 py-3 text-left">Driver code</th>
                             <th class="min-w-[140px] px-4 py-3 text-right">Liquido</th>
                             <th class="min-w-[140px] px-4 py-3 text-right">Tips</th>
-                            <th class="min-w-[260px] px-4 py-3 text-left">Coluna liquido</th>
-                            <th class="min-w-[260px] px-4 py-3 text-left">Coluna tips</th>
                             <th class="min-w-[240px] px-4 py-3 text-left">Raw row</th>
                         </tr>
                     </thead>
@@ -177,8 +170,6 @@
                                 <td class="px-4 py-3 text-right font-semibold">
                                     {{ number_format((float) ($row['tips_amount'] ?? 0), 2, ',', ' ') }} &euro;
                                 </td>
-                                <td class="px-4 py-3 text-gray-300">{{ $row['net_source_column'] ?? '-' }}</td>
-                                <td class="px-4 py-3 text-gray-300">{{ $row['tips_source_column'] ?? '-' }}</td>
                                 <td class="px-4 py-3">
                                     <details class="rounded-lg border border-gray-700 bg-gray-950 px-3 py-2 text-xs text-gray-300">
                                         <summary class="cursor-pointer text-gray-200">Ver raw row</summary>
@@ -188,7 +179,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="8" class="px-4 py-6 text-center text-gray-400">
+                                <td colspan="6" class="px-4 py-6 text-center text-gray-400">
                                     Sem dados de auditoria para o periodo selecionado.
                                 </td>
                             </tr>
@@ -196,28 +187,8 @@
                     </tbody>
                 </table>
             </div>
-        </section>
+        </x-filament::section>
 
-        <x-filament::modal
-            id="delete-period-modal"
-            heading="Eliminar dados do periodo"
-            description="Esta acao vai apagar settlements e balances do periodo selecionado. Esta acao nao pode ser revertida."
-        >
-            <x-slot name="footer">
-                <div class="flex justify-end gap-3">
-                    <x-filament::button color="gray" x-on:click="$dispatch('close-modal', { id: 'delete-period-modal' })">
-                        Cancelar
-                    </x-filament::button>
-                    <x-filament::button
-                        color="danger"
-                        wire:click="deletePeriodData"
-                        x-on:click="$dispatch('close-modal', { id: 'delete-period-modal' })"
-                    >
-                        Eliminar dados
-                    </x-filament::button>
-                </div>
-            </x-slot>
-        </x-filament::modal>
     </div>
 </x-filament-panels::page>
 

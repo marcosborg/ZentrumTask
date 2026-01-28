@@ -79,6 +79,26 @@ class UberPlatformCsvImportService
                 throw new RuntimeException('Uber CSV invalido: valores nao correspondem as colunas de origem.');
             }
 
+            if ($netAmount === 0.0) {
+                $skipped++;
+                $invalidRows++;
+                Log::info('Uber CSV skip: net_amount zero', [
+                    'driver_code' => $driverCode,
+                    'period_start' => $period['start'],
+                    'period_end' => $period['end'],
+                    'skip_reason' => 'net_amount_zero',
+                    'raw_row' => $row,
+                ]);
+
+                continue;
+            }
+
+            $lineType = 'earnings';
+            if ($netAmount < 0.0) {
+                $lineType = 'adjustment';
+                $tipsAmount = 0.0;
+            }
+
             $exists = PlatformDriverBalance::query()
                 ->where('platform', 'uber')
                 ->where('driver_code', $driverCode)
@@ -114,6 +134,8 @@ class UberPlatformCsvImportService
                     'net_source_value' => $netRawValue,
                     'tips_source_column' => $columnMap['tips_source_label'],
                     'tips_source_value' => $tipsRawValue,
+                    'line_type' => $lineType,
+                    'adjustment_note' => $lineType === 'adjustment' ? 'negative_net_amount' : null,
                 ],
                 'source_file' => basename($path),
                 'imported_at' => now(),

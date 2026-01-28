@@ -63,7 +63,7 @@ class DriverSettlementCalculator
             }
 
             $netTotal = round((float) $driverBalances->sum('net_amount'), 2);
-            $tipsTotal = round((float) $driverBalances->sum('tips_amount'), 2);
+            $tipsTotal = (float) $driverBalances->sum('tips_amount');
 
             $percentCompany = (float) $profile->percent_company;
             $percentDriver = (float) $profile->percent_driver;

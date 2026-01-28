@@ -7,17 +7,15 @@ use App\Models\DriverSettlement;
 use App\Models\PlatformDriverBalance;
 use App\Services\DriverSettlementCalculator;
 use BackedEnum;
+use Filament\Actions\Action;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Contracts\HasForms;
-use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\Facades\DB;
-use RuntimeException;
 use UnitEnum;
 
 class DriverSettlementsReport extends Page implements HasForms
@@ -34,34 +32,26 @@ class DriverSettlementsReport extends Page implements HasForms
 
     protected string $view = 'filament.pages.driver-settlements-report';
 
-    public ?array $data = [];
+    public ?string $periodStart = null;
 
-    /** @var array<int, object> */
-    public array $settlements = [];
+    public ?string $periodEnd = null;
 
-    /** @var array<int, array<string, mixed>> */
-    public array $pendingBalances = [];
-
-    /** @var array<int, array<string, mixed>> */
-    public array $driversMissingProfiles = [];
-
-    /** @var array<int, array<string, mixed>> */
-    public array $auditRows = [];
-
-    public bool $hasSettlementsForPeriod = false;
+    public ?int $driverId = null;
 
     public function mount(): void
     {
         $start = Carbon::today()->startOfWeek(Carbon::MONDAY)->toDateString();
         $end = Carbon::today()->endOfWeek(Carbon::SUNDAY)->toDateString();
 
-        $this->form->fill([
-            'period_start' => $start,
-            'period_end' => $end,
-            'driver_id' => null,
-        ]);
+        $this->periodStart = $start;
+        $this->periodEnd = $end;
+        $this->driverId = null;
 
-        $this->loadData();
+        $this->form->fill([
+            'periodStart' => $start,
+            'periodEnd' => $end,
+            'driverId' => null,
+        ]);
     }
 
     public function form(Schema $schema): Schema
@@ -69,114 +59,28 @@ class DriverSettlementsReport extends Page implements HasForms
         return $schema
             ->columns(3)
             ->schema([
-                DatePicker::make('period_start')
-                    ->label('Periodo inicio')
-                    ->native(false)
+                DatePicker::make('periodStart')
+                    ->label('Período início')
                     ->required(),
-                DatePicker::make('period_end')
-                    ->label('Periodo fim')
-                    ->native(false)
+                DatePicker::make('periodEnd')
+                    ->label('Período fim')
                     ->required(),
-                Select::make('driver_id')
+                Select::make('driverId')
                     ->label('Motorista')
-                    ->options(fn (): array => Driver::query()
-                        ->orderBy('name')
-                        ->pluck('name', 'id')
-                        ->all())
+                    ->options(Driver::query()->orderBy('name')->pluck('name', 'id'))
                     ->searchable()
-                    ->preload()
-                    ->native(false),
-            ])
-            ->statePath('data');
+                    ->nullable(),
+            ]);
     }
 
-    public function applyFilters(): void
+    /**
+     * @return array<string, mixed>
+     */
+    protected function getViewData(): array
     {
-        $this->loadData();
-    }
-
-    public function generateSettlements(): void
-    {
-        $data = $this->form->getState();
-        $periodStart = $data['period_start'] ?? null;
-        $periodEnd = $data['period_end'] ?? null;
-        $driverId = $data['driver_id'] ?? null;
-
-        if (! $periodStart || ! $periodEnd) {
-            Notification::make()
-                ->danger()
-                ->title('Selecione o periodo para gerar settlements')
-                ->send();
-
-            return;
-        }
-
-        try {
-            $result = app(DriverSettlementCalculator::class)
-                ->calculate($periodStart, $periodEnd, $driverId ? (int) $driverId : null);
-
-            Notification::make()
-                ->success()
-                ->title('Settlements gerados')
-                ->body("Criados: {$result['created']} | Ignorados: {$result['skipped']} | Sem perfil: {$result['missing_profiles']}")
-                ->send();
-
-            $this->loadData();
-        } catch (RuntimeException $exception) {
-            Notification::make()
-                ->danger()
-                ->title('Falha ao gerar settlements')
-                ->body($exception->getMessage())
-                ->send();
-        }
-    }
-
-    public function deletePeriodData(): void
-    {
-        $data = $this->form->getState();
-        $periodStart = $data['period_start'] ?? null;
-        $periodEnd = $data['period_end'] ?? null;
-
-        if (! $periodStart || ! $periodEnd) {
-            Notification::make()
-                ->danger()
-                ->title('Selecione o periodo para eliminar os dados')
-                ->send();
-
-            return;
-        }
-
-        $deletedSettlements = 0;
-        $deletedBalances = 0;
-
-        DB::transaction(function () use ($periodStart, $periodEnd, &$deletedSettlements, &$deletedBalances): void {
-            $deletedSettlements = DriverSettlement::query()
-                ->whereDate('period_start', $periodStart)
-                ->whereDate('period_end', $periodEnd)
-                ->delete();
-
-            $deletedBalances = PlatformDriverBalance::query()
-                ->whereDate('period_start', $periodStart)
-                ->whereDate('period_end', $periodEnd)
-                ->delete();
-        });
-
-        Notification::make()
-            ->success()
-            ->title('Dados eliminados')
-            ->body("Settlements apagados: {$deletedSettlements} | Balances apagados: {$deletedBalances}")
-            ->send();
-
-        $this->dispatch('close-modal', id: 'delete-period-modal');
-        $this->loadData();
-    }
-
-    protected function loadData(): void
-    {
-        $data = $this->form->getState();
-        $periodStart = $data['period_start'] ?? null;
-        $periodEnd = $data['period_end'] ?? null;
-        $driverId = $data['driver_id'] ?? null;
+        $periodStart = $this->periodStart;
+        $periodEnd = $this->periodEnd;
+        $driverId = $this->driverId;
 
         $settlementsQuery = DriverSettlement::query()
             ->leftJoin('drivers', 'drivers.id', '=', 'driver_settlements.driver_id')
@@ -224,9 +128,7 @@ class DriverSettlementsReport extends Page implements HasForms
             ->orderByDesc('driver_settlements.period_start')
             ->get();
 
-        $this->hasSettlementsForPeriod = $settlements->isNotEmpty();
-
-        $this->settlements = $settlements->all();
+        $hasSettlementsForPeriod = $settlements->isNotEmpty();
 
         $pendingQuery = PlatformDriverBalance::query()
             ->whereNull('driver_id');
@@ -237,7 +139,7 @@ class DriverSettlementsReport extends Page implements HasForms
                 ->whereDate('period_end', '<=', $periodEnd);
         }
 
-        $this->pendingBalances = $pendingQuery
+        $pendingBalances = $pendingQuery
             ->orderByDesc('period_start')
             ->get([
                 'platform',
@@ -270,7 +172,7 @@ class DriverSettlementsReport extends Page implements HasForms
             ->distinct()
             ->pluck('driver_id');
 
-        $this->driversMissingProfiles = $driverIds->isEmpty()
+        $driversMissingProfiles = $driverIds->isEmpty()
             ? []
             : Driver::query()
                 ->whereIn('id', $driverIds)
@@ -328,7 +230,7 @@ class DriverSettlementsReport extends Page implements HasForms
             $auditQuery->where('platform_driver_balances.driver_id', $driverId);
         }
 
-        $this->auditRows = $auditQuery
+        $auditRows = $auditQuery
             ->orderByDesc('platform_driver_balances.period_start')
             ->get()
             ->map(fn (PlatformDriverBalance $row): array => [
@@ -343,5 +245,46 @@ class DriverSettlementsReport extends Page implements HasForms
                 'raw_row' => $row->raw_row,
             ])
             ->all();
+
+        return [
+            'settlements' => $settlements->all(),
+            'pendingBalances' => $pendingBalances,
+            'driversMissingProfiles' => $driversMissingProfiles,
+            'auditRows' => $auditRows,
+            'hasSettlementsForPeriod' => $hasSettlementsForPeriod,
+        ];
+    }
+
+    public function applyFiltersAction(): Action
+    {
+        return Action::make('applyFilters')
+            ->label('Aplicar filtros')
+            ->color('primary')
+            ->action(fn () => null)
+            ->livewire($this);
+    }
+
+    public function generateSettlementsAction(): Action
+    {
+        return Action::make('generateSettlements')
+            ->label('Gerar settlements para este periodo')
+            ->color('warning')
+            ->requiresConfirmation()
+            ->disabled(fn (): bool => ! $this->periodStart || ! $this->periodEnd)
+            ->action(fn () => app(DriverSettlementCalculator::class)
+                ->calculate($this->periodStart, $this->periodEnd))
+            ->livewire($this);
+    }
+
+    public function deletePeriodAction(): Action
+    {
+        return Action::make('deletePeriod')
+            ->label('Eliminar dados do periodo')
+            ->color('danger')
+            ->requiresConfirmation()
+            ->action(fn () => DriverSettlement::query()
+                ->whereBetween('period_start', [$this->periodStart, $this->periodEnd])
+                ->delete())
+            ->livewire($this);
     }
 }
