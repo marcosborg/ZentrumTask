@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class DriverSettlement extends Model
 {
@@ -36,5 +37,10 @@ class DriverSettlement extends Model
             'amount_payable' => 'decimal:2',
             'rules_snapshot' => 'array',
         ];
+    }
+
+    public function driver(): BelongsTo
+    {
+        return $this->belongsTo(Driver::class);
     }
 }

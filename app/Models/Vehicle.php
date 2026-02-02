@@ -19,6 +19,8 @@ class Vehicle extends Model implements HasMedia
 
     protected $fillable = [
         'license_plate',
+        'prio_card_code',
+        'prio_card_label',
         'vin',
         'make',
         'model',
@@ -46,6 +48,11 @@ class Vehicle extends Model implements HasMedia
     public function allocations(): HasMany
     {
         return $this->hasMany(VehicleAllocation::class);
+    }
+
+    public function prioTransactions(): HasMany
+    {
+        return $this->hasMany(PrioTransaction::class);
     }
 
     public function currentAllocation(): HasOne

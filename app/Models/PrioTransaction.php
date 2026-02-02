@@ -5,23 +5,27 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-class PlatformDriverBalance extends Model
+class PrioTransaction extends Model
 {
     /**
      * @var list<string>
      */
     protected $fillable = [
-        'platform',
-        'driver_code',
-        'period_start',
-        'period_end',
+        'occurred_at',
+        'card_code',
+        'vehicle_plate',
+        'id_usage',
+        'station_id',
+        'energy_kwh',
         'net_amount',
-        'tips_amount',
-        'net_source_column',
-        'tips_source_column',
+        'gross_amount',
+        'vat_rate',
+        'vehicle_id',
+        'driver_id',
+        'assignment_status',
         'raw_row',
-        'source_file',
         'imported_at',
+        'source_file',
     ];
 
     /**
@@ -30,13 +34,19 @@ class PlatformDriverBalance extends Model
     protected function casts(): array
     {
         return [
-            'period_start' => 'date',
-            'period_end' => 'date',
+            'occurred_at' => 'datetime',
+            'energy_kwh' => 'decimal:3',
             'net_amount' => 'decimal:2',
-            'tips_amount' => 'decimal:2',
+            'gross_amount' => 'decimal:2',
+            'vat_rate' => 'decimal:2',
             'raw_row' => 'array',
             'imported_at' => 'datetime',
         ];
+    }
+
+    public function vehicle(): BelongsTo
+    {
+        return $this->belongsTo(Vehicle::class);
     }
 
     public function driver(): BelongsTo
