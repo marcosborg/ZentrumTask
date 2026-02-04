@@ -100,4 +100,136 @@
             </div>
         @endif
     </x-filament::section>
+
+    <x-filament::section heading="Despesas PRIO">
+        <div class="grid gap-4 sm:grid-cols-2">
+            <div>
+                <div class="text-xs uppercase text-gray-400">Total PRIO</div>
+                <div class="text-sm font-semibold text-gray-100">
+                    {{ number_format((float) ($prioExpenses['total'] ?? 0), 2, ',', ' ') }} &euro;
+                </div>
+            </div>
+            <div>
+                <div class="text-xs uppercase text-gray-400">Transacoes</div>
+                <div class="text-sm font-semibold text-gray-100">
+                    {{ $prioExpenses['count'] ?? 0 }}
+                </div>
+            </div>
+        </div>
+
+        @if (($prioExpenses['rows'] ?? []) !== [])
+            <div class="mt-4 overflow-x-auto">
+                <table class="min-w-full text-sm text-gray-200">
+                    <thead class="text-xs uppercase text-gray-400">
+                        <tr>
+                            <th class="px-3 py-2 text-left">Data/Hora</th>
+                            <th class="px-3 py-2 text-left">Cartao</th>
+                            <th class="px-3 py-2 text-left">Matricula</th>
+                            <th class="px-3 py-2 text-right">Total</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-800">
+                        @foreach ($prioExpenses['rows'] as $row)
+                            <tr>
+                                <td class="px-3 py-2">{{ $row['occurred_at']?->format('d/m/Y H:i') ?? '-' }}</td>
+                                <td class="px-3 py-2">{{ $row['card_code'] ?? '-' }}</td>
+                                <td class="px-3 py-2">{{ $row['vehicle_plate'] ?? '-' }}</td>
+                                <td class="px-3 py-2 text-right">
+                                    {{ number_format((float) ($row['net_amount'] ?? 0), 2, ',', ' ') }} &euro;
+                                </td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
+        @endif
+    </x-filament::section>
+
+    <x-filament::section heading="Despesas Via Verde">
+        <div class="grid gap-4 sm:grid-cols-2">
+            <div>
+                <div class="text-xs uppercase text-gray-400">Total Via Verde</div>
+                <div class="text-sm font-semibold text-gray-100">
+                    {{ number_format((float) ($viaVerdeExpenses['total'] ?? 0), 2, ',', ' ') }} &euro;
+                </div>
+            </div>
+            <div>
+                <div class="text-xs uppercase text-gray-400">Transacoes</div>
+                <div class="text-sm font-semibold text-gray-100">
+                    {{ $viaVerdeExpenses['count'] ?? 0 }}
+                </div>
+            </div>
+        </div>
+
+        @if (($viaVerdeExpenses['rows'] ?? []) !== [])
+            <div class="mt-4 overflow-x-auto">
+                <table class="min-w-full text-sm text-gray-200">
+                    <thead class="text-xs uppercase text-gray-400">
+                        <tr>
+                            <th class="px-3 py-2 text-left">Data/Hora</th>
+                            <th class="px-3 py-2 text-left">Matricula</th>
+                            <th class="px-3 py-2 text-left">Local</th>
+                            <th class="px-3 py-2 text-right">Total</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-800">
+                        @foreach ($viaVerdeExpenses['rows'] as $row)
+                            <tr>
+                                <td class="px-3 py-2">{{ $row['occurred_at']?->format('d/m/Y H:i') ?? '-' }}</td>
+                                <td class="px-3 py-2">{{ $row['vehicle_plate'] ?? '-' }}</td>
+                                <td class="px-3 py-2">{{ $row['location'] ?? '-' }}</td>
+                                <td class="px-3 py-2 text-right">
+                                    {{ number_format((float) ($row['amount'] ?? 0), 2, ',', ' ') }} &euro;
+                                </td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
+        @endif
+    </x-filament::section>
+
+    <x-filament::section heading="Ajustes (Caucao / Acertos)">
+        <div class="grid gap-4 sm:grid-cols-2">
+            <div>
+                <div class="text-xs uppercase text-gray-400">Total ajustes</div>
+                <div class="text-sm font-semibold text-gray-100">
+                    {{ number_format((float) ($adjustments['total'] ?? 0), 2, ',', ' ') }} &euro;
+                </div>
+            </div>
+            <div>
+                <div class="text-xs uppercase text-gray-400">Ocorrencias</div>
+                <div class="text-sm font-semibold text-gray-100">
+                    {{ $adjustments['count'] ?? 0 }}
+                </div>
+            </div>
+        </div>
+
+        @if (($adjustments['rows'] ?? []) !== [])
+            <div class="mt-4 overflow-x-auto">
+                <table class="min-w-full text-sm text-gray-200">
+                    <thead class="text-xs uppercase text-gray-400">
+                        <tr>
+                            <th class="px-3 py-2 text-left">Data</th>
+                            <th class="px-3 py-2 text-left">Tipo</th>
+                            <th class="px-3 py-2 text-left">Descricao</th>
+                            <th class="px-3 py-2 text-right">Valor</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-800">
+                        @foreach ($adjustments['rows'] as $row)
+                            <tr>
+                                <td class="px-3 py-2">{{ $row['occurred_at']?->format('d/m/Y') ?? '-' }}</td>
+                                <td class="px-3 py-2">{{ $row['category'] ?? '-' }}</td>
+                                <td class="px-3 py-2">{{ $row['description'] ?? '-' }}</td>
+                                <td class="px-3 py-2 text-right">
+                                    {{ number_format((float) ($row['amount'] ?? 0), 2, ',', ' ') }} &euro;
+                                </td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
+        @endif
+    </x-filament::section>
 </div>

@@ -190,6 +190,13 @@ class DriverSettlementsReport extends Page implements HasTable
                     ->sortable(query: function (Builder $query, string $direction): Builder {
                         return $query->orderBy('drivers.name', $direction);
                     }),
+                TextColumn::make('driver_email')
+                    ->label('Email')
+                    ->state(fn (DriverSettlement $record): string => (string) ($record->driver_email ?? '—'))
+                    ->copyable()
+                    ->copyableState(fn (DriverSettlement $record): string => (string) ($record->driver_email ?? ''))
+                    ->copyMessage('Email copiado')
+                    ->copyMessageDuration(1500),
                 TextColumn::make('period_range')
                     ->label('Periodo')
                     ->state(function (DriverSettlement $record): string {
@@ -215,14 +222,25 @@ class DriverSettlementsReport extends Page implements HasTable
                     ->label('Tips')
                     ->alignRight()
                     ->formatStateUsing(fn ($state): string => $this->formatMoney($state)),
-                TextColumn::make('total_liquido_sem_tips')
-                    ->label('Total liquido')
+                TextColumn::make('prio_expenses')
+                    ->label('PRIO')
                     ->alignRight()
-                    ->state(function (DriverSettlement $record): float {
-                        $totalOperadores = (float) $record->uber_net + (float) $record->bolt_net;
-
-                        return $totalOperadores - (float) $record->tips_total_balance;
-                    })
+                    ->state(fn (DriverSettlement $record): float => $this->prioExpensesForSettlement($record)['total'])
+                    ->formatStateUsing(fn ($state): string => $this->formatMoney($state)),
+                TextColumn::make('via_verde_expenses')
+                    ->label('Via Verde')
+                    ->alignRight()
+                    ->state(fn (DriverSettlement $record): float => $this->viaVerdeExpensesForSettlement($record)['total'])
+                    ->formatStateUsing(fn ($state): string => $this->formatMoney($state)),
+                TextColumn::make('adjustments_expenses')
+                    ->label('Ajustes')
+                    ->alignRight()
+                    ->state(fn (DriverSettlement $record): float => $this->adjustmentsForSettlement($record)['total'])
+                    ->formatStateUsing(fn ($state): string => $this->formatMoney($state)),
+                TextColumn::make('expenses_total')
+                    ->label('Despesas')
+                    ->alignRight()
+                    ->state(fn (DriverSettlement $record): float => (float) $record->expenses_total)
                     ->formatStateUsing(fn ($state): string => $this->formatMoney($state)),
                 TextColumn::make('rental_days')
                     ->label('Dias')
@@ -233,6 +251,18 @@ class DriverSettlementsReport extends Page implements HasTable
                     ->label('Aluguer')
                     ->alignRight()
                     ->state(fn (DriverSettlement $record): float => $this->billingFor($record)['rent_total'])
+                    ->formatStateUsing(fn ($state): string => $this->formatMoney($state)),
+                TextColumn::make('total_liquido_sem_tips')
+                    ->label('Valor da semana')
+                    ->alignRight()
+                    ->state(function (DriverSettlement $record): float {
+                        $totalOperadores = (float) $record->uber_net + (float) $record->bolt_net;
+
+                        return $totalOperadores
+                            + (float) $record->tips_total_balance
+                            - (float) $record->expenses_total
+                            - (float) $this->billingFor($record)['rent_total'];
+                    })
                     ->formatStateUsing(fn ($state): string => $this->formatMoney($state)),
                 TextColumn::make('percent_company')
                     ->label('Empresa %')
@@ -270,6 +300,10 @@ class DriverSettlementsReport extends Page implements HasTable
                     ->badge()
                     ->state(fn (DriverSettlement $record): string => $this->billingProfileLabel($record))
                     ->color(fn (DriverSettlement $record): string => $this->billingProfileColor($record)),
+                TextColumn::make('amount_payable')
+                    ->label('A pagar')
+                    ->alignRight()
+                    ->formatStateUsing(fn ($state): string => $this->formatMoney($state)),
                 TextColumn::make('created_at')
                     ->label('Criado em')
                     ->dateTime('d/m/Y H:i')
@@ -511,11 +545,17 @@ class DriverSettlementsReport extends Page implements HasTable
             ->modalContent(function (DriverSettlement $record) {
                 $balances = $this->balancesForSettlement($record);
                 $billing = $this->billingFor($record);
+                $prioExpenses = $this->prioExpensesForSettlement($record);
+                $viaVerdeExpenses = $this->viaVerdeExpensesForSettlement($record);
+                $adjustments = $this->adjustmentsForSettlement($record);
 
                 return view('filament.pages.driver-settlements-report-details', [
                     'settlement' => $record,
                     'balances' => $balances,
                     'billing' => $billing,
+                    'prioExpenses' => $prioExpenses,
+                    'viaVerdeExpenses' => $viaVerdeExpenses,
+                    'adjustments' => $adjustments,
                 ]);
             })
             ->action(function (): void {});
@@ -569,6 +609,135 @@ class DriverSettlementsReport extends Page implements HasTable
                 'source_file' => $row->source_file,
             ])
             ->all();
+    }
+
+    /**
+     * @return array{total: float, count: int, rows: array<int, array<string, mixed>>}
+     */
+    private function prioExpensesForSettlement(DriverSettlement $settlement): array
+    {
+        $rows = \App\Models\PrioTransaction::query()
+            ->where('driver_id', $settlement->driver_id)
+            ->where('assignment_status', 'ok')
+            ->whereDate('occurred_at', '>=', $settlement->period_start)
+            ->whereDate('occurred_at', '<=', $settlement->period_end)
+            ->orderBy('occurred_at')
+            ->get([
+                'occurred_at',
+                'vehicle_plate',
+                'card_code',
+                'net_amount',
+            ])
+            ->map(fn (\App\Models\PrioTransaction $row): array => [
+                'occurred_at' => $row->occurred_at,
+                'vehicle_plate' => $row->vehicle_plate,
+                'card_code' => $row->card_code,
+                'net_amount' => (float) $row->net_amount,
+            ])
+            ->all();
+
+        $total = array_reduce($rows, fn (float $carry, array $row): float => $carry + (float) $row['net_amount'], 0.0);
+
+        return [
+            'total' => round($total, 2),
+            'count' => count($rows),
+            'rows' => $rows,
+        ];
+    }
+
+    /**
+     * @return array{total: float, count: int, rows: array<int, array<string, mixed>>}
+     */
+    private function viaVerdeExpensesForSettlement(DriverSettlement $settlement): array
+    {
+        $rows = \App\Models\ViaVerdeTransaction::query()
+            ->where('driver_id', $settlement->driver_id)
+            ->where('assignment_status', 'ok')
+            ->whereDate('occurred_at', '>=', $settlement->period_start)
+            ->whereDate('occurred_at', '<=', $settlement->period_end)
+            ->orderBy('occurred_at')
+            ->get([
+                'occurred_at',
+                'vehicle_plate',
+                'location',
+                'amount',
+            ])
+            ->map(fn (\App\Models\ViaVerdeTransaction $row): array => [
+                'occurred_at' => $row->occurred_at,
+                'vehicle_plate' => $row->vehicle_plate,
+                'location' => $row->location,
+                'amount' => (float) $row->amount,
+            ])
+            ->all();
+
+        $total = array_reduce($rows, fn (float $carry, array $row): float => $carry + (float) $row['amount'], 0.0);
+
+        return [
+            'total' => round($total, 2),
+            'count' => count($rows),
+            'rows' => $rows,
+        ];
+    }
+
+    /**
+     * @return array{total: float, count: int, rows: array<int, array<string, mixed>>}
+     */
+    private function adjustmentsForSettlement(DriverSettlement $settlement): array
+    {
+        $adjustments = \App\Models\DriverAdjustment::query()
+            ->where('driver_id', $settlement->driver_id)
+            ->whereDate('starts_at', '<=', $settlement->period_end)
+            ->orderBy('starts_at')
+            ->get([
+                'starts_at',
+                'recurrence_weeks',
+                'category',
+                'description',
+                'amount',
+            ]);
+
+        if ($adjustments->isEmpty()) {
+            return [
+                'total' => 0.0,
+                'count' => 0,
+                'rows' => [],
+            ];
+        }
+
+        $start = Carbon::parse($settlement->period_start)->startOfDay();
+        $end = Carbon::parse($settlement->period_end)->endOfDay();
+
+        $rows = [];
+        $total = 0.0;
+
+        foreach ($adjustments as $adjustment) {
+            $startsAt = Carbon::parse($adjustment->starts_at)->startOfDay();
+            $weeks = (int) ($adjustment->recurrence_weeks ?? 1);
+            $weeks = max(1, $weeks);
+
+            for ($i = 0; $i < $weeks; $i++) {
+                $occurrence = $startsAt->copy()->addWeeks($i);
+
+                if ($occurrence->lt($start) || $occurrence->gt($end)) {
+                    continue;
+                }
+
+                $rows[] = [
+                    'occurred_at' => $occurrence,
+                    'category' => $adjustment->category,
+                    'description' => $adjustment->description,
+                    'amount' => (float) $adjustment->amount,
+                ];
+
+                $total += (float) $adjustment->amount;
+            }
+        }
+
+        return [
+            'total' => round($total, 2),
+            'count' => count($rows),
+            'rows' => $rows,
+        ];
     }
 
     private function deleteSettlementsForPeriod(string $periodStart, string $periodEnd, ?int $driverId = null): int

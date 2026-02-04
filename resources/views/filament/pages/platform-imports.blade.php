@@ -112,6 +112,60 @@
             </section>
         @endif
 
+        @if ($missingPrioCards !== [])
+            <section class="rounded-xl border border-amber-700 bg-amber-900 px-4 py-3 text-sm text-amber-100">
+                <p class="font-semibold">Estes cartoes PRIO ainda nao estao associados a viaturas.</p>
+                <p class="mt-1 text-amber-200">
+                    Copie o cartao e associe na viatura correspondente.
+                </p>
+                <div class="mt-3 flex flex-wrap gap-2">
+                    @foreach ($missingPrioCards as $code)
+                        <span
+                            x-data="{ copied: false }"
+                            role="button"
+                            tabindex="0"
+                            title="Clique para copiar"
+                            class="cursor-pointer select-text rounded-full border border-amber-700 bg-amber-800 px-3 py-1 text-xs font-semibold text-amber-100 transition"
+                            :class="copied ? 'border-emerald-600 bg-emerald-700 text-emerald-50' : ''"
+                            @click="navigator.clipboard.writeText('{{ $code }}'); copied = true; setTimeout(() => copied = false, 1500)"
+                            @keydown.enter="navigator.clipboard.writeText('{{ $code }}'); copied = true; setTimeout(() => copied = false, 1500)"
+                            @keydown.space.prevent="navigator.clipboard.writeText('{{ $code }}'); copied = true; setTimeout(() => copied = false, 1500)"
+                        >
+                            <span x-show="!copied">{{ $code }}</span>
+                            <span x-show="copied">Copiado!</span>
+                        </span>
+                    @endforeach
+                </div>
+            </section>
+        @endif
+
+        @if ($missingViaVerdePlates !== [])
+            <section class="rounded-xl border border-amber-700 bg-amber-900 px-4 py-3 text-sm text-amber-100">
+                <p class="font-semibold">Estas matriculas ainda nao existem no sistema.</p>
+                <p class="mt-1 text-amber-200">
+                    Crie a viatura e volte a importar o ficheiro Via Verde.
+                </p>
+                <div class="mt-3 flex flex-wrap gap-2">
+                    @foreach ($missingViaVerdePlates as $plate)
+                        <span
+                            x-data="{ copied: false }"
+                            role="button"
+                            tabindex="0"
+                            title="Clique para copiar"
+                            class="cursor-pointer select-text rounded-full border border-amber-700 bg-amber-800 px-3 py-1 text-xs font-semibold text-amber-100 transition"
+                            :class="copied ? 'border-emerald-600 bg-emerald-700 text-emerald-50' : ''"
+                            @click="navigator.clipboard.writeText('{{ $plate }}'); copied = true; setTimeout(() => copied = false, 1500)"
+                            @keydown.enter="navigator.clipboard.writeText('{{ $plate }}'); copied = true; setTimeout(() => copied = false, 1500)"
+                            @keydown.space.prevent="navigator.clipboard.writeText('{{ $plate }}'); copied = true; setTimeout(() => copied = false, 1500)"
+                        >
+                            <span x-show="!copied">{{ $plate }}</span>
+                            <span x-show="copied">Copiado!</span>
+                        </span>
+                    @endforeach
+                </div>
+            </section>
+        @endif
+
         @if ($result)
             <section class="space-y-3">
                 <h3 class="text-lg font-semibold">Resumo</h3>
@@ -124,7 +178,7 @@
                         <div class="text-xs uppercase text-gray-400">Importados</div>
                         <div class="text-2xl font-semibold text-gray-100">{{ $result['inserted'] }}</div>
                     </div>
-                    @if (($result['import_type'] ?? null) === 'prio')
+                    @if (in_array(($result['import_type'] ?? null), ['prio', 'via_verde'], true))
                         <div class="rounded-xl border border-gray-800 bg-gray-900 px-4 py-3">
                             <div class="text-xs uppercase text-gray-400">Atualizados</div>
                             <div class="text-2xl font-semibold text-gray-100">{{ $result['updated'] ?? 0 }}</div>
@@ -147,6 +201,8 @@
                             <div class="text-xs uppercase text-gray-400">Sem viatura</div>
                             <div class="text-2xl font-semibold text-gray-100">{{ $result['unassigned_vehicle'] ?? 0 }}</div>
                         </div>
+                    @endif
+                    @if (in_array(($result['import_type'] ?? null), ['prio', 'via_verde'], true))
                         <div class="rounded-xl border border-gray-800 bg-gray-900 px-4 py-3">
                             <div class="text-xs uppercase text-gray-400">Sem motorista</div>
                             <div class="text-2xl font-semibold text-gray-100">{{ $result['unassigned_driver'] ?? 0 }}</div>
@@ -166,8 +222,157 @@
             </section>
         @endif
 
+        <x-filament::section heading="Importar ajustes (caucao e acertos)">
+            <div class="text-sm text-gray-400">
+                CSV com colunas: motorista (email ou codigo), data, valor, descricao, categoria (caucao/acerto) e semanas (opcional).
+            </div>
+            <div class="mt-4">
+                <x-filament::actions
+                    :actions="[
+                        $this->importAdjustmentsAction(),
+                    ]"
+                />
+            </div>
+            <div class="mt-4">
+                <x-filament::button
+                    color="gray"
+                    tag="a"
+                    href="{{ route('driver-adjustments.sample') }}"
+                >
+                    Download exemplo CSV
+                </x-filament::button>
+            </div>
+
+            @if ($adjustmentError)
+                <div class="mt-3 rounded-xl border border-red-700/70 bg-red-900/80 px-4 py-3 text-sm text-red-100">
+                    {{ $adjustmentError }}
+                </div>
+            @endif
+
+            @if ($missingAdjustmentDrivers !== [])
+                <div class="mt-3 rounded-xl border border-amber-700 bg-amber-900 px-4 py-3 text-sm text-amber-100">
+                    <p class="font-semibold">Motoristas nao encontrados.</p>
+                    <p class="mt-1 text-amber-200">
+                        Confirme o email ou codigo no ficheiro e volte a importar.
+                    </p>
+                    <div class="mt-3 flex flex-wrap gap-2">
+                        @foreach ($missingAdjustmentDrivers as $code)
+                            <span
+                                class="select-text rounded-full border border-amber-700 bg-amber-800 px-3 py-1 text-xs font-semibold text-amber-100"
+                            >
+                                {{ $code }}
+                            </span>
+                        @endforeach
+                    </div>
+                </div>
+            @endif
+
+            @if ($adjustmentResult)
+                <div class="mt-4 grid gap-4 md:grid-cols-3">
+                    <div class="rounded-xl border border-gray-800 bg-gray-900 px-4 py-3">
+                        <div class="text-xs uppercase text-gray-400">Processado</div>
+                        <div class="text-2xl font-semibold text-gray-100">{{ $adjustmentResult['total'] ?? 0 }}</div>
+                    </div>
+                    <div class="rounded-xl border border-gray-800 bg-gray-900 px-4 py-3">
+                        <div class="text-xs uppercase text-gray-400">Importados</div>
+                        <div class="text-2xl font-semibold text-gray-100">{{ $adjustmentResult['inserted'] ?? 0 }}</div>
+                    </div>
+                    <div class="rounded-xl border border-gray-800 bg-gray-900 px-4 py-3">
+                        <div class="text-xs uppercase text-gray-400">Atualizados</div>
+                        <div class="text-2xl font-semibold text-gray-100">{{ $adjustmentResult['updated'] ?? 0 }}</div>
+                    </div>
+                </div>
+            @endif
+        </x-filament::section>
+
+        <x-filament::section heading="Historico de ajustes">
+            @if (($adjustmentImports ?? []) === [])
+                <div class="text-sm text-gray-500">
+                    Ainda nao existem ajustes importados.
+                </div>
+            @else
+                <div class="overflow-x-auto rounded-xl border border-gray-800 bg-gray-900">
+                    <table class="w-full text-sm">
+                        <thead class="bg-gray-800 text-xs uppercase text-gray-400">
+                            <tr>
+                                <th class="px-4 py-3 text-left">Ficheiro</th>
+                                <th class="px-4 py-3 text-left">Periodo</th>
+                                <th class="px-4 py-3 text-right">Registos</th>
+                                <th class="px-4 py-3 text-right">Acoes</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-800">
+                            @foreach ($adjustmentImports as $row)
+                                <tr class="text-gray-100 transition hover:bg-gray-800/50">
+                                    <td class="px-4 py-3 text-gray-100">
+                                        {{ $row['source_file'] ? basename($row['source_file']) : '-' }}
+                                    </td>
+                                    <td class="px-4 py-3 text-gray-300">
+                                        {{ $row['period_start'] ? \Illuminate\Support\Carbon::parse($row['period_start'])->format('d/m/Y') : '-' }}
+                                        &rarr;
+                                        {{ $row['period_end'] ? \Illuminate\Support\Carbon::parse($row['period_end'])->format('d/m/Y') : '-' }}
+                                    </td>
+                                    <td class="px-4 py-3 text-right text-gray-100">{{ number_format($row['total_records']) }}</td>
+                                    <td class="px-4 py-3 text-right">
+                                        <x-filament::actions
+                                            :actions="[
+                                                $this->deleteAdjustmentImportAction()->arguments([
+                                                    'source_file' => $row['source_file'],
+                                                ]),
+                                            ]"
+                                            alignment="end"
+                                            class="justify-end"
+                                        />
+                                    </td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            @endif
+        </x-filament::section>
+
         <x-filament::section heading="Transacoes PRIO por associar">
             {{ $this->table }}
+        </x-filament::section>
+
+        <x-filament::section heading="Transacoes Via Verde por associar">
+            @if (($viaVerdePending ?? []) === [])
+                <p class="text-sm text-gray-500">Sem transacoes por associar.</p>
+            @else
+                <div class="overflow-x-auto rounded-xl border border-gray-800 bg-gray-900">
+                    <table class="w-full text-sm">
+                        <thead class="bg-gray-800 text-xs uppercase text-gray-400">
+                            <tr>
+                                <th class="px-4 py-3 text-left">Data/Hora</th>
+                                <th class="px-4 py-3 text-left">Matricula</th>
+                                <th class="px-4 py-3 text-left">Local</th>
+                                <th class="px-4 py-3 text-right">Valor</th>
+                                <th class="px-4 py-3 text-left">Motorista</th>
+                                <th class="px-4 py-3 text-left">Estado</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-800">
+                            @foreach ($viaVerdePending as $row)
+                                <tr class="text-gray-100 transition hover:bg-gray-800/50">
+                                    <td class="px-4 py-3">
+                                        {{ $row['occurred_at']?->format('d/m/Y H:i') ?? '-' }}
+                                    </td>
+                                    <td class="px-4 py-3 text-gray-100">{{ $row['vehicle_plate'] ?? '-' }}</td>
+                                    <td class="px-4 py-3 text-gray-300">{{ $row['location'] ?? '-' }}</td>
+                                    <td class="px-4 py-3 text-right text-gray-100">
+                                        {{ number_format((float) ($row['amount'] ?? 0), 2, ',', ' ') }} &euro;
+                                    </td>
+                                    <td class="px-4 py-3 text-gray-300">{{ $row['driver_name'] ?? '—' }}</td>
+                                    <td class="px-4 py-3 text-gray-300">
+                                        {{ $row['status'] === 'ambiguous_driver' ? 'Ambiguo' : 'Sem motorista' }}
+                                    </td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            @endif
         </x-filament::section>
     </div>
 </x-filament-panels::page>

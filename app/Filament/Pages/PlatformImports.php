@@ -3,13 +3,17 @@
 namespace App\Filament\Pages;
 
 use App\Models\Driver;
+use App\Models\DriverAdjustment;
 use App\Models\PlatformDriverBalance;
 use App\Models\PrioTransaction;
 use App\Models\Vehicle;
 use App\Models\VehicleAllocation;
+use App\Models\ViaVerdeTransaction;
 use App\Services\BoltPlatformCsvImportService;
+use App\Services\DriverAdjustmentsCsvImportService;
 use App\Services\PrioFuelCsvImportService;
 use App\Services\UberPlatformCsvImportService;
+use App\Services\ViaVerdeCsvImportService;
 use BackedEnum;
 use Filament\Actions\Action;
 use Filament\Forms\Components\DatePicker;
@@ -56,6 +60,20 @@ class PlatformImports extends Page implements HasForms, HasTable
     /** @var list<string> */
     public array $missingDriverCodes = [];
 
+    /** @var list<string> */
+    public array $missingPrioCards = [];
+
+    /** @var list<string> */
+    public array $missingViaVerdePlates = [];
+
+    /** @var list<string> */
+    public array $missingAdjustmentDrivers = [];
+
+    /** @var array<string, mixed>|null */
+    public ?array $adjustmentResult = null;
+
+    public ?string $adjustmentError = null;
+
     public ?string $errorMessage = null;
 
     public function mount(): void
@@ -77,6 +95,7 @@ class PlatformImports extends Page implements HasForms, HasTable
                         'bolt' => 'Bolt',
                         'uber' => 'Uber',
                         'prio' => 'PRIO Abastecimento',
+                        'via_verde' => 'Via Verde',
                     ])
                     ->required()
                     ->native(false),
@@ -107,6 +126,8 @@ class PlatformImports extends Page implements HasForms, HasTable
         $this->errorMessage = null;
         $this->result = null;
         $this->missingDriverCodes = [];
+        $this->missingPrioCards = [];
+        $this->missingViaVerdePlates = [];
 
         $data = $this->form->getState();
         $platform = $data['platform'] ?? null;
@@ -123,7 +144,7 @@ class PlatformImports extends Page implements HasForms, HasTable
             return;
         }
 
-        if ($platform !== 'prio' && (($periodStart && ! $periodEnd) || ($periodEnd && ! $periodStart))) {
+        if (! in_array($platform, ['prio', 'via_verde'], true) && (($periodStart && ! $periodEnd) || ($periodEnd && ! $periodStart))) {
             Notification::make()
                 ->danger()
                 ->title('Indique inicio e fim do periodo')
@@ -135,7 +156,7 @@ class PlatformImports extends Page implements HasForms, HasTable
         $path = Storage::disk('local')->path($file);
         $options = [];
 
-        if ($platform !== 'prio' && $periodStart && $periodEnd) {
+        if (! in_array($platform, ['prio', 'via_verde'], true) && $periodStart && $periodEnd) {
             $options = [
                 'period_start' => $periodStart,
                 'period_end' => $periodEnd,
@@ -145,13 +166,15 @@ class PlatformImports extends Page implements HasForms, HasTable
         try {
             if ($platform === 'prio') {
                 $result = app(PrioFuelCsvImportService::class)->import($path);
+            } elseif ($platform === 'via_verde') {
+                $result = app(ViaVerdeCsvImportService::class)->import($path);
             } else {
                 $result = $platform === 'bolt'
                     ? app(BoltPlatformCsvImportService::class)->import($path, $options)
                     : app(UberPlatformCsvImportService::class)->import($path, $options);
             }
 
-            if ($platform !== 'prio') {
+            if (! in_array($platform, ['prio', 'via_verde'], true)) {
                 $driverCodes = array_values(array_filter(array_map(
                     fn (string $code): string => strtolower(trim($code)),
                     $result['driver_codes'] ?? []
@@ -171,6 +194,19 @@ class PlatformImports extends Page implements HasForms, HasTable
 
                     $this->missingDriverCodes = array_values(array_diff($driverCodes, $missing));
                 }
+            } elseif ($platform === 'prio') {
+                $sourceFile = basename($path);
+                $this->missingPrioCards = PrioTransaction::query()
+                    ->where('source_file', $sourceFile)
+                    ->where('assignment_status', 'unassigned_vehicle')
+                    ->pluck('card_code')
+                    ->filter()
+                    ->map(fn (string $code): string => strtoupper(trim($code)))
+                    ->unique()
+                    ->values()
+                    ->all();
+            } elseif ($platform === 'via_verde') {
+                $this->missingViaVerdePlates = [];
             }
 
             $this->result = [
@@ -183,7 +219,7 @@ class PlatformImports extends Page implements HasForms, HasTable
                 'period_start' => $result['period_start'] ?? null,
                 'period_end' => $result['period_end'] ?? null,
                 'platform' => $platform,
-                'import_type' => $platform === 'prio' ? 'prio' : 'platform',
+                'import_type' => in_array($platform, ['prio', 'via_verde'], true) ? $platform : 'platform',
                 'unassigned_vehicle' => $result['unassigned_vehicle'] ?? 0,
                 'unassigned_driver' => $result['unassigned_driver'] ?? 0,
                 'ambiguous_driver' => $result['ambiguous_driver'] ?? 0,
@@ -195,6 +231,11 @@ class PlatformImports extends Page implements HasForms, HasTable
                 ->send();
         } catch (RuntimeException $exception) {
             $this->errorMessage = $exception->getMessage();
+            if ($platform === 'via_verde') {
+                if (preg_match('/matricula\s+([A-Z0-9-]+)/i', $exception->getMessage(), $matches)) {
+                    $this->missingViaVerdePlates = [strtoupper($matches[1])];
+                }
+            }
 
             Notification::make()
                 ->danger()
@@ -202,6 +243,64 @@ class PlatformImports extends Page implements HasForms, HasTable
                 ->body($exception->getMessage())
                 ->send();
         }
+    }
+
+    public function importAdjustmentsAction(): Action
+    {
+        return Action::make('importAdjustments')
+            ->label('Importar ajustes')
+            ->icon(Heroicon::OutlinedArrowUpTray)
+            ->modalHeading('Importar ajustes (caucao e acertos)')
+            ->form([
+                FileUpload::make('file')
+                    ->label('CSV')
+                    ->disk('local')
+                    ->directory('settlement-adjustments')
+                    ->preserveFilenames()
+                    ->acceptedFileTypes([
+                        'text/csv',
+                        'text/plain',
+                        'application/vnd.ms-excel',
+                    ])
+                    ->required(),
+            ])
+            ->action(function (array $data): void {
+                $this->adjustmentError = null;
+                $this->adjustmentResult = null;
+                $this->missingAdjustmentDrivers = [];
+
+                $file = $data['file'] ?? null;
+
+                if (! $file) {
+                    Notification::make()
+                        ->danger()
+                        ->title('Selecione um ficheiro CSV')
+                        ->send();
+
+                    return;
+                }
+
+                try {
+                    $path = Storage::disk('local')->path($file);
+                    $result = app(DriverAdjustmentsCsvImportService::class)->import($path);
+
+                    $this->missingAdjustmentDrivers = $result['missing_drivers'] ?? [];
+                    $this->adjustmentResult = $result;
+
+                    Notification::make()
+                        ->success()
+                        ->title('Ajustes importados')
+                        ->send();
+                } catch (RuntimeException $exception) {
+                    $this->adjustmentError = $exception->getMessage();
+
+                    Notification::make()
+                        ->danger()
+                        ->title('Falha ao importar ajustes')
+                        ->body($exception->getMessage())
+                        ->send();
+                }
+            });
     }
 
     public function table(Table $table): Table
@@ -378,8 +477,87 @@ class PlatformImports extends Page implements HasForms, HasTable
             })
             ->all();
 
+        $viaVerdeImports = [];
+        $viaVerdePending = [];
+
+        if (DB::getSchemaBuilder()->hasTable('via_verde_transactions')) {
+            $viaVerdeImports = ViaVerdeTransaction::query()
+                ->selectRaw('source_file, MIN(occurred_at) as period_start, MAX(occurred_at) as period_end')
+                ->selectRaw('COUNT(*) as total_records')
+                ->selectRaw("SUM(CASE WHEN assignment_status = 'ok' THEN 1 ELSE 0 END) as allocated_count")
+                ->selectRaw("SUM(CASE WHEN assignment_status != 'ok' THEN 1 ELSE 0 END) as pending_count")
+                ->groupBy('source_file')
+                ->orderByDesc('period_start')
+                ->get()
+                ->map(function ($row): array {
+                    $allocatedCount = (int) $row->allocated_count;
+                    $pendingCount = (int) $row->pending_count;
+
+                    if ($pendingCount === 0) {
+                        $statusLabel = 'Completo';
+                        $statusColor = 'success';
+                    } elseif ($allocatedCount > 0) {
+                        $statusLabel = 'Parcial';
+                        $statusColor = 'warning';
+                    } else {
+                        $statusLabel = 'Nao alocado';
+                        $statusColor = 'danger';
+                    }
+
+                    return [
+                        'platform' => 'via_verde',
+                        'platform_label' => 'Via Verde',
+                        'source_file' => $row->source_file,
+                        'period_start' => $row->period_start,
+                        'period_end' => $row->period_end,
+                        'total_records' => (int) $row->total_records,
+                        'allocated_count' => $allocatedCount,
+                        'pending_count' => $pendingCount,
+                        'status_label' => $statusLabel,
+                        'status_color' => $statusColor,
+                        'import_type' => 'via_verde',
+                    ];
+                })
+                ->all();
+
+            $viaVerdePending = ViaVerdeTransaction::query()
+                ->whereIn('assignment_status', ['unassigned_driver', 'ambiguous_driver'])
+                ->with(['driver'])
+                ->orderByDesc('occurred_at')
+                ->get()
+                ->map(fn (ViaVerdeTransaction $row): array => [
+                    'occurred_at' => $row->occurred_at,
+                    'vehicle_plate' => $row->vehicle_plate,
+                    'location' => $row->location,
+                    'amount' => (float) $row->amount,
+                    'driver_name' => $row->driver?->name,
+                    'status' => $row->assignment_status,
+                ])
+                ->all();
+        }
+
+        $adjustmentImports = [];
+
+        if (DB::getSchemaBuilder()->hasTable('driver_adjustments')) {
+            $adjustmentImports = DriverAdjustment::query()
+                ->selectRaw('source_file, MIN(starts_at) as period_start, MAX(starts_at) as period_end')
+                ->selectRaw('COUNT(*) as total_records')
+                ->groupBy('source_file')
+                ->orderByDesc('period_start')
+                ->get()
+                ->map(fn ($row): array => [
+                    'source_file' => $row->source_file,
+                    'period_start' => $row->period_start,
+                    'period_end' => $row->period_end,
+                    'total_records' => (int) $row->total_records,
+                ])
+                ->all();
+        }
+
         return [
-            'importsHistory' => array_merge($prioImports, $imports),
+            'importsHistory' => array_merge($prioImports, $viaVerdeImports, $imports),
+            'viaVerdePending' => $viaVerdePending,
+            'adjustmentImports' => $adjustmentImports,
         ];
     }
 
@@ -504,11 +682,35 @@ class PlatformImports extends Page implements HasForms, HasTable
                     return;
                 }
 
+                if (($arguments['import_type'] ?? null) === 'via_verde') {
+                    ViaVerdeTransaction::query()
+                        ->where('source_file', $arguments['source_file'] ?? null)
+                        ->delete();
+
+                    return;
+                }
+
                 PlatformDriverBalance::query()
                     ->where('platform', $arguments['platform'] ?? null)
                     ->where('source_file', $arguments['source_file'] ?? null)
                     ->whereDate('period_start', $arguments['period_start'] ?? null)
                     ->whereDate('period_end', $arguments['period_end'] ?? null)
+                    ->delete();
+            })
+            ->livewire($this);
+    }
+
+    public function deleteAdjustmentImportAction(): Action
+    {
+        return Action::make('deleteAdjustmentImport')
+            ->label('Eliminar import')
+            ->color('danger')
+            ->size('sm')
+            ->requiresConfirmation()
+            ->modalDescription('Remove todos os ajustes importados deste ficheiro.')
+            ->action(function (array $arguments): void {
+                DriverAdjustment::query()
+                    ->where('source_file', $arguments['source_file'] ?? null)
                     ->delete();
             })
             ->livewire($this);

@@ -2,9 +2,12 @@
 
 namespace App\Services;
 
+use App\Models\DriverAdjustment;
 use App\Models\DriverBillingProfile;
 use App\Models\DriverSettlement;
 use App\Models\PlatformDriverBalance;
+use App\Models\PrioTransaction;
+use App\Models\ViaVerdeTransaction;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Log;
 
@@ -26,6 +29,32 @@ class DriverSettlementCalculator
             ->get(['driver_id', 'net_amount', 'tips_amount']);
 
         $grouped = $balances->groupBy('driver_id');
+
+        $prioExpenses = PrioTransaction::query()
+            ->whereNotNull('driver_id')
+            ->where('assignment_status', 'ok')
+            ->whereBetween('occurred_at', [$start, $end])
+            ->when($driverId, fn ($query) => $query->where('driver_id', $driverId))
+            ->selectRaw('driver_id, COALESCE(SUM(net_amount), 0) as total')
+            ->groupBy('driver_id')
+            ->get()
+            ->keyBy('driver_id');
+
+        $viaVerdeExpenses = ViaVerdeTransaction::query()
+            ->whereNotNull('driver_id')
+            ->where('assignment_status', 'ok')
+            ->whereBetween('occurred_at', [$start, $end])
+            ->when($driverId, fn ($query) => $query->where('driver_id', $driverId))
+            ->selectRaw('driver_id, COALESCE(SUM(amount), 0) as total')
+            ->groupBy('driver_id')
+            ->get()
+            ->keyBy('driver_id');
+
+        $adjustmentExpenses = DriverAdjustment::query()
+            ->whereDate('starts_at', '<=', $end->toDateString())
+            ->when($driverId, fn ($query) => $query->where('driver_id', $driverId))
+            ->get()
+            ->groupBy('driver_id');
 
         $created = 0;
         $skipped = 0;
@@ -64,6 +93,14 @@ class DriverSettlementCalculator
 
             $netTotal = round((float) $driverBalances->sum('net_amount'), 2);
             $tipsTotal = (float) $driverBalances->sum('tips_amount');
+            $prioTotal = (float) ($prioExpenses[$driverId]->total ?? 0);
+            $viaVerdeTotal = (float) ($viaVerdeExpenses[$driverId]->total ?? 0);
+            $adjustmentsTotal = $this->sumAdjustmentsForPeriod(
+                $adjustmentExpenses[$driverId] ?? collect(),
+                $start,
+                $end
+            );
+            $expensesTotal = round($prioTotal + $viaVerdeTotal + $adjustmentsTotal, 2);
 
             $percentCompany = (float) $profile->percent_company;
             $percentDriver = (float) $profile->percent_driver;
@@ -71,7 +108,12 @@ class DriverSettlementCalculator
 
             $companyShare = round($netTotal * ($percentCompany / 100), 2);
             $driverShare = round($netTotal * ($percentDriver / 100), 2);
-            $amountPayable = round($driverShare - $rentAmount, 2);
+            $amountPayableBase = $netTotal + $tipsTotal - $expensesTotal;
+            $vatPercent = (float) ($profile->vat_percent ?? 0);
+            $vatMultiplier = $profile->vat_refund_mode === \App\Enums\VatRefundMode::DriverDeliversVat && $vatPercent > 0
+                ? 1 + ($vatPercent / 100)
+                : 1;
+            $amountPayable = round($amountPayableBase * $vatMultiplier, 2);
 
             DriverSettlement::query()->create([
                 'driver_id' => $driverId,
@@ -79,6 +121,7 @@ class DriverSettlementCalculator
                 'period_end' => $end->toDateString(),
                 'net_total' => $netTotal,
                 'tips_total' => $tipsTotal,
+                'expenses_total' => $expensesTotal,
                 'company_share' => $companyShare,
                 'driver_share' => $driverShare,
                 'amount_payable' => $amountPayable,
@@ -118,5 +161,35 @@ class DriverSettlementCalculator
             ->first();
 
         return $profile;
+    }
+
+    /**
+     * @param  \Illuminate\Support\Collection<int, DriverAdjustment>  $adjustments
+     */
+    private function sumAdjustmentsForPeriod(\Illuminate\Support\Collection $adjustments, Carbon $start, Carbon $end): float
+    {
+        if ($adjustments->isEmpty()) {
+            return 0.0;
+        }
+
+        $total = 0.0;
+
+        foreach ($adjustments as $adjustment) {
+            $startsAt = Carbon::parse($adjustment->starts_at)->startOfDay();
+            $weeks = (int) ($adjustment->recurrence_weeks ?? 1);
+            $weeks = max(1, $weeks);
+
+            for ($i = 0; $i < $weeks; $i++) {
+                $occurrence = $startsAt->copy()->addWeeks($i);
+
+                if ($occurrence->lt($start) || $occurrence->gt($end)) {
+                    continue;
+                }
+
+                $total += (float) $adjustment->amount;
+            }
+        }
+
+        return round($total, 2);
     }
 }

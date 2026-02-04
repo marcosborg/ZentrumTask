@@ -313,6 +313,9 @@ class PrioFuelCsvImportService
         $value = trim($value);
         $value = str_replace("\u{FEFF}", '', $value);
         $value = preg_replace('/\s+/', ' ', $value) ?? '';
+        $value = iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $value) ?: $value;
+        $value = strtolower($value);
+        $value = preg_replace('/[^a-z0-9]+/', '', $value) ?? '';
 
         return $value;
     }
@@ -333,23 +336,82 @@ class PrioFuelCsvImportService
      */
     private function resolveColumnMap(array $headers, array $headerMap): array
     {
-        $startDate = $this->findExactHeader($headers, ['StartDate']);
-        $cardCode = $this->findExactHeader($headers, ['CardCode']);
-        $vehiclePlate = $this->findExactHeader($headers, ['MobileRegistration']);
-        $idUsage = $this->findExactHeader($headers, ['IdUsage']);
-        $stationId = $this->findExactHeader($headers, ['IdChargingStation']);
-        $energy = $this->findExactHeader($headers, ['Energy']);
-        $netAmount = $this->findExactHeader($headers, ['ChargingTotalValue']);
-        $grossAmount = $this->findExactHeader($headers, ['TotalValueWithTaxes']);
+        $startDate = $this->findExactHeader($headers, [
+            'StartDate',
+            'Data',
+            'DATA',
+        ]);
+        $cardCode = $this->findExactHeader($headers, [
+            'CardCode',
+            'N CARTAO',
+            'N. CARTAO',
+            'NUMERO CARTAO',
+            'NUM CARTAO',
+            'NO CARTAO',
+            'CARTAO',
+        ]);
+        $vehiclePlate = $this->findExactHeader($headers, [
+            'MobileRegistration',
+            'Matricula',
+            'MATRICULA',
+        ]);
+        $description = $this->findExactHeader($headers, [
+            'Descricao',
+            'DESCRICAO',
+        ]);
+        $idUsage = $this->findExactHeader($headers, [
+            'IdUsage',
+            'ID CARREGAMENTO',
+            'ID Carregamento',
+            'Id Carregamento',
+            'IdCarregamento',
+        ]);
+        $stationId = $this->findExactHeader($headers, [
+            'IdChargingStation',
+            'Posto',
+            'POSTO',
+        ]);
+        $energy = $this->findExactHeader($headers, [
+            'Energy',
+            'Energia',
+            'ENERGIA',
+        ]);
+        $netAmount = $this->findExactHeader($headers, [
+            'ChargingTotalValue',
+            'Total',
+            'TOTAL',
+            'Total s/ IVA',
+            'TOTAL S/ IVA',
+            'Total sem IVA',
+            'TOTAL SEM IVA',
+        ]);
+        $grossAmount = $this->findExactHeader($headers, [
+            'TotalValueWithTaxes',
+            'Total c/ IVA',
+            'TOTAL C/ IVA',
+            'Total com IVA',
+            'TOTAL COM IVA',
+        ]);
 
-        if (! $startDate || ! $cardCode || ! $vehiclePlate || ! $idUsage) {
-            throw new RuntimeException('CSV PRIO invalido: colunas obrigatorias em falta.');
+        $missing = [];
+        if (! $startDate) {
+            $missing[] = 'DATA';
+        }
+        if (! $cardCode) {
+            $missing[] = 'N CARTAO';
+        }
+        if (! $idUsage) {
+            $missing[] = 'ID CARREGAMENTO';
+        }
+
+        if ($missing !== []) {
+            throw new RuntimeException('CSV PRIO invalido: colunas obrigatorias em falta: '.implode(', ', $missing).'.');
         }
 
         return [
             'start_date' => $startDate,
             'card_code' => $cardCode,
-            'vehicle_plate' => $vehiclePlate,
+            'vehicle_plate' => $vehiclePlate ?? $description ?? 'missing_vehicle',
             'id_usage' => $idUsage,
             'station_id' => $stationId ?? 'missing_station',
             'energy_kwh' => $energy ?? 'missing_energy',
@@ -402,6 +464,9 @@ class PrioFuelCsvImportService
         $value = trim(str_replace("\u{FEFF}", '', $value));
 
         $formats = [
+            'd/m/y H:i:s',
+            'd/m/y H:i',
+            'd/m/y',
             'd/m/Y H:i:s',
             'd/m/Y H:i',
             'd/m/Y',

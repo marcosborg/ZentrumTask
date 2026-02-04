@@ -21,3 +21,17 @@ Route::get('/media-proxy/{uuid}/{conversion?}', [MediaProxyController::class, 's
     ->whereUuid('uuid')
     ->where('conversion', '[A-Za-z0-9_-]+')
     ->name('media.proxy');
+
+Route::middleware(['auth'])->get('/admin/ajustes/exemplo.csv', function () {
+    $content = implode("\n", [
+        'motorista,data,valor,descricao,categoria,semanas',
+        '"driver@example.com",2026-02-03,"50,00","Caucao semana 1",caucao,4',
+        '"CODIGO123",2026-02-03,"15,00","Acerto lavagem",acerto,',
+    ]);
+
+    return response()->streamDownload(function () use ($content): void {
+        echo $content;
+    }, 'exemplo-ajustes.csv', [
+        'Content-Type' => 'text/csv; charset=UTF-8',
+    ]);
+})->name('driver-adjustments.sample');
