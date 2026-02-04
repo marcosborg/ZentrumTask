@@ -16,6 +16,8 @@
 
     <x-fleet-faqs />
 
+    <x-blog-news />
+
     <x-contact /> 
 
 @endsection

@@ -12,6 +12,15 @@
                 ->orderBy('position')
                 ->get(['id', 'label', 'url', 'position'])
             : collect();
+        $blogUrl = route('blog.index');
+        if ($menuItems->isNotEmpty() && ! $menuItems->contains(fn ($item) => $item->url === $blogUrl)) {
+            $menuItems->push((object) [
+                'id' => 'blog',
+                'label' => 'Noticias',
+                'url' => $blogUrl,
+                'children' => collect(),
+            ]);
+        }
         $linkColor = '#000000';
         $hoverColor = '#2A66B5';
     @endphp
@@ -64,6 +73,9 @@
           </li>
           <li class="nav-item">
             <a class="nav-link nav-link-custom" href="#aluguer">Aluguer de viaturas</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link nav-link-custom" href="{{ $blogUrl }}">Noticias</a>
           </li>
           <li class="nav-item">
             <a class="nav-link nav-link-custom" href="#contactos">Contactos</a>
