@@ -17,9 +17,13 @@ class DriverSettlement extends Model
         'net_total',
         'tips_total',
         'expenses_total',
+        'carry_over_balance',
         'company_share',
         'driver_share',
         'amount_payable',
+        'amount_due',
+        'is_paid',
+        'paid_at',
         'rules_snapshot',
     ];
 
@@ -34,9 +38,13 @@ class DriverSettlement extends Model
             'net_total' => 'decimal:2',
             'tips_total' => 'decimal:2',
             'expenses_total' => 'decimal:2',
+            'carry_over_balance' => 'decimal:2',
             'company_share' => 'decimal:2',
             'driver_share' => 'decimal:2',
             'amount_payable' => 'decimal:2',
+            'amount_due' => 'decimal:2',
+            'is_paid' => 'boolean',
+            'paid_at' => 'datetime',
             'rules_snapshot' => 'array',
         ];
     }

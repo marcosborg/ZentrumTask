@@ -3,6 +3,8 @@
 namespace App\Filament\Pages;
 
 use App\Models\Driver;
+use App\Models\DriverBalance;
+use App\Models\DriverBalanceMovement;
 use App\Models\DriverBillingProfile;
 use App\Models\DriverSettlement;
 use App\Models\PlatformDriverBalance;
@@ -13,6 +15,8 @@ use BackedEnum;
 use Filament\Actions\Action;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Select;
+use Filament\Forms\Components\Textarea;
+use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
 use Filament\Pages\Dashboard\Concerns\HasFiltersForm;
 use Filament\Pages\Page;
@@ -192,7 +196,7 @@ class DriverSettlementsReport extends Page implements HasTable
                     }),
                 TextColumn::make('driver_email')
                     ->label('Email')
-                    ->state(fn (DriverSettlement $record): string => (string) ($record->driver_email ?? '—'))
+                    ->state(fn (DriverSettlement $record): string => (string) ($record->driver_email ?? '-'))
                     ->copyable()
                     ->copyableState(fn (DriverSettlement $record): string => (string) ($record->driver_email ?? ''))
                     ->copyMessage('Email copiado')
@@ -217,7 +221,8 @@ class DriverSettlementsReport extends Page implements HasTable
                     ->label('Total operadores')
                     ->alignRight()
                     ->state(fn (DriverSettlement $record): float => (float) $record->uber_net + (float) $record->bolt_net)
-                    ->formatStateUsing(fn ($state): string => $this->formatMoney($state)),
+                    ->formatStateUsing(fn ($state): string => $this->formatMoney($state))
+                    ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('tips_total_balance')
                     ->label('Tips')
                     ->alignRight()
@@ -241,7 +246,8 @@ class DriverSettlementsReport extends Page implements HasTable
                     ->label('Despesas')
                     ->alignRight()
                     ->state(fn (DriverSettlement $record): float => (float) $record->expenses_total)
-                    ->formatStateUsing(fn ($state): string => $this->formatMoney($state)),
+                    ->formatStateUsing(fn ($state): string => $this->formatMoney($state))
+                    ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('rental_days')
                     ->label('Dias')
                     ->alignRight()
@@ -264,21 +270,29 @@ class DriverSettlementsReport extends Page implements HasTable
                             - (float) $this->billingFor($record)['rent_total'];
                     })
                     ->formatStateUsing(fn ($state): string => $this->formatMoney($state)),
+                TextColumn::make('carry_over_balance')
+                    ->label('Saldo transitado')
+                    ->alignRight()
+                    ->state(fn (DriverSettlement $record): float => (float) $record->carry_over_balance)
+                    ->formatStateUsing(fn ($state): string => $this->formatMoney($state)),
                 TextColumn::make('percent_company')
                     ->label('Empresa %')
                     ->alignRight()
                     ->state(fn (DriverSettlement $record): ?float => $this->billingFor($record)['percent_company'])
-                    ->formatStateUsing(fn ($state): string => $this->formatPercent($state)),
+                    ->formatStateUsing(fn ($state): string => $this->formatPercent($state))
+                    ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('percent_driver')
                     ->label('Motorista %')
                     ->alignRight()
                     ->state(fn (DriverSettlement $record): ?float => $this->billingFor($record)['percent_driver'])
-                    ->formatStateUsing(fn ($state): string => $this->formatPercent($state)),
+                    ->formatStateUsing(fn ($state): string => $this->formatPercent($state))
+                    ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('withholding_label')
                     ->label('Retencao')
                     ->badge()
                     ->state(fn (DriverSettlement $record): string => $this->billingFor($record)['withholding_label'])
-                    ->color(fn (DriverSettlement $record): string => $this->billingBadgeColor($record, 'withholding')),
+                    ->color(fn (DriverSettlement $record): string => $this->billingBadgeColor($record, 'withholding'))
+                    ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('vat_23_label')
                     ->label('IVA')
                     ->badge()
@@ -290,20 +304,28 @@ class DriverSettlementsReport extends Page implements HasTable
                         $label = $data['vat_label'] ?? null;
 
                         if ($mode && $label) {
-                            return "Modo: {$mode} · {$label}";
+                            return "Modo: {$mode} - {$label}";
                         }
 
                         return $mode ? "Modo: {$mode}" : $label;
-                    }),
+                    })
+                    ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('profile_status')
                     ->label('Perfil')
                     ->badge()
                     ->state(fn (DriverSettlement $record): string => $this->billingProfileLabel($record))
-                    ->color(fn (DriverSettlement $record): string => $this->billingProfileColor($record)),
+                    ->color(fn (DriverSettlement $record): string => $this->billingProfileColor($record))
+                    ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('amount_payable')
-                    ->label('A pagar')
+                    ->label('Valor a transferir')
                     ->alignRight()
+                    ->state(fn (DriverSettlement $record): float => (float) $record->amount_due)
                     ->formatStateUsing(fn ($state): string => $this->formatMoney($state)),
+                TextColumn::make('is_paid')
+                    ->label('Pago')
+                    ->badge()
+                    ->state(fn (DriverSettlement $record): string => $record->is_paid ? 'Pago' : 'Pendente')
+                    ->color(fn (DriverSettlement $record): string => $record->is_paid ? 'success' : 'warning'),
                 TextColumn::make('created_at')
                     ->label('Criado em')
                     ->dateTime('d/m/Y H:i')
@@ -314,6 +336,8 @@ class DriverSettlementsReport extends Page implements HasTable
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->recordActions([
+                $this->adjustBalanceAction(),
+                $this->markPaidAction(),
                 $this->viewDetailsAction(),
                 $this->deleteSettlementAction(),
             ])
@@ -548,6 +572,8 @@ class DriverSettlementsReport extends Page implements HasTable
                 $prioExpenses = $this->prioExpensesForSettlement($record);
                 $viaVerdeExpenses = $this->viaVerdeExpensesForSettlement($record);
                 $adjustments = $this->adjustmentsForSettlement($record);
+                $balance = $this->resolveBalance((int) $record->driver_id);
+                $balanceMovements = $this->balanceMovementsForSettlement($record);
 
                 return view('filament.pages.driver-settlements-report-details', [
                     'settlement' => $record,
@@ -556,9 +582,114 @@ class DriverSettlementsReport extends Page implements HasTable
                     'prioExpenses' => $prioExpenses,
                     'viaVerdeExpenses' => $viaVerdeExpenses,
                     'adjustments' => $adjustments,
+                    'balance' => $balance,
+                    'balanceMovements' => $balanceMovements,
                 ]);
             })
             ->action(function (): void {});
+    }
+
+    private function adjustBalanceAction(): Action
+    {
+        return Action::make('adjustBalance')
+            ->label('Ajustar saldo')
+            ->icon(Heroicon::OutlinedPencilSquare)
+            ->color('warning')
+            ->modalHeading('Ajustar saldo transitado')
+            ->modalDescription('Use valores negativos para reduzir o saldo.')
+            ->form([
+                TextInput::make('amount')
+                    ->label('Valor')
+                    ->required()
+                    ->numeric(),
+                Textarea::make('description')
+                    ->label('Descricao')
+                    ->required()
+                    ->rows(3),
+            ])
+            ->action(function (DriverSettlement $record, array $data): void {
+                DB::transaction(function () use ($record, $data): void {
+                    $balance = $this->resolveBalance((int) $record->driver_id);
+                    $amount = round((float) $data['amount'], 2);
+
+                    $balance->forceFill([
+                        'current_balance' => round((float) $balance->current_balance + $amount, 2),
+                        'is_settled' => false,
+                        'settled_at' => null,
+                        'last_settlement_id' => $record->id,
+                    ])->save();
+
+                    DriverBalanceMovement::query()->create([
+                        'driver_id' => $record->driver_id,
+                        'driver_balance_id' => $balance->id,
+                        'driver_settlement_id' => $record->id,
+                        'amount' => $amount,
+                        'type' => 'manual_adjustment',
+                        'description' => (string) $data['description'],
+                    ]);
+
+                    $record->forceFill([
+                        'amount_due' => (float) $balance->current_balance,
+                        'is_paid' => false,
+                        'paid_at' => null,
+                    ])->save();
+                });
+
+                $this->resetTable();
+
+                Notification::make()
+                    ->success()
+                    ->title('Saldo atualizado')
+                    ->send();
+            });
+    }
+
+    private function markPaidAction(): Action
+    {
+        return Action::make('markPaid')
+            ->label('Dar como pago')
+            ->icon(Heroicon::OutlinedCheckCircle)
+            ->color('success')
+            ->requiresConfirmation()
+            ->visible(fn (DriverSettlement $record): bool => ! $record->is_paid)
+            ->modalDescription('Define o settlement como pago e zera o saldo transitado.')
+            ->action(function (DriverSettlement $record): void {
+                DB::transaction(function () use ($record): void {
+                    $balance = $this->resolveBalance((int) $record->driver_id);
+                    $current = round((float) $balance->current_balance, 2);
+
+                    if ($current !== 0.0) {
+                        DriverBalanceMovement::query()->create([
+                            'driver_id' => $record->driver_id,
+                            'driver_balance_id' => $balance->id,
+                            'driver_settlement_id' => $record->id,
+                            'amount' => -$current,
+                            'type' => 'payment',
+                            'description' => 'Pagamento settlement '.$record->period_start?->format('d/m/Y').' - '.$record->period_end?->format('d/m/Y'),
+                        ]);
+                    }
+
+                    $balance->forceFill([
+                        'current_balance' => 0,
+                        'is_settled' => true,
+                        'settled_at' => now(),
+                        'last_settlement_id' => $record->id,
+                    ])->save();
+
+                    $record->forceFill([
+                        'amount_due' => 0,
+                        'is_paid' => true,
+                        'paid_at' => now(),
+                    ])->save();
+                });
+
+                $this->resetTable();
+
+                Notification::make()
+                    ->success()
+                    ->title('Settlement marcado como pago')
+                    ->send();
+            });
     }
 
     private function deleteSettlementAction(): Action
@@ -740,6 +871,41 @@ class DriverSettlementsReport extends Page implements HasTable
         ];
     }
 
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    private function balanceMovementsForSettlement(DriverSettlement $settlement): array
+    {
+        return DriverBalanceMovement::query()
+            ->where('driver_id', $settlement->driver_id)
+            ->where('driver_settlement_id', $settlement->id)
+            ->orderByDesc('created_at')
+            ->get([
+                'amount',
+                'type',
+                'description',
+                'created_at',
+            ])
+            ->map(fn (DriverBalanceMovement $movement): array => [
+                'amount' => (float) $movement->amount,
+                'type' => $movement->type,
+                'description' => $movement->description,
+                'created_at' => $movement->created_at,
+            ])
+            ->all();
+    }
+
+    private function resolveBalance(int $driverId): DriverBalance
+    {
+        return DriverBalance::query()->firstOrCreate(
+            ['driver_id' => $driverId],
+            [
+                'current_balance' => 0,
+                'is_settled' => false,
+            ]
+        );
+    }
+
     private function deleteSettlementsForPeriod(string $periodStart, string $periodEnd, ?int $driverId = null): int
     {
         return DriverSettlement::query()
@@ -799,7 +965,7 @@ class DriverSettlementsReport extends Page implements HasTable
     private function formatMoney(mixed $value): string
     {
         if ($value === null) {
-            return '—';
+            return '-';
         }
 
         return number_format((float) $value, 2, ',', ' ')." \u{20AC}";
@@ -808,7 +974,7 @@ class DriverSettlementsReport extends Page implements HasTable
     private function formatPercent(mixed $value): string
     {
         if ($value === null) {
-            return '—';
+            return '-';
         }
 
         return number_format((float) $value, 2, ',', ' ').'%';
@@ -935,8 +1101,8 @@ class DriverSettlementsReport extends Page implements HasTable
             'rent_total' => 0.0,
             'percent_company' => null,
             'percent_driver' => null,
-            'withholding_label' => '—',
-            'vat_label' => '—',
+            'withholding_label' => '-',
+            'vat_label' => '-',
             'vat_refund_mode' => null,
         ];
     }

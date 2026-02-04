@@ -17,6 +17,69 @@
         </div>
     </x-filament::section>
 
+    <x-filament::section heading="Saldo transitado">
+        <div class="grid gap-4 sm:grid-cols-2">
+            <div>
+                <div class="text-xs uppercase text-gray-400">Saldo anterior</div>
+                <div class="text-sm font-semibold text-gray-100">
+                    {{ number_format((float) ($settlement->carry_over_balance ?? 0), 2, ',', ' ') }} &euro;
+                </div>
+            </div>
+            <div>
+                <div class="text-xs uppercase text-gray-400">Saldo atual</div>
+                <div class="text-sm font-semibold text-gray-100">
+                    {{ number_format((float) ($balance->current_balance ?? 0), 2, ',', ' ') }} &euro;
+                </div>
+            </div>
+            <div>
+                <div class="text-xs uppercase text-gray-400">A pagar</div>
+                <div class="text-sm font-semibold text-gray-100">
+                    {{ number_format((float) ($settlement->amount_due ?? 0), 2, ',', ' ') }} &euro;
+                </div>
+            </div>
+            <div>
+                <div class="text-xs uppercase text-gray-400">Estado</div>
+                <div class="text-sm font-semibold text-gray-100">
+                    {{ $settlement->is_paid ? 'Pago' : 'Pendente' }}
+                </div>
+                @if ($settlement->paid_at)
+                    <div class="text-xs text-gray-400">Pago em {{ $settlement->paid_at->format('d/m/Y H:i') }}</div>
+                @endif
+            </div>
+        </div>
+    </x-filament::section>
+
+    <x-filament::section heading="Movimentos de saldo">
+        @if (($balanceMovements ?? []) === [])
+            <p class="text-sm text-gray-500">Sem movimentos registados para este settlement.</p>
+        @else
+            <div class="overflow-x-auto">
+                <table class="min-w-full text-sm text-gray-200">
+                    <thead class="text-xs uppercase text-gray-400">
+                        <tr>
+                            <th class="px-3 py-2 text-left">Data</th>
+                            <th class="px-3 py-2 text-left">Tipo</th>
+                            <th class="px-3 py-2 text-left">Descricao</th>
+                            <th class="px-3 py-2 text-right">Valor</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-800">
+                        @foreach ($balanceMovements as $movement)
+                            <tr>
+                                <td class="px-3 py-2">{{ $movement['created_at']?->format('d/m/Y H:i') ?? '-' }}</td>
+                                <td class="px-3 py-2">{{ $movement['type'] ?? '-' }}</td>
+                                <td class="px-3 py-2">{{ $movement['description'] ?? '-' }}</td>
+                                <td class="px-3 py-2 text-right">
+                                    {{ number_format((float) ($movement['amount'] ?? 0), 2, ',', ' ') }} &euro;
+                                </td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
+        @endif
+    </x-filament::section>
+
     <x-filament::section heading="Faturacao">
         <div class="grid gap-4 sm:grid-cols-2">
             <div>
@@ -38,7 +101,7 @@
                 <div class="text-xs uppercase text-gray-400">Dias / Aluguer</div>
                 <div class="text-sm font-semibold text-gray-100">
                     {{ $billing['rental_days'] ?? 0 }} dias
-                    Â·
+                    Â-
                     {{ isset($billing['rent_total']) ? number_format((float) $billing['rent_total'], 2, ',', ' ') : '-' }} &euro;
                 </div>
             </div>
@@ -54,7 +117,7 @@
                 <div class="text-xs uppercase text-gray-400">Retencao / IVA 23%</div>
                 <div class="text-sm font-semibold text-gray-100">
                     {{ $billing['withholding_label'] ?? '-' }}
-                    Â·
+                    Â-
                     {{ $billing['vat_label'] ?? '-' }}
                 </div>
                 @if (! empty($billing['vat_refund_mode']))

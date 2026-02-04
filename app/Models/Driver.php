@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Driver extends Model
 {
@@ -59,6 +60,16 @@ class Driver extends Model
     public function weekStatements(): HasMany
     {
         return $this->hasMany(DriverWeekStatement::class);
+    }
+
+    public function balance(): HasOne
+    {
+        return $this->hasOne(DriverBalance::class);
+    }
+
+    public function balanceMovements(): HasMany
+    {
+        return $this->hasMany(DriverBalanceMovement::class);
     }
 
     public function candidateApplication(): \Illuminate\Database\Eloquent\Relations\BelongsTo

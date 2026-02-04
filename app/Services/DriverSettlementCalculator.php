@@ -3,6 +3,8 @@
 namespace App\Services;
 
 use App\Models\DriverAdjustment;
+use App\Models\DriverBalance;
+use App\Models\DriverBalanceMovement;
 use App\Models\DriverBillingProfile;
 use App\Models\DriverSettlement;
 use App\Models\PlatformDriverBalance;
@@ -114,24 +116,54 @@ class DriverSettlementCalculator
                 ? 1 + ($vatPercent / 100)
                 : 1;
             $amountPayable = round($amountPayableBase * $vatMultiplier, 2);
+            $balance = DriverBalance::query()->firstOrCreate(
+                ['driver_id' => $driverId],
+                [
+                    'current_balance' => 0,
+                    'is_settled' => false,
+                ]
+            );
+            $carryOverBalance = (float) $balance->current_balance;
+            $amountDue = round($carryOverBalance + $amountPayable, 2);
 
-            DriverSettlement::query()->create([
+            $settlement = DriverSettlement::query()->create([
                 'driver_id' => $driverId,
                 'period_start' => $start->toDateString(),
                 'period_end' => $end->toDateString(),
                 'net_total' => $netTotal,
                 'tips_total' => $tipsTotal,
                 'expenses_total' => $expensesTotal,
+                'carry_over_balance' => $carryOverBalance,
                 'company_share' => $companyShare,
                 'driver_share' => $driverShare,
                 'amount_payable' => $amountPayable,
+                'amount_due' => $amountDue,
+                'is_paid' => false,
                 'rules_snapshot' => [
                     'billing_profile_id' => $profile->id,
                     'percent_company' => $percentCompany,
                     'percent_driver' => $percentDriver,
                     'vehicle_rent_type' => $profile->vehicle_rent_type?->value ?? (string) $profile->vehicle_rent_type,
                     'vehicle_rent_value' => $rentAmount,
+                    'carry_over_balance' => $carryOverBalance,
+                    'amount_due' => $amountDue,
                 ],
+            ]);
+
+            $balance->forceFill([
+                'current_balance' => $amountDue,
+                'last_settlement_id' => $settlement->id,
+                'is_settled' => false,
+                'settled_at' => null,
+            ])->save();
+
+            DriverBalanceMovement::query()->create([
+                'driver_id' => $driverId,
+                'driver_balance_id' => $balance->id,
+                'driver_settlement_id' => $settlement->id,
+                'amount' => $amountPayable,
+                'type' => 'settlement',
+                'description' => "Settlement {$start->toDateString()} - {$end->toDateString()}",
             ]);
 
             $created++;
