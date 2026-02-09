@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Vehicles\Tables;
 
+use App\Models\VehicleAllocation;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
@@ -34,6 +35,16 @@ class VehiclesTable
                     ->label('Modelo')
                     ->searchable()
                     ->sortable(),
+                TextColumn::make('trim')
+                    ->label('Versao')
+                    ->searchable()
+                    ->sortable()
+                    ->toggleable(),
+                TextColumn::make('color')
+                    ->label('Cor')
+                    ->searchable()
+                    ->sortable()
+                    ->toggleable(),
                 TextColumn::make('status')
                     ->label('Estado')
                     ->badge()
@@ -67,7 +78,20 @@ class VehiclesTable
                     ->sortable(),
                 TextColumn::make('currentAllocation.driver.name')
                     ->label('Motorista atual')
-                    ->placeholder('-'),
+                    ->placeholder('-')
+                    ->sortable(query: function (Builder $query, string $direction): Builder {
+                        return $query->orderBy(
+                            VehicleAllocation::query()
+                                ->select('drivers.name')
+                                ->join('drivers', 'drivers.id', '=', 'vehicle_allocations.driver_id')
+                                ->whereColumn('vehicle_allocations.vehicle_id', 'vehicles.id')
+                                ->where('vehicle_allocations.status', 'active')
+                                ->whereNull('vehicle_allocations.ends_at')
+                                ->orderByDesc('vehicle_allocations.starts_at')
+                                ->limit(1),
+                            $direction,
+                        );
+                    }),
                 TextColumn::make('expired_documents_count')
                     ->label('Docs expirados')
                     ->badge()
