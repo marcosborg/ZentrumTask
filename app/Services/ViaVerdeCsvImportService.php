@@ -311,7 +311,12 @@ class ViaVerdeCsvImportService
         $value = trim($value);
         $value = str_replace("\u{FEFF}", '', $value);
         $value = preg_replace('/\s+/', ' ', $value) ?? '';
-        $value = iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $value) ?: $value;
+        if (function_exists('iconv')) {
+            $converted = iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $value);
+            if ($converted !== false) {
+                $value = $converted;
+            }
+        }
         $value = strtolower($value);
         $value = preg_replace('/[^a-z0-9]+/', '', $value) ?? '';
 
