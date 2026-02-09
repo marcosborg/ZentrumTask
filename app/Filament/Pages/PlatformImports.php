@@ -693,8 +693,14 @@ class PlatformImports extends Page implements HasForms, HasTable
                 PlatformDriverBalance::query()
                     ->where('platform', $arguments['platform'] ?? null)
                     ->where('source_file', $arguments['source_file'] ?? null)
-                    ->whereDate('period_start', $arguments['period_start'] ?? null)
-                    ->whereDate('period_end', $arguments['period_end'] ?? null)
+                    ->when(
+                        $this->normalizeDateArgument($arguments['period_start'] ?? null),
+                        fn ($query, string $date) => $query->whereDate('period_start', $date)
+                    )
+                    ->when(
+                        $this->normalizeDateArgument($arguments['period_end'] ?? null),
+                        fn ($query, string $date) => $query->whereDate('period_end', $date)
+                    )
                     ->delete();
             })
             ->livewire($this);
@@ -714,5 +720,22 @@ class PlatformImports extends Page implements HasForms, HasTable
                     ->delete();
             })
             ->livewire($this);
+    }
+
+    private function normalizeDateArgument(mixed $value): ?string
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        if ($value instanceof Carbon) {
+            return $value->toDateString();
+        }
+
+        try {
+            return Carbon::parse((string) $value)->toDateString();
+        } catch (\Throwable) {
+            return null;
+        }
     }
 }
