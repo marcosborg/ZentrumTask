@@ -612,11 +612,23 @@ class DriverSettlementsReport extends Page implements HasTable
                     $balance = $this->resolveBalance((int) $record->driver_id);
                     $amount = round((float) $data['amount'], 2);
 
+                    $this->applyAdjustmentForward($record, $amount);
+
+                    $latestSettlement = DriverSettlement::query()
+                        ->where('driver_id', $record->driver_id)
+                        ->orderByDesc('period_end')
+                        ->orderByDesc('id')
+                        ->first(['id', 'amount_due']);
+
+                    $currentBalance = $latestSettlement
+                        ? round((float) $latestSettlement->amount_due, 2)
+                        : round((float) $balance->current_balance + $amount, 2);
+
                     $balance->forceFill([
-                        'current_balance' => round((float) $balance->current_balance + $amount, 2),
+                        'current_balance' => $currentBalance,
                         'is_settled' => false,
                         'settled_at' => null,
-                        'last_settlement_id' => $record->id,
+                        'last_settlement_id' => $latestSettlement?->id,
                     ])->save();
 
                     DriverBalanceMovement::query()->create([
@@ -627,12 +639,6 @@ class DriverSettlementsReport extends Page implements HasTable
                         'type' => 'manual_adjustment',
                         'description' => (string) $data['description'],
                     ]);
-
-                    $record->forceFill([
-                        'amount_due' => (float) $balance->current_balance,
-                        'is_paid' => false,
-                        'paid_at' => null,
-                    ])->save();
                 });
 
                 $this->resetTable();
@@ -641,6 +647,37 @@ class DriverSettlementsReport extends Page implements HasTable
                     ->success()
                     ->title('Saldo atualizado')
                     ->send();
+            });
+    }
+
+    private function applyAdjustmentForward(DriverSettlement $record, float $amount): void
+    {
+        if ($amount === 0.0) {
+            return;
+        }
+
+        $apply = false;
+
+        DriverSettlement::query()
+            ->where('driver_id', $record->driver_id)
+            ->orderBy('period_start')
+            ->orderBy('id')
+            ->get(['id', 'carry_over_balance', 'amount_due', 'is_paid', 'paid_at'])
+            ->each(function (DriverSettlement $settlement) use ($record, $amount, &$apply): void {
+                if (! $apply && $settlement->id === $record->id) {
+                    $apply = true;
+                }
+
+                if (! $apply) {
+                    return;
+                }
+
+                $settlement->forceFill([
+                    'carry_over_balance' => round((float) $settlement->carry_over_balance + $amount, 2),
+                    'amount_due' => round((float) $settlement->amount_due + $amount, 2),
+                    'is_paid' => false,
+                    'paid_at' => null,
+                ])->save();
             });
     }
 
