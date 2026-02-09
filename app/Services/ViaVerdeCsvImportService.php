@@ -8,6 +8,7 @@ use App\Models\ViaVerdeTransaction;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use RuntimeException;
 use Throwable;
 
@@ -316,6 +317,8 @@ class ViaVerdeCsvImportService
             if ($converted !== false) {
                 $value = $converted;
             }
+        } else {
+            $value = Str::ascii($value);
         }
         $value = strtolower($value);
         $value = preg_replace('/[^a-z0-9]+/', '', $value) ?? '';
