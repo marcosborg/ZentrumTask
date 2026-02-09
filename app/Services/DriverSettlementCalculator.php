@@ -123,7 +123,7 @@ class DriverSettlementCalculator
                     'is_settled' => false,
                 ]
             );
-            $carryOverBalance = (float) $balance->current_balance;
+            $carryOverBalance = $this->resolveCarryOverBalance((int) $driverId, $start, $balance);
             $amountDue = round($carryOverBalance + $amountPayable, 2);
 
             $settlement = DriverSettlement::query()->create([
@@ -174,6 +174,22 @@ class DriverSettlementCalculator
             'skipped' => $skipped,
             'missing_profiles' => $missingProfiles,
         ];
+    }
+
+    private function resolveCarryOverBalance(int $driverId, Carbon $periodStart, DriverBalance $balance): float
+    {
+        $latestPreviousSettlement = DriverSettlement::query()
+            ->where('driver_id', $driverId)
+            ->whereDate('period_end', '<', $periodStart->toDateString())
+            ->orderByDesc('period_end')
+            ->orderByDesc('id')
+            ->first(['amount_due']);
+
+        if ($latestPreviousSettlement) {
+            return round((float) $latestPreviousSettlement->amount_due, 2);
+        }
+
+        return round((float) $balance->current_balance, 2);
     }
 
     private function resolveActiveProfile(int $driverId, Carbon $start, Carbon $end): ?DriverBillingProfile

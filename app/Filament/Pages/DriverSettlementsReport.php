@@ -701,7 +701,11 @@ class DriverSettlementsReport extends Page implements HasTable
             ->requiresConfirmation()
             ->modalDescription('Remove apenas este settlement.')
             ->action(function (DriverSettlement $record): void {
-                DB::transaction(fn (): bool => (bool) $record->delete());
+                DB::transaction(function () use ($record): void {
+                    $this->deleteSettlementsAndRebuildBalances(
+                        DriverSettlement::query()->whereKey($record->id)
+                    );
+                });
 
                 $this->resetTable();
 
@@ -908,11 +912,67 @@ class DriverSettlementsReport extends Page implements HasTable
 
     private function deleteSettlementsForPeriod(string $periodStart, string $periodEnd, ?int $driverId = null): int
     {
-        return DriverSettlement::query()
-            ->when($driverId, fn (Builder $query) => $query->where('driver_id', $driverId))
-            ->whereDate('period_start', '>=', $periodStart)
-            ->whereDate('period_end', '<=', $periodEnd)
+        return $this->deleteSettlementsAndRebuildBalances(
+            DriverSettlement::query()
+                ->when($driverId, fn (Builder $query) => $query->where('driver_id', $driverId))
+                ->whereDate('period_start', '>=', $periodStart)
+                ->whereDate('period_end', '<=', $periodEnd)
+        );
+    }
+
+    private function deleteSettlementsAndRebuildBalances(Builder $query): int
+    {
+        $rows = (clone $query)
+            ->get(['id', 'driver_id']);
+
+        if ($rows->isEmpty()) {
+            return 0;
+        }
+
+        $settlementIds = $rows->pluck('id')->all();
+        $driverIds = $rows->pluck('driver_id')->filter()->unique()->values()->all();
+
+        DriverBalanceMovement::query()
+            ->whereIn('driver_settlement_id', $settlementIds)
             ->delete();
+
+        $deleted = (clone $query)->delete();
+
+        DriverBalanceMovement::query()
+            ->whereIn('driver_id', $driverIds)
+            ->where('type', 'settlement')
+            ->whereNull('driver_settlement_id')
+            ->delete();
+
+        foreach ($driverIds as $driverId) {
+            $balance = $this->resolveBalance((int) $driverId);
+
+            $latestSettlement = DriverSettlement::query()
+                ->where('driver_id', $driverId)
+                ->orderByDesc('period_end')
+                ->orderByDesc('id')
+                ->first(['id', 'amount_due', 'is_paid', 'paid_at']);
+
+            if (! $latestSettlement) {
+                $balance->forceFill([
+                    'current_balance' => 0,
+                    'last_settlement_id' => null,
+                    'is_settled' => false,
+                    'settled_at' => null,
+                ])->save();
+
+                continue;
+            }
+
+            $balance->forceFill([
+                'current_balance' => round((float) $latestSettlement->amount_due, 2),
+                'last_settlement_id' => $latestSettlement->id,
+                'is_settled' => (bool) $latestSettlement->is_paid,
+                'settled_at' => $latestSettlement->paid_at,
+            ])->save();
+        }
+
+        return $deleted;
     }
 
     /**
