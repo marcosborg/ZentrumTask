@@ -3,6 +3,7 @@
 namespace App\Filament\Pages;
 
 use App\Models\Driver;
+use App\Models\DriverAdjustment;
 use App\Models\DriverBalance;
 use App\Models\DriverBalanceMovement;
 use App\Models\DriverBillingProfile;
@@ -32,6 +33,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use UnitEnum;
 
 class DriverSettlementsReport extends Page implements HasTable
@@ -262,10 +264,8 @@ class DriverSettlementsReport extends Page implements HasTable
                     ->label('Valor da semana')
                     ->alignRight()
                     ->state(function (DriverSettlement $record): float {
-                        $totalOperadores = (float) $record->uber_net + (float) $record->bolt_net;
-
-                        return $totalOperadores
-                            + (float) $record->tips_total_balance
+                        return (float) $record->driver_share
+                            + (float) $record->tips_total
                             - (float) $record->expenses_total
                             - (float) $this->billingFor($record)['rent_total'];
                     })
@@ -336,6 +336,7 @@ class DriverSettlementsReport extends Page implements HasTable
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->recordActions([
+                $this->manageAdjustmentsAction(),
                 $this->adjustBalanceAction(),
                 $this->markPaidAction(),
                 $this->viewDetailsAction(),
@@ -596,23 +597,37 @@ class DriverSettlementsReport extends Page implements HasTable
             ->icon(Heroicon::OutlinedPencilSquare)
             ->color('warning')
             ->modalHeading('Ajustar saldo transitado')
-            ->modalDescription('Use valores negativos para reduzir o saldo.')
+            ->modalDescription('Defina o valor exato do saldo transitado para este settlement.')
             ->form([
                 TextInput::make('amount')
-                    ->label('Valor')
+                    ->label('Saldo transitado')
                     ->required()
-                    ->numeric(),
+                    ->placeholder('Ex.: -25,63')
+                    ->helperText('Este valor substitui o saldo transitado deste settlement e recalcula os seguintes.'),
                 Textarea::make('description')
                     ->label('Descricao')
                     ->required()
                     ->rows(3),
             ])
             ->action(function (DriverSettlement $record, array $data): void {
-                DB::transaction(function () use ($record, $data): void {
-                    $balance = $this->resolveBalance((int) $record->driver_id);
-                    $amount = round((float) $data['amount'], 2);
+                $targetCarryValue = $this->parseLocalizedDecimal($data['amount'] ?? null);
 
-                    $this->applyAdjustmentForward($record, $amount);
+                if ($targetCarryValue === null) {
+                    Notification::make()
+                        ->danger()
+                        ->title('Saldo transitado invalido')
+                        ->send();
+
+                    return;
+                }
+
+                DB::transaction(function () use ($record, $data, $targetCarryValue): void {
+                    $balance = $this->resolveBalance((int) $record->driver_id);
+                    $targetCarry = round($targetCarryValue, 2);
+                    $currentCarry = round((float) $record->carry_over_balance, 2);
+                    $delta = round($targetCarry - $currentCarry, 2);
+
+                    $this->applyAdjustmentForward($record, $targetCarry);
 
                     $latestSettlement = DriverSettlement::query()
                         ->where('driver_id', $record->driver_id)
@@ -622,7 +637,7 @@ class DriverSettlementsReport extends Page implements HasTable
 
                     $currentBalance = $latestSettlement
                         ? round((float) $latestSettlement->amount_due, 2)
-                        : round((float) $balance->current_balance + $amount, 2);
+                        : round((float) $balance->current_balance + $delta, 2);
 
                     $balance->forceFill([
                         'current_balance' => $currentBalance,
@@ -635,9 +650,9 @@ class DriverSettlementsReport extends Page implements HasTable
                         'driver_id' => $record->driver_id,
                         'driver_balance_id' => $balance->id,
                         'driver_settlement_id' => $record->id,
-                        'amount' => $amount,
+                        'amount' => $delta,
                         'type' => 'manual_adjustment',
-                        'description' => (string) $data['description'],
+                        'description' => (string) $data['description'].' (carry '.$currentCarry.' -> '.$targetCarry.')',
                     ]);
                 });
 
@@ -650,35 +665,238 @@ class DriverSettlementsReport extends Page implements HasTable
             });
     }
 
-    private function applyAdjustmentForward(DriverSettlement $record, float $amount): void
+    private function manageAdjustmentsAction(): Action
     {
-        if ($amount === 0.0) {
-            return;
-        }
+        return Action::make('manageAdjustments')
+            ->label('Ajustes')
+            ->icon(Heroicon::OutlinedAdjustmentsHorizontal)
+            ->color('info')
+            ->modalHeading('Ajustes do motorista')
+            ->modalSubmitActionLabel('Executar')
+            ->modalDescription('Crie ajustes manuais sem CSV. Os valores de settlement sao atualizados ao recalcular.')
+            ->modalContent(fn (DriverSettlement $record) => view('filament.pages.partials.driver-adjustments-list', [
+                'driverId' => (int) $record->driver_id,
+                'adjustments' => $this->manualAdjustmentsForDriver((int) $record->driver_id),
+            ]))
+            ->fillForm(fn (DriverSettlement $record): array => [
+                'operation' => 'create',
+                'adjustment_id' => null,
+                'starts_at' => $record->period_start?->toDateString(),
+                'recurrence_weeks' => null,
+                'category' => 'acerto',
+                'description' => null,
+                'amount' => null,
+            ])
+            ->form([
+                Select::make('operation')
+                    ->label('Operacao')
+                    ->options([
+                        'create' => 'Criar',
+                        'update' => 'Editar',
+                        'delete' => 'Apagar',
+                    ])
+                    ->default('create')
+                    ->required()
+                    ->native(false),
+                Select::make('adjustment_id')
+                    ->label('Ajuste existente')
+                    ->options(fn (DriverSettlement $record): array => collect($this->manualAdjustmentsForDriver((int) $record->driver_id))
+                        ->mapWithKeys(fn (array $row): array => [
+                            (int) $row['id'] => ($row['starts_at']?->format('d/m/Y') ?? '-').' | '.($row['category'] ?? '-').' | '.number_format((float) ($row['amount'] ?? 0), 2, ',', ' ').' EUR',
+                        ])
+                        ->all())
+                    ->searchable()
+                    ->native(false),
+                DatePicker::make('starts_at')
+                    ->label('Inicio')
+                    ->native(false)
+                    ->default(fn (DriverSettlement $record): ?string => $record->period_start?->toDateString()),
+                TextInput::make('recurrence_weeks')
+                    ->label('Semanas (opcional)')
+                    ->numeric()
+                    ->minValue(1)
+                    ->placeholder('1'),
+                Select::make('category')
+                    ->label('Categoria')
+                    ->options([
+                        'acerto' => 'Acerto',
+                        'caucao' => 'Caucao',
+                        'outro' => 'Outro',
+                    ])
+                    ->default('acerto')
+                    ->required()
+                    ->native(false),
+                Textarea::make('description')
+                    ->label('Descricao')
+                    ->rows(3),
+                TextInput::make('amount')
+                    ->label('Valor')
+                    ->required()
+                    ->placeholder('Ex.: 25,63'),
+            ])
+            ->action(function (DriverSettlement $record, array $data): void {
+                $operation = (string) ($data['operation'] ?? 'create');
+                $adjustmentId = isset($data['adjustment_id']) && $data['adjustment_id'] !== '' ? (int) $data['adjustment_id'] : null;
 
-        $apply = false;
+                if (in_array($operation, ['update', 'delete'], true) && ! $adjustmentId) {
+                    Notification::make()
+                        ->danger()
+                        ->title('Selecione um ajuste existente')
+                        ->send();
 
-        DriverSettlement::query()
-            ->where('driver_id', $record->driver_id)
-            ->orderBy('period_start')
-            ->orderBy('id')
-            ->get(['id', 'carry_over_balance', 'amount_due', 'is_paid', 'paid_at'])
-            ->each(function (DriverSettlement $settlement) use ($record, $amount, &$apply): void {
-                if (! $apply && $settlement->id === $record->id) {
-                    $apply = true;
-                }
-
-                if (! $apply) {
                     return;
                 }
 
-                $settlement->forceFill([
-                    'carry_over_balance' => round((float) $settlement->carry_over_balance + $amount, 2),
-                    'amount_due' => round((float) $settlement->amount_due + $amount, 2),
-                    'is_paid' => false,
-                    'paid_at' => null,
-                ])->save();
+                if ($operation === 'delete') {
+                    $adjustment = DriverAdjustment::query()
+                        ->where('driver_id', $record->driver_id)
+                        ->find($adjustmentId);
+
+                    if (! $adjustment) {
+                        Notification::make()
+                            ->danger()
+                            ->title('Ajuste nao encontrado')
+                            ->send();
+
+                        return;
+                    }
+
+                    $adjustment->delete();
+
+                    $this->resetBillingCache();
+                    $this->resetTable();
+
+                    Notification::make()
+                        ->success()
+                        ->title('Ajuste removido')
+                        ->send();
+
+                    return;
+                }
+
+                $amountValue = $this->parseLocalizedDecimal($data['amount'] ?? null);
+
+                if ($amountValue === null) {
+                    Notification::make()
+                        ->danger()
+                        ->title('Preencha um valor valido')
+                        ->send();
+
+                    return;
+                }
+
+                $startsAtInput = $data['starts_at'] ?? $record->period_start?->toDateString();
+
+                if (empty($startsAtInput)) {
+                    Notification::make()
+                        ->danger()
+                        ->title('Preencha uma data de inicio valida')
+                        ->send();
+
+                    return;
+                }
+
+                $startsAt = Carbon::parse((string) $startsAtInput)->toDateString();
+                $description = trim((string) ($data['description'] ?? '')) ?: 'Ajuste manual';
+                $weeks = isset($data['recurrence_weeks']) && $data['recurrence_weeks'] !== ''
+                    ? max(1, (int) $data['recurrence_weeks'])
+                    : null;
+
+                if ($weeks === 1) {
+                    $weeks = null;
+                }
+
+                if ($operation === 'update') {
+                    $adjustment = DriverAdjustment::query()
+                        ->where('driver_id', $record->driver_id)
+                        ->find($adjustmentId);
+
+                    if (! $adjustment) {
+                        Notification::make()
+                            ->danger()
+                            ->title('Ajuste nao encontrado')
+                            ->send();
+
+                        return;
+                    }
+
+                    $adjustment->forceFill([
+                        'starts_at' => $startsAt,
+                        'recurrence_weeks' => $weeks,
+                        'category' => (string) ($data['category'] ?? 'acerto'),
+                        'description' => $description,
+                        'amount' => round($amountValue, 2),
+                        'source_file' => $adjustment->source_file ?? 'manual',
+                    ])->save();
+
+                    $this->resetBillingCache();
+                    $this->resetTable();
+
+                    Notification::make()
+                        ->success()
+                        ->title('Ajuste atualizado')
+                        ->send();
+
+                    return;
+                }
+
+                DriverAdjustment::query()->create([
+                    'driver_id' => $record->driver_id,
+                    'starts_at' => $startsAt,
+                    'recurrence_weeks' => $weeks,
+                    'category' => (string) ($data['category'] ?? 'acerto'),
+                    'description' => $description,
+                    'amount' => round($amountValue, 2),
+                    'external_ref' => (string) Str::uuid(),
+                    'raw_row' => ['origin' => 'manual'],
+                    'source_file' => 'manual',
+                    'imported_at' => now(),
+                ]);
+
+                $this->resetBillingCache();
+                $this->resetTable();
+
+                Notification::make()
+                    ->success()
+                    ->title('Ajuste criado')
+                    ->body('Recalcule os settlements do periodo para refletir o novo ajuste.')
+                    ->send();
             });
+    }
+
+    private function applyAdjustmentForward(DriverSettlement $record, float $targetCarry): void
+    {
+        $settlements = DriverSettlement::query()
+            ->where('driver_id', $record->driver_id)
+            ->where(function (Builder $query) use ($record): void {
+                $query->whereDate('period_start', '>', $record->period_start)
+                    ->orWhere(function (Builder $nested) use ($record): void {
+                        $nested->whereDate('period_start', $record->period_start)
+                            ->where('id', '>=', $record->id);
+                    });
+            })
+            ->orderBy('period_start')
+            ->orderBy('id')
+            ->get(['id', 'carry_over_balance', 'amount_payable', 'amount_due', 'is_paid', 'paid_at']);
+
+        if ($settlements->isEmpty()) {
+            return;
+        }
+
+        $currentCarry = round($targetCarry, 2);
+
+        foreach ($settlements as $settlement) {
+            $amountDue = round($currentCarry + (float) $settlement->amount_payable, 2);
+
+            $settlement->forceFill([
+                'carry_over_balance' => $currentCarry,
+                'amount_due' => $amountDue,
+                'is_paid' => false,
+                'paid_at' => null,
+            ])->save();
+
+            $currentCarry = $amountDue;
+        }
     }
 
     private function markPaidAction(): Action
@@ -856,7 +1074,7 @@ class DriverSettlementsReport extends Page implements HasTable
      */
     private function adjustmentsForSettlement(DriverSettlement $settlement): array
     {
-        $adjustments = \App\Models\DriverAdjustment::query()
+        $adjustments = DriverAdjustment::query()
             ->where('driver_id', $settlement->driver_id)
             ->whereDate('starts_at', '<=', $settlement->period_end)
             ->orderBy('starts_at')
@@ -910,6 +1128,30 @@ class DriverSettlementsReport extends Page implements HasTable
             'count' => count($rows),
             'rows' => $rows,
         ];
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    private function manualAdjustmentsForDriver(int $driverId): array
+    {
+        return DriverAdjustment::query()
+            ->where('driver_id', $driverId)
+            ->orderByDesc('starts_at')
+            ->orderByDesc('id')
+            ->limit(20)
+            ->get(['id', 'driver_id', 'starts_at', 'recurrence_weeks', 'category', 'description', 'amount', 'source_file'])
+            ->map(fn (DriverAdjustment $adjustment): array => [
+                'id' => $adjustment->id,
+                'driver_id' => $adjustment->driver_id,
+                'starts_at' => $adjustment->starts_at,
+                'recurrence_weeks' => $adjustment->recurrence_weeks,
+                'category' => $adjustment->category,
+                'description' => $adjustment->description,
+                'amount' => (float) $adjustment->amount,
+                'source_file' => $adjustment->source_file,
+            ])
+            ->all();
     }
 
     /**
@@ -1075,6 +1317,32 @@ class DriverSettlementsReport extends Page implements HasTable
         }
 
         return number_format((float) $value, 2, ',', ' ').'%';
+    }
+
+    private function parseLocalizedDecimal(mixed $value): ?float
+    {
+        if ($value === null) {
+            return null;
+        }
+
+        $normalized = trim((string) $value);
+
+        if ($normalized === '') {
+            return null;
+        }
+
+        $normalized = str_replace(' ', '', $normalized);
+
+        if (str_contains($normalized, ',')) {
+            $normalized = str_replace('.', '', $normalized);
+            $normalized = str_replace(',', '.', $normalized);
+        }
+
+        if (! is_numeric($normalized)) {
+            return null;
+        }
+
+        return (float) $normalized;
     }
 
     private function resetBillingCache(): void

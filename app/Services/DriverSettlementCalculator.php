@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\Driver;
 use App\Models\DriverAdjustment;
 use App\Models\DriverBalance;
 use App\Models\DriverBalanceMovement;
@@ -9,6 +10,7 @@ use App\Models\DriverBillingProfile;
 use App\Models\DriverSettlement;
 use App\Models\PlatformDriverBalance;
 use App\Models\PrioTransaction;
+use App\Models\VehicleAllocation;
 use App\Models\ViaVerdeTransaction;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Log;
@@ -61,6 +63,18 @@ class DriverSettlementCalculator
         $created = 0;
         $skipped = 0;
         $missingProfiles = 0;
+        $driverIds = $grouped->keys()->map(fn ($id): int => (int) $id)->values();
+        $driversById = Driver::query()->whereIn('id', $driverIds)->get()->keyBy('id');
+        $allocationsByDriver = VehicleAllocation::query()
+            ->whereIn('driver_id', $driverIds)
+            ->where('starts_at', '<=', $end)
+            ->where(function ($query) use ($start): void {
+                $query->whereNull('ends_at')
+                    ->orWhere('ends_at', '>=', $start);
+            })
+            ->get()
+            ->groupBy('driver_id');
+        $billingResolver = app(SettlementBillingResolver::class);
 
         foreach ($grouped as $driverId => $driverBalances) {
             $exists = DriverSettlement::query()
@@ -106,11 +120,32 @@ class DriverSettlementCalculator
 
             $percentCompany = (float) $profile->percent_company;
             $percentDriver = (float) $profile->percent_driver;
-            $rentAmount = (float) ($profile->vehicle_rent_value ?? 0);
+            $driver = $driversById->get((int) $driverId);
 
-            $companyShare = round($netTotal * ($percentCompany / 100), 2);
-            $driverShare = round($netTotal * ($percentDriver / 100), 2);
-            $amountPayableBase = $netTotal + $tipsTotal - $expensesTotal;
+            if (! $driver instanceof Driver) {
+                $missingProfiles++;
+                Log::warning('Settlement skip: driver not found for balance group', [
+                    'driver_id' => $driverId,
+                    'period_start' => $start->toDateString(),
+                    'period_end' => $end->toDateString(),
+                ]);
+
+                continue;
+            }
+
+            $billing = $billingResolver->resolveSettlementBilling(
+                $driver,
+                $start,
+                $end,
+                collect([$profile]),
+                $allocationsByDriver->get((int) $driverId, collect())
+            );
+            $rentTotal = round((float) ($billing['rent_total'] ?? 0), 2);
+
+            $netWithoutTips = round($netTotal - $tipsTotal, 2);
+            $companyShare = round($netWithoutTips * ($percentCompany / 100), 2);
+            $driverShare = round($netWithoutTips * ($percentDriver / 100), 2);
+            $amountPayableBase = round($driverShare + $tipsTotal - $expensesTotal - $rentTotal, 2);
             $vatPercent = (float) ($profile->vat_percent ?? 0);
             $vatMultiplier = $profile->vat_refund_mode === \App\Enums\VatRefundMode::DriverDeliversVat && $vatPercent > 0
                 ? 1 + ($vatPercent / 100)
@@ -144,7 +179,11 @@ class DriverSettlementCalculator
                     'percent_company' => $percentCompany,
                     'percent_driver' => $percentDriver,
                     'vehicle_rent_type' => $profile->vehicle_rent_type?->value ?? (string) $profile->vehicle_rent_type,
-                    'vehicle_rent_value' => $rentAmount,
+                    'vehicle_rent_value' => (float) ($profile->vehicle_rent_value ?? 0),
+                    'rental_days' => (int) ($billing['rental_days'] ?? 0),
+                    'rent_total' => $rentTotal,
+                    'net_without_tips' => $netWithoutTips,
+                    'amount_payable_base' => $amountPayableBase,
                     'carry_over_balance' => $carryOverBalance,
                     'amount_due' => $amountDue,
                 ],
