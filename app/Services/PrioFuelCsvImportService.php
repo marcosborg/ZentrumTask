@@ -349,10 +349,13 @@ class PrioFuelCsvImportService
         $cardCode = $this->findExactHeader($headers, [
             'CardCode',
             'N CARTAO',
+            'NO CARTAO',
+            'NO. CARTAO',
+            'Nº CARTAO',
+            'Nº. CARTAO',
             'N. CARTAO',
             'NUMERO CARTAO',
             'NUM CARTAO',
-            'NO CARTAO',
             'CARTAO',
         ]);
         $vehiclePlate = $this->findExactHeader($headers, [
