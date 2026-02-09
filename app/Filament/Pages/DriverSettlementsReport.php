@@ -478,22 +478,11 @@ class DriverSettlementsReport extends Page implements HasTable
             ->color('info')
             ->icon(Heroicon::OutlinedEnvelope)
             ->requiresConfirmation()
-            ->modalDescription('Em modo de testes, todos os emails sao enviados apenas para o email configurado no .env.')
+            ->modalDescription('Envia email do settlement conforme o modo configurado (test/production).')
             ->action(function (): void {
                 $filters = $this->filtersForActions();
 
                 if (! $filters) {
-                    return;
-                }
-
-                $recipient = $this->settlementTestRecipient();
-
-                if (! $recipient) {
-                    Notification::make()
-                        ->danger()
-                        ->title('Defina SETTLEMENT_TEST_EMAIL no .env')
-                        ->send();
-
                     return;
                 }
 
@@ -507,9 +496,18 @@ class DriverSettlementsReport extends Page implements HasTable
 
                 $sent = 0;
                 $failed = 0;
+                $skipped = 0;
 
-                $query->orderBy('id')->chunkById(50, function ($rows) use ($recipient, &$sent, &$failed): void {
+                $query->orderBy('id')->chunkById(50, function ($rows) use (&$sent, &$failed, &$skipped): void {
                     foreach ($rows as $row) {
+                        $recipient = $this->settlementRecipientForRecord($row);
+
+                        if (! $recipient) {
+                            $skipped++;
+
+                            continue;
+                        }
+
                         try {
                             $this->sendSettlementEmail($row, $recipient);
                             $sent++;
@@ -524,7 +522,7 @@ class DriverSettlementsReport extends Page implements HasTable
                 Notification::make()
                     ->success()
                     ->title('Envio concluido')
-                    ->body("Enviados: {$sent} | Falhas: {$failed} | Destino teste: {$recipient}")
+                    ->body("Enviados: {$sent} | Falhas: {$failed} | Ignorados: {$skipped} | Modo: ".$this->settlementDeliveryMode())
                     ->send();
             });
     }
@@ -536,14 +534,17 @@ class DriverSettlementsReport extends Page implements HasTable
             ->icon(Heroicon::OutlinedEnvelope)
             ->color('info')
             ->requiresConfirmation()
-            ->modalDescription('Em testes, este envio vai para SETTLEMENT_TEST_EMAIL no .env.')
+            ->modalDescription('Envia email do settlement conforme o modo configurado (test/production).')
             ->action(function (DriverSettlement $record): void {
-                $recipient = $this->settlementTestRecipient();
+                $recipient = $this->settlementRecipientForRecord($record);
 
                 if (! $recipient) {
                     Notification::make()
                         ->danger()
-                        ->title('Defina SETTLEMENT_TEST_EMAIL no .env')
+                        ->title('Destinatario de email invalido')
+                        ->body($this->settlementDeliveryMode() === 'test'
+                            ? 'Defina SETTLEMENT_TEST_EMAIL no .env'
+                            : 'Motorista sem email valido')
                         ->send();
 
                     return;
@@ -567,7 +568,7 @@ class DriverSettlementsReport extends Page implements HasTable
                 Notification::make()
                     ->success()
                     ->title('Email enviado')
-                    ->body("Destino teste: {$recipient} | Total enviados neste settlement: ".((int) $record->email_sent_count))
+                    ->body("Destino: {$recipient} | Modo: ".$this->settlementDeliveryMode().' | Total enviados neste settlement: '.((int) $record->email_sent_count))
                     ->send();
             });
     }
@@ -793,6 +794,28 @@ class DriverSettlementsReport extends Page implements HasTable
                 'amount' => $this->formatMoney($row['amount'] ?? 0),
             ])->values()->all(),
         ];
+    }
+
+    private function settlementRecipientForRecord(DriverSettlement $record): ?string
+    {
+        if ($this->settlementDeliveryMode() === 'test') {
+            return $this->settlementTestRecipient();
+        }
+
+        $driverEmail = trim((string) ($this->driverIdentity((int) $record->driver_id)['email'] ?? ''));
+
+        if ($driverEmail === '' || filter_var($driverEmail, FILTER_VALIDATE_EMAIL) === false) {
+            return null;
+        }
+
+        return $driverEmail;
+    }
+
+    private function settlementDeliveryMode(): string
+    {
+        $mode = strtolower(trim((string) config('mail.settlement_delivery_mode', 'test')));
+
+        return in_array($mode, ['test', 'production'], true) ? $mode : 'test';
     }
 
     private function settlementTestRecipient(): ?string
