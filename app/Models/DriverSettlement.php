@@ -23,6 +23,9 @@ class DriverSettlement extends Model
         'amount_payable',
         'amount_due',
         'is_paid',
+        'email_sent_count',
+        'last_emailed_at',
+        'last_emailed_to',
         'paid_at',
         'rules_snapshot',
     ];
@@ -44,6 +47,8 @@ class DriverSettlement extends Model
             'amount_payable' => 'decimal:2',
             'amount_due' => 'decimal:2',
             'is_paid' => 'boolean',
+            'email_sent_count' => 'integer',
+            'last_emailed_at' => 'datetime',
             'paid_at' => 'datetime',
             'rules_snapshot' => 'array',
         ];

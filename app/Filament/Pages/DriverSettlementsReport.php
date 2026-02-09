@@ -2,6 +2,7 @@
 
 namespace App\Filament\Pages;
 
+use App\Mail\DriverSettlementSummaryMail;
 use App\Models\Driver;
 use App\Models\DriverAdjustment;
 use App\Models\DriverBalance;
@@ -33,7 +34,9 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
+use Throwable;
 use UnitEnum;
 
 class DriverSettlementsReport extends Page implements HasTable
@@ -59,6 +62,9 @@ class DriverSettlementsReport extends Page implements HasTable
     private array $billingCache = [];
 
     private bool $billingCacheBuilt = false;
+
+    /** @var array<int, array{name: string, email: string}> */
+    private array $driverIdentityCache = [];
 
     public function mount(): void {}
 
@@ -190,6 +196,7 @@ class DriverSettlementsReport extends Page implements HasTable
             ->columns([
                 TextColumn::make('driver_name')
                     ->label('Motorista')
+                    ->state(fn (DriverSettlement $record): string => $this->driverIdentity((int) $record->driver_id)['name'])
                     ->searchable(query: function (Builder $query, string $search): Builder {
                         return $query->where('drivers.name', 'like', "%{$search}%");
                     })
@@ -198,9 +205,9 @@ class DriverSettlementsReport extends Page implements HasTable
                     }),
                 TextColumn::make('driver_email')
                     ->label('Email')
-                    ->state(fn (DriverSettlement $record): string => (string) ($record->driver_email ?? '-'))
+                    ->state(fn (DriverSettlement $record): string => $this->driverIdentity((int) $record->driver_id)['email'])
                     ->copyable()
-                    ->copyableState(fn (DriverSettlement $record): string => (string) ($record->driver_email ?? ''))
+                    ->copyableState(fn (DriverSettlement $record): string => $this->driverIdentity((int) $record->driver_id)['email'])
                     ->copyMessage('Email copiado')
                     ->copyMessageDuration(1500),
                 TextColumn::make('period_range')
@@ -326,6 +333,16 @@ class DriverSettlementsReport extends Page implements HasTable
                     ->badge()
                     ->state(fn (DriverSettlement $record): string => $record->is_paid ? 'Pago' : 'Pendente')
                     ->color(fn (DriverSettlement $record): string => $record->is_paid ? 'success' : 'warning'),
+                TextColumn::make('email_sent_count')
+                    ->label('Emails')
+                    ->alignRight()
+                    ->state(fn (DriverSettlement $record): int => (int) ($record->email_sent_count ?? 0))
+                    ->badge()
+                    ->color('gray'),
+                TextColumn::make('last_emailed_at')
+                    ->label('Ultimo envio')
+                    ->dateTime('d/m/Y H:i')
+                    ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('created_at')
                     ->label('Criado em')
                     ->dateTime('d/m/Y H:i')
@@ -336,6 +353,7 @@ class DriverSettlementsReport extends Page implements HasTable
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->recordActions([
+                $this->sendSettlementEmailAction(),
                 $this->manageAdjustmentsAction(),
                 $this->adjustBalanceAction(),
                 $this->markPaidAction(),
@@ -452,6 +470,107 @@ class DriverSettlementsReport extends Page implements HasTable
             });
     }
 
+    public function sendPeriodSettlementEmailsAction(): Action
+    {
+        return Action::make('sendPeriodSettlementEmails')
+            ->label('Enviar emails do periodo')
+            ->color('info')
+            ->icon(Heroicon::OutlinedEnvelope)
+            ->requiresConfirmation()
+            ->modalDescription('Em modo de testes, todos os emails sao enviados apenas para o email configurado no .env.')
+            ->action(function (): void {
+                $filters = $this->filtersForActions();
+
+                if (! $filters) {
+                    return;
+                }
+
+                $recipient = $this->settlementTestRecipient();
+
+                if (! $recipient) {
+                    Notification::make()
+                        ->danger()
+                        ->title('Defina SETTLEMENT_TEST_EMAIL no .env')
+                        ->send();
+
+                    return;
+                }
+
+                $query = DriverSettlement::query()
+                    ->whereDate('period_start', '>=', $filters['period_start'])
+                    ->whereDate('period_end', '<=', $filters['period_end']);
+
+                if ($filters['driver_id']) {
+                    $query->where('driver_id', $filters['driver_id']);
+                }
+
+                $sent = 0;
+                $failed = 0;
+
+                $query->orderBy('id')->chunkById(50, function ($rows) use ($recipient, &$sent, &$failed): void {
+                    foreach ($rows as $row) {
+                        try {
+                            $this->sendSettlementEmail($row, $recipient);
+                            $sent++;
+                        } catch (Throwable) {
+                            $failed++;
+                        }
+                    }
+                });
+
+                $this->resetTable();
+
+                Notification::make()
+                    ->success()
+                    ->title('Envio concluido')
+                    ->body("Enviados: {$sent} | Falhas: {$failed} | Destino teste: {$recipient}")
+                    ->send();
+            });
+    }
+
+    private function sendSettlementEmailAction(): Action
+    {
+        return Action::make('sendSettlementEmail')
+            ->label('Enviar email')
+            ->icon(Heroicon::OutlinedEnvelope)
+            ->color('info')
+            ->requiresConfirmation()
+            ->modalDescription('Em testes, este envio vai para SETTLEMENT_TEST_EMAIL no .env.')
+            ->action(function (DriverSettlement $record): void {
+                $recipient = $this->settlementTestRecipient();
+
+                if (! $recipient) {
+                    Notification::make()
+                        ->danger()
+                        ->title('Defina SETTLEMENT_TEST_EMAIL no .env')
+                        ->send();
+
+                    return;
+                }
+
+                try {
+                    $this->sendSettlementEmail($record, $recipient);
+                } catch (Throwable $exception) {
+                    Notification::make()
+                        ->danger()
+                        ->title('Falha ao enviar email')
+                        ->body($this->sanitizeUtf8($exception->getMessage()) ?? 'Erro desconhecido')
+                        ->send();
+
+                    return;
+                }
+
+                $record->refresh();
+                $this->resetTable();
+
+                Notification::make()
+                    ->success()
+                    ->title('Email enviado')
+                    ->body("Destino teste: {$recipient} | Total enviados neste settlement: ".((int) $record->email_sent_count))
+                    ->send();
+            });
+    }
+
     /**
      * @return array{period_start: string|null, period_end: string|null, driver_id: int|null, platform: string|null}
      */
@@ -503,8 +622,6 @@ class DriverSettlementsReport extends Page implements HasTable
             ->leftJoin('drivers', 'drivers.id', '=', 'driver_settlements.driver_id')
             ->select([
                 'driver_settlements.*',
-                'drivers.name as driver_name',
-                'drivers.email as driver_email',
             ]);
 
         $query->selectSub(
@@ -570,6 +687,7 @@ class DriverSettlementsReport extends Page implements HasTable
             ->modalContent(function (DriverSettlement $record) {
                 $balances = $this->balancesForSettlement($record);
                 $billing = $this->billingFor($record);
+                $driverIdentity = $this->driverIdentity((int) $record->driver_id);
                 $prioExpenses = $this->prioExpensesForSettlement($record);
                 $viaVerdeExpenses = $this->viaVerdeExpensesForSettlement($record);
                 $adjustments = $this->adjustmentsForSettlement($record);
@@ -578,6 +696,7 @@ class DriverSettlementsReport extends Page implements HasTable
 
                 return view('filament.pages.driver-settlements-report-details', [
                     'settlement' => $record,
+                    'driverIdentity' => $driverIdentity,
                     'balances' => $balances,
                     'billing' => $billing,
                     'prioExpenses' => $prioExpenses,
@@ -588,6 +707,74 @@ class DriverSettlementsReport extends Page implements HasTable
                 ]);
             })
             ->action(function (): void {});
+    }
+
+    private function sendSettlementEmail(DriverSettlement $record, string $recipient): void
+    {
+        $record->refresh();
+        $payload = $this->settlementEmailPayload($record);
+
+        Mail::to($recipient)->send(new DriverSettlementSummaryMail($payload));
+
+        $record->forceFill([
+            'email_sent_count' => ((int) $record->email_sent_count) + 1,
+            'last_emailed_at' => now(),
+            'last_emailed_to' => $recipient,
+        ])->save();
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function settlementEmailPayload(DriverSettlement $record): array
+    {
+        $driver = $this->driverIdentity((int) $record->driver_id);
+        $balances = $this->balancesForSettlement($record);
+        $billing = $this->billingFor($record);
+        $balanceMovements = $this->balanceMovementsForSettlement($record);
+        $uberNet = collect($balances)->where('platform', 'uber')->sum('net_amount');
+        $boltNet = collect($balances)->where('platform', 'bolt')->sum('net_amount');
+
+        return [
+            'driver' => [
+                'name' => $driver['name'],
+                'email' => $driver['email'],
+            ],
+            'period_label' => ($record->period_start?->format('d/m/Y') ?? '-').' - '.($record->period_end?->format('d/m/Y') ?? '-'),
+            'totals' => [
+                'uber_net' => $this->formatMoney($uberNet),
+                'bolt_net' => $this->formatMoney($boltNet),
+                'tips_total' => $this->formatMoney($record->tips_total ?? 0),
+                'expenses_total' => $this->formatMoney($record->expenses_total ?? 0),
+                'rent_total' => $this->formatMoney($billing['rent_total'] ?? 0),
+                'carry_over_balance' => $this->formatMoney($record->carry_over_balance ?? 0),
+                'amount_due' => $this->formatMoney($record->amount_due ?? 0),
+            ],
+            'balances' => collect($balances)->map(fn (array $row): array => [
+                'platform' => strtoupper((string) ($row['platform'] ?? '-')),
+                'period' => Carbon::parse((string) $row['period_start'])->format('d/m/Y').' - '.Carbon::parse((string) $row['period_end'])->format('d/m/Y'),
+                'net_amount' => $this->formatMoney($row['net_amount'] ?? 0),
+                'tips_amount' => $this->formatMoney($row['tips_amount'] ?? 0),
+                'source_file' => $row['source_file'] ?? '-',
+            ])->values()->all(),
+            'balance_movements' => collect($balanceMovements)->map(fn (array $row): array => [
+                'created_at' => $row['created_at'] instanceof Carbon ? $row['created_at']->format('d/m/Y H:i') : '-',
+                'type' => (string) ($row['type'] ?? '-'),
+                'description' => (string) ($row['description'] ?? '-'),
+                'amount' => $this->formatMoney($row['amount'] ?? 0),
+            ])->values()->all(),
+        ];
+    }
+
+    private function settlementTestRecipient(): ?string
+    {
+        $recipient = trim((string) config('mail.settlement_test_recipient'));
+
+        if ($recipient === '' || filter_var($recipient, FILTER_VALIDATE_EMAIL) === false) {
+            return null;
+        }
+
+        return $recipient;
     }
 
     private function adjustBalanceAction(): Action
@@ -991,12 +1178,12 @@ class DriverSettlementsReport extends Page implements HasTable
                 'source_file',
             ])
             ->map(fn (PlatformDriverBalance $row): array => [
-                'platform' => $row->platform,
+                'platform' => $this->sanitizeUtf8((string) $row->platform),
                 'period_start' => $row->period_start,
                 'period_end' => $row->period_end,
                 'net_amount' => (float) $row->net_amount,
                 'tips_amount' => (float) $row->tips_amount,
-                'source_file' => $row->source_file,
+                'source_file' => $this->sanitizeUtf8($row->source_file),
             ])
             ->all();
     }
@@ -1020,8 +1207,8 @@ class DriverSettlementsReport extends Page implements HasTable
             ])
             ->map(fn (\App\Models\PrioTransaction $row): array => [
                 'occurred_at' => $row->occurred_at,
-                'vehicle_plate' => $row->vehicle_plate,
-                'card_code' => $row->card_code,
+                'vehicle_plate' => $this->sanitizeUtf8($row->vehicle_plate),
+                'card_code' => $this->sanitizeUtf8($row->card_code),
                 'net_amount' => (float) $row->net_amount,
             ])
             ->all();
@@ -1054,8 +1241,8 @@ class DriverSettlementsReport extends Page implements HasTable
             ])
             ->map(fn (\App\Models\ViaVerdeTransaction $row): array => [
                 'occurred_at' => $row->occurred_at,
-                'vehicle_plate' => $row->vehicle_plate,
-                'location' => $row->location,
+                'vehicle_plate' => $this->sanitizeUtf8($row->vehicle_plate),
+                'location' => $this->sanitizeUtf8($row->location),
                 'amount' => (float) $row->amount,
             ])
             ->all();
@@ -1114,8 +1301,8 @@ class DriverSettlementsReport extends Page implements HasTable
 
                 $rows[] = [
                     'occurred_at' => $occurrence,
-                    'category' => $adjustment->category,
-                    'description' => $adjustment->description,
+                    'category' => $this->sanitizeUtf8($adjustment->category),
+                    'description' => $this->sanitizeUtf8($adjustment->description),
                     'amount' => (float) $adjustment->amount,
                 ];
 
@@ -1146,10 +1333,10 @@ class DriverSettlementsReport extends Page implements HasTable
                 'driver_id' => $adjustment->driver_id,
                 'starts_at' => $adjustment->starts_at,
                 'recurrence_weeks' => $adjustment->recurrence_weeks,
-                'category' => $adjustment->category,
-                'description' => $adjustment->description,
+                'category' => $this->sanitizeUtf8($adjustment->category),
+                'description' => $this->sanitizeUtf8($adjustment->description),
                 'amount' => (float) $adjustment->amount,
-                'source_file' => $adjustment->source_file,
+                'source_file' => $this->sanitizeUtf8($adjustment->source_file),
             ])
             ->all();
     }
@@ -1171,8 +1358,8 @@ class DriverSettlementsReport extends Page implements HasTable
             ])
             ->map(fn (DriverBalanceMovement $movement): array => [
                 'amount' => (float) $movement->amount,
-                'type' => $movement->type,
-                'description' => $movement->description,
+                'type' => $this->sanitizeUtf8($movement->type),
+                'description' => $this->sanitizeUtf8($movement->description),
                 'created_at' => $movement->created_at,
             ])
             ->all();
@@ -1259,10 +1446,15 @@ class DriverSettlementsReport extends Page implements HasTable
      */
     private function driverOptions(): array
     {
-        return cache()->remember('driver_options_select', 60, fn (): array => Driver::query()
-            ->orderBy('name')
-            ->pluck('name', 'id')
-            ->all());
+        return cache()->remember('driver_options_select', 60, function (): array {
+            return Driver::query()
+                ->orderBy('name')
+                ->get(['id', 'name'])
+                ->mapWithKeys(fn (Driver $driver): array => [
+                    $driver->id => $this->sanitizeUtf8($driver->name) ?? ('Motorista #'.$driver->id),
+                ])
+                ->all();
+        });
     }
 
     /**
@@ -1343,6 +1535,44 @@ class DriverSettlementsReport extends Page implements HasTable
         }
 
         return (float) $normalized;
+    }
+
+    private function sanitizeUtf8(?string $value): ?string
+    {
+        if ($value === null || $value === '') {
+            return $value;
+        }
+
+        if (preg_match('//u', $value) === 1) {
+            return $value;
+        }
+
+        if (function_exists('mb_convert_encoding')) {
+            return mb_convert_encoding($value, 'UTF-8', 'UTF-8, ISO-8859-1, Windows-1252');
+        }
+
+        return utf8_encode($value);
+    }
+
+    /**
+     * @return array{name: string, email: string}
+     */
+    private function driverIdentity(int $driverId): array
+    {
+        if (array_key_exists($driverId, $this->driverIdentityCache)) {
+            return $this->driverIdentityCache[$driverId];
+        }
+
+        $driver = Driver::query()->find($driverId, ['name', 'email']);
+
+        $identity = [
+            'name' => $this->sanitizeUtf8($driver?->name) ?? ('Motorista #'.$driverId),
+            'email' => $this->sanitizeUtf8($driver?->email) ?? '-',
+        ];
+
+        $this->driverIdentityCache[$driverId] = $identity;
+
+        return $identity;
     }
 
     private function resetBillingCache(): void

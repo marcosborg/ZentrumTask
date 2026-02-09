@@ -164,14 +164,14 @@ class SettlementBillingResolver
         $percentCompany = $status === 'ok' && $profile ? $this->normalizePercent($profile->percent_company) : null;
         $percentDriver = $status === 'ok' && $profile ? $this->normalizePercent($profile->percent_driver) : null;
 
-        $withholdingLabel = '—';
+        $withholdingLabel = '-';
         if ($status === 'ok' && $profile) {
             $withholdingLabel = ($profile->apply_withholding_tax && (float) $profile->withholding_tax_percent > 0)
                 ? 'Sim ('.number_format((float) $profile->withholding_tax_percent, 2, ',', ' ').'%)'
                 : 'Nao';
         }
 
-        $vatLabel = '—';
+        $vatLabel = '-';
         if ($status === 'ok' && $profile) {
             $percent = (float) $profile->vat_percent;
             $mode = $profile->vat_refund_mode?->value;

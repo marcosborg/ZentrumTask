@@ -1,10 +1,20 @@
+@php
+    $tableContainerClasses = 'mt-4 overflow-hidden rounded-xl border border-white/10 bg-white/[0.02]';
+    $tableScrollClasses = 'w-full overflow-x-auto';
+    $tableClasses = 'w-full min-w-full table-fixed text-sm text-gray-200';
+    $theadClasses = 'bg-white/5 text-xs uppercase tracking-wide text-gray-400';
+    $thClasses = 'px-4 py-3 text-left font-semibold';
+    $tdClasses = 'px-4 py-3 align-top';
+    $tbodyClasses = 'divide-y divide-white/10';
+@endphp
+
 <div class="space-y-4">
     <x-filament::section heading="Resumo">
-        <div class="grid gap-4 sm:grid-cols-2">
+        <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <div>
                 <div class="text-xs uppercase text-gray-400">Motorista</div>
-                <div class="text-sm font-semibold text-gray-100">{{ $settlement->driver_name ?? '-' }}</div>
-                <div class="text-sm text-gray-400">{{ $settlement->driver_email ?? '-' }}</div>
+                <div class="text-sm font-semibold text-gray-100">{{ $driverIdentity['name'] ?? '-' }}</div>
+                <div class="text-sm text-gray-400">{{ $driverIdentity['email'] ?? '-' }}</div>
             </div>
             <div>
                 <div class="text-xs uppercase text-gray-400">Periodo</div>
@@ -12,6 +22,16 @@
                     {{ $settlement->period_start?->format('d/m/Y') ?? '-' }}
                     -
                     {{ $settlement->period_end?->format('d/m/Y') ?? '-' }}
+                </div>
+            </div>
+            <div>
+                <div class="text-xs uppercase text-gray-400">Emails enviados</div>
+                <div class="text-sm font-semibold text-gray-100">{{ (int) ($settlement->email_sent_count ?? 0) }}</div>
+                <div class="text-xs text-gray-400">
+                    Ultimo envio: {{ $settlement->last_emailed_at?->format('d/m/Y H:i') ?? '-' }}
+                    @if (! empty($settlement->last_emailed_to))
+                        ({{ $settlement->last_emailed_to }})
+                    @endif
                 </div>
             </div>
         </div>
@@ -53,29 +73,31 @@
         @if (($balanceMovements ?? []) === [])
             <p class="text-sm text-gray-500">Sem movimentos registados para este settlement.</p>
         @else
-            <div class="overflow-x-auto">
-                <table class="min-w-full text-sm text-gray-200">
-                    <thead class="text-xs uppercase text-gray-400">
+            <div class="{{ $tableContainerClasses }}">
+                <div class="{{ $tableScrollClasses }}">
+                <table class="{{ $tableClasses }}">
+                    <thead class="{{ $theadClasses }}">
                         <tr>
-                            <th class="px-3 py-2 text-left">Data</th>
-                            <th class="px-3 py-2 text-left">Tipo</th>
-                            <th class="px-3 py-2 text-left">Descricao</th>
-                            <th class="px-3 py-2 text-right">Valor</th>
+                            <th class="{{ $thClasses }} whitespace-nowrap">Data</th>
+                            <th class="{{ $thClasses }} whitespace-nowrap">Tipo</th>
+                            <th class="{{ $thClasses }}">Descricao</th>
+                            <th class="{{ $thClasses }} whitespace-nowrap text-right">Valor</th>
                         </tr>
                     </thead>
-                    <tbody class="divide-y divide-gray-800">
+                    <tbody class="{{ $tbodyClasses }}">
                         @foreach ($balanceMovements as $movement)
-                            <tr>
-                                <td class="px-3 py-2">{{ $movement['created_at']?->format('d/m/Y H:i') ?? '-' }}</td>
-                                <td class="px-3 py-2">{{ $movement['type'] ?? '-' }}</td>
-                                <td class="px-3 py-2">{{ $movement['description'] ?? '-' }}</td>
-                                <td class="px-3 py-2 text-right">
+                            <tr class="odd:bg-white/[0.02]">
+                                <td class="{{ $tdClasses }} whitespace-nowrap">{{ $movement['created_at']?->format('d/m/Y H:i') ?? '-' }}</td>
+                                <td class="{{ $tdClasses }} whitespace-nowrap">{{ $movement['type'] ?? '-' }}</td>
+                                <td class="{{ $tdClasses }} break-words">{{ $movement['description'] ?? '-' }}</td>
+                                <td class="{{ $tdClasses }} whitespace-nowrap text-right">
                                     {{ number_format((float) ($movement['amount'] ?? 0), 2, ',', ' ') }} &euro;
                                 </td>
                             </tr>
                         @endforeach
                     </tbody>
                 </table>
+                </div>
             </div>
         @endif
     </x-filament::section>
@@ -101,7 +123,7 @@
                 <div class="text-xs uppercase text-gray-400">Dias / Aluguer</div>
                 <div class="text-sm font-semibold text-gray-100">
                     {{ $billing['rental_days'] ?? 0 }} dias
-                    Â-
+                    -
                     {{ isset($billing['rent_total']) ? number_format((float) $billing['rent_total'], 2, ',', ' ') : '-' }} &euro;
                 </div>
             </div>
@@ -117,7 +139,7 @@
                 <div class="text-xs uppercase text-gray-400">Retencao / IVA 23%</div>
                 <div class="text-sm font-semibold text-gray-100">
                     {{ $billing['withholding_label'] ?? '-' }}
-                    Â-
+                    -
                     {{ $billing['vat_label'] ?? '-' }}
                 </div>
                 @if (! empty($billing['vat_refund_mode']))
@@ -131,35 +153,37 @@
         @if ($balances === [])
             <p class="text-sm text-gray-500">Sem balances associados a este settlement.</p>
         @else
-            <div class="overflow-x-auto">
-                <table class="min-w-full text-sm text-gray-200">
-                    <thead class="text-xs uppercase text-gray-400">
+            <div class="{{ $tableContainerClasses }}">
+                <div class="{{ $tableScrollClasses }}">
+                <table class="{{ $tableClasses }}">
+                    <thead class="{{ $theadClasses }}">
                         <tr>
-                            <th class="px-3 py-2 text-left">Plataforma</th>
-                            <th class="px-3 py-2 text-left">Periodo</th>
-                            <th class="px-3 py-2 text-right">Liquido</th>
-                            <th class="px-3 py-2 text-right">Tips</th>
-                            <th class="px-3 py-2 text-left">Fonte</th>
+                            <th class="{{ $thClasses }} whitespace-nowrap">Plataforma</th>
+                            <th class="{{ $thClasses }} whitespace-nowrap">Periodo</th>
+                            <th class="{{ $thClasses }} whitespace-nowrap text-right">Liquido</th>
+                            <th class="{{ $thClasses }} whitespace-nowrap text-right">Tips</th>
+                            <th class="{{ $thClasses }} whitespace-nowrap">Fonte</th>
                         </tr>
                     </thead>
-                    <tbody class="divide-y divide-gray-800">
+                    <tbody class="{{ $tbodyClasses }}">
                         @foreach ($balances as $row)
-                            <tr>
-                                <td class="px-3 py-2">{{ strtoupper($row['platform']) }}</td>
-                                <td class="px-3 py-2 text-gray-300">
-                                    {{ $row['period_start'] }} - {{ $row['period_end'] }}
+                            <tr class="odd:bg-white/[0.02]">
+                                <td class="{{ $tdClasses }} whitespace-nowrap">{{ strtoupper($row['platform']) }}</td>
+                                <td class="{{ $tdClasses }} whitespace-nowrap text-gray-300">
+                                    {{ \Illuminate\Support\Carbon::parse($row['period_start'])->format('d/m/Y') }} - {{ \Illuminate\Support\Carbon::parse($row['period_end'])->format('d/m/Y') }}
                                 </td>
-                                <td class="px-3 py-2 text-right">
+                                <td class="{{ $tdClasses }} whitespace-nowrap text-right">
                                     {{ number_format($row['net_amount'], 2, ',', ' ') }} &euro;
                                 </td>
-                                <td class="px-3 py-2 text-right">
+                                <td class="{{ $tdClasses }} whitespace-nowrap text-right">
                                     {{ number_format($row['tips_amount'], 2, ',', ' ') }} &euro;
                                 </td>
-                                <td class="px-3 py-2 text-gray-300">{{ $row['source_file'] ?? '-' }}</td>
+                                <td class="{{ $tdClasses }} whitespace-nowrap text-gray-300">{{ $row['source_file'] ?? '-' }}</td>
                             </tr>
                         @endforeach
                     </tbody>
                 </table>
+                </div>
             </div>
         @endif
     </x-filament::section>
@@ -181,29 +205,31 @@
         </div>
 
         @if (($prioExpenses['rows'] ?? []) !== [])
-            <div class="mt-4 overflow-x-auto">
-                <table class="min-w-full text-sm text-gray-200">
-                    <thead class="text-xs uppercase text-gray-400">
+            <div class="{{ $tableContainerClasses }}">
+                <div class="{{ $tableScrollClasses }}">
+                <table class="{{ $tableClasses }}">
+                    <thead class="{{ $theadClasses }}">
                         <tr>
-                            <th class="px-3 py-2 text-left">Data/Hora</th>
-                            <th class="px-3 py-2 text-left">Cartao</th>
-                            <th class="px-3 py-2 text-left">Matricula</th>
-                            <th class="px-3 py-2 text-right">Total</th>
+                            <th class="{{ $thClasses }} whitespace-nowrap">Data/Hora</th>
+                            <th class="{{ $thClasses }} whitespace-nowrap">Cartao</th>
+                            <th class="{{ $thClasses }} whitespace-nowrap">Matricula</th>
+                            <th class="{{ $thClasses }} whitespace-nowrap text-right">Total</th>
                         </tr>
                     </thead>
-                    <tbody class="divide-y divide-gray-800">
+                    <tbody class="{{ $tbodyClasses }}">
                         @foreach ($prioExpenses['rows'] as $row)
-                            <tr>
-                                <td class="px-3 py-2">{{ $row['occurred_at']?->format('d/m/Y H:i') ?? '-' }}</td>
-                                <td class="px-3 py-2">{{ $row['card_code'] ?? '-' }}</td>
-                                <td class="px-3 py-2">{{ $row['vehicle_plate'] ?? '-' }}</td>
-                                <td class="px-3 py-2 text-right">
+                            <tr class="odd:bg-white/[0.02]">
+                                <td class="{{ $tdClasses }} whitespace-nowrap">{{ $row['occurred_at']?->format('d/m/Y H:i') ?? '-' }}</td>
+                                <td class="{{ $tdClasses }} whitespace-nowrap">{{ $row['card_code'] ?? '-' }}</td>
+                                <td class="{{ $tdClasses }} whitespace-nowrap">{{ $row['vehicle_plate'] ?? '-' }}</td>
+                                <td class="{{ $tdClasses }} whitespace-nowrap text-right">
                                     {{ number_format((float) ($row['net_amount'] ?? 0), 2, ',', ' ') }} &euro;
                                 </td>
                             </tr>
                         @endforeach
                     </tbody>
                 </table>
+                </div>
             </div>
         @endif
     </x-filament::section>
@@ -225,29 +251,31 @@
         </div>
 
         @if (($viaVerdeExpenses['rows'] ?? []) !== [])
-            <div class="mt-4 overflow-x-auto">
-                <table class="min-w-full text-sm text-gray-200">
-                    <thead class="text-xs uppercase text-gray-400">
+            <div class="{{ $tableContainerClasses }}">
+                <div class="{{ $tableScrollClasses }}">
+                <table class="{{ $tableClasses }}">
+                    <thead class="{{ $theadClasses }}">
                         <tr>
-                            <th class="px-3 py-2 text-left">Data/Hora</th>
-                            <th class="px-3 py-2 text-left">Matricula</th>
-                            <th class="px-3 py-2 text-left">Local</th>
-                            <th class="px-3 py-2 text-right">Total</th>
+                            <th class="{{ $thClasses }} whitespace-nowrap">Data/Hora</th>
+                            <th class="{{ $thClasses }} whitespace-nowrap">Matricula</th>
+                            <th class="{{ $thClasses }}">Local</th>
+                            <th class="{{ $thClasses }} whitespace-nowrap text-right">Total</th>
                         </tr>
                     </thead>
-                    <tbody class="divide-y divide-gray-800">
+                    <tbody class="{{ $tbodyClasses }}">
                         @foreach ($viaVerdeExpenses['rows'] as $row)
-                            <tr>
-                                <td class="px-3 py-2">{{ $row['occurred_at']?->format('d/m/Y H:i') ?? '-' }}</td>
-                                <td class="px-3 py-2">{{ $row['vehicle_plate'] ?? '-' }}</td>
-                                <td class="px-3 py-2">{{ $row['location'] ?? '-' }}</td>
-                                <td class="px-3 py-2 text-right">
+                            <tr class="odd:bg-white/[0.02]">
+                                <td class="{{ $tdClasses }} whitespace-nowrap">{{ $row['occurred_at']?->format('d/m/Y H:i') ?? '-' }}</td>
+                                <td class="{{ $tdClasses }} whitespace-nowrap">{{ $row['vehicle_plate'] ?? '-' }}</td>
+                                <td class="{{ $tdClasses }} break-words">{{ $row['location'] ?? '-' }}</td>
+                                <td class="{{ $tdClasses }} whitespace-nowrap text-right">
                                     {{ number_format((float) ($row['amount'] ?? 0), 2, ',', ' ') }} &euro;
                                 </td>
                             </tr>
                         @endforeach
                     </tbody>
                 </table>
+                </div>
             </div>
         @endif
     </x-filament::section>
@@ -269,29 +297,31 @@
         </div>
 
         @if (($adjustments['rows'] ?? []) !== [])
-            <div class="mt-4 overflow-x-auto">
-                <table class="min-w-full text-sm text-gray-200">
-                    <thead class="text-xs uppercase text-gray-400">
+            <div class="{{ $tableContainerClasses }}">
+                <div class="{{ $tableScrollClasses }}">
+                <table class="{{ $tableClasses }}">
+                    <thead class="{{ $theadClasses }}">
                         <tr>
-                            <th class="px-3 py-2 text-left">Data</th>
-                            <th class="px-3 py-2 text-left">Tipo</th>
-                            <th class="px-3 py-2 text-left">Descricao</th>
-                            <th class="px-3 py-2 text-right">Valor</th>
+                            <th class="{{ $thClasses }} whitespace-nowrap">Data</th>
+                            <th class="{{ $thClasses }} whitespace-nowrap">Tipo</th>
+                            <th class="{{ $thClasses }}">Descricao</th>
+                            <th class="{{ $thClasses }} whitespace-nowrap text-right">Valor</th>
                         </tr>
                     </thead>
-                    <tbody class="divide-y divide-gray-800">
+                    <tbody class="{{ $tbodyClasses }}">
                         @foreach ($adjustments['rows'] as $row)
-                            <tr>
-                                <td class="px-3 py-2">{{ $row['occurred_at']?->format('d/m/Y') ?? '-' }}</td>
-                                <td class="px-3 py-2">{{ $row['category'] ?? '-' }}</td>
-                                <td class="px-3 py-2">{{ $row['description'] ?? '-' }}</td>
-                                <td class="px-3 py-2 text-right">
+                            <tr class="odd:bg-white/[0.02]">
+                                <td class="{{ $tdClasses }} whitespace-nowrap">{{ $row['occurred_at']?->format('d/m/Y') ?? '-' }}</td>
+                                <td class="{{ $tdClasses }} whitespace-nowrap">{{ $row['category'] ?? '-' }}</td>
+                                <td class="{{ $tdClasses }} break-words">{{ $row['description'] ?? '-' }}</td>
+                                <td class="{{ $tdClasses }} whitespace-nowrap text-right">
                                     {{ number_format((float) ($row['amount'] ?? 0), 2, ',', ' ') }} &euro;
                                 </td>
                             </tr>
                         @endforeach
                     </tbody>
                 </table>
+                </div>
             </div>
         @endif
     </x-filament::section>

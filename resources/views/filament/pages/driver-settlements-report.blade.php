@@ -16,6 +16,7 @@
         <x-filament::section heading="Acoes">
             <x-filament::actions
                 :actions="[
+                    $this->sendPeriodSettlementEmailsAction(),
                     $this->generateSettlementsAction(),
                     $this->deletePeriodSettlementsAction(),
                     $this->regenerateSettlementsAction(),
