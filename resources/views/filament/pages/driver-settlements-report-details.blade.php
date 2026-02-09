@@ -102,6 +102,41 @@
         @endif
     </x-filament::section>
 
+    <x-filament::section heading="Historico de emails">
+        @if (($emailLogs ?? []) === [])
+            <p class="text-sm text-gray-500">Sem registos de envio para este settlement.</p>
+        @else
+            <div class="{{ $tableContainerClasses }}">
+                <div class="{{ $tableScrollClasses }}">
+                    <table class="{{ $tableClasses }}">
+                        <thead class="{{ $theadClasses }}">
+                            <tr>
+                                <th class="{{ $thClasses }} whitespace-nowrap">Data</th>
+                                <th class="{{ $thClasses }} whitespace-nowrap">Estado</th>
+                                <th class="{{ $thClasses }}">Destinatario</th>
+                                <th class="{{ $thClasses }}">Message-ID</th>
+                                <th class="{{ $thClasses }}">Erro</th>
+                            </tr>
+                        </thead>
+                        <tbody class="{{ $tbodyClasses }}">
+                            @foreach ($emailLogs as $row)
+                                <tr class="odd:bg-white/[0.02]">
+                                    <td class="{{ $tdClasses }} whitespace-nowrap">{{ $row['created_at']?->format('d/m/Y H:i') ?? '-' }}</td>
+                                    <td class="{{ $tdClasses }} whitespace-nowrap">
+                                        {{ ($row['status'] ?? '-') === 'sent' ? 'Enviado' : 'Falhou' }}
+                                    </td>
+                                    <td class="{{ $tdClasses }} break-all">{{ $row['recipient'] ?? '-' }}</td>
+                                    <td class="{{ $tdClasses }} break-all">{{ $row['message_id'] ?? '-' }}</td>
+                                    <td class="{{ $tdClasses }} break-words">{{ $row['error_message'] ?? '-' }}</td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        @endif
+    </x-filament::section>
+
     <x-filament::section heading="Faturacao">
         <div class="grid gap-4 sm:grid-cols-2">
             <div>

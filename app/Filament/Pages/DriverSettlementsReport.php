@@ -10,6 +10,7 @@ use App\Models\DriverBalanceMovement;
 use App\Models\DriverBillingProfile;
 use App\Models\DriverSettlement;
 use App\Models\PlatformDriverBalance;
+use App\Models\SettlementEmailLog;
 use App\Models\VehicleAllocation;
 use App\Services\DriverSettlementCalculator;
 use App\Services\SettlementBillingResolver;
@@ -693,6 +694,7 @@ class DriverSettlementsReport extends Page implements HasTable
                 $adjustments = $this->adjustmentsForSettlement($record);
                 $balance = $this->resolveBalance((int) $record->driver_id);
                 $balanceMovements = $this->balanceMovementsForSettlement($record);
+                $emailLogs = $this->emailLogsForSettlement($record);
 
                 return view('filament.pages.driver-settlements-report-details', [
                     'settlement' => $record,
@@ -704,6 +706,7 @@ class DriverSettlementsReport extends Page implements HasTable
                     'adjustments' => $adjustments,
                     'balance' => $balance,
                     'balanceMovements' => $balanceMovements,
+                    'emailLogs' => $emailLogs,
                 ]);
             })
             ->action(function (): void {});
@@ -711,16 +714,42 @@ class DriverSettlementsReport extends Page implements HasTable
 
     private function sendSettlementEmail(DriverSettlement $record, string $recipient): void
     {
-        $record->refresh();
-        $payload = $this->settlementEmailPayload($record);
+        DB::transaction(function () use ($record, $recipient): void {
+            $record->refresh();
+            $payload = $this->settlementEmailPayload($record);
 
-        Mail::to($recipient)->send(new DriverSettlementSummaryMail($payload));
+            try {
+                $sentMessage = Mail::to($recipient)->send(new DriverSettlementSummaryMail($payload));
 
-        $record->forceFill([
-            'email_sent_count' => ((int) $record->email_sent_count) + 1,
-            'last_emailed_at' => now(),
-            'last_emailed_to' => $recipient,
-        ])->save();
+                $record->forceFill([
+                    'email_sent_count' => ((int) $record->email_sent_count) + 1,
+                    'last_emailed_at' => now(),
+                    'last_emailed_to' => $recipient,
+                ])->save();
+
+                SettlementEmailLog::query()->create([
+                    'driver_settlement_id' => $record->id,
+                    'driver_id' => $record->driver_id,
+                    'triggered_by_user_id' => auth()->id(),
+                    'recipient' => $recipient,
+                    'status' => 'sent',
+                    'message_id' => is_object($sentMessage) && method_exists($sentMessage, 'getMessageId')
+                        ? $sentMessage->getMessageId()
+                        : null,
+                ]);
+            } catch (Throwable $exception) {
+                SettlementEmailLog::query()->create([
+                    'driver_settlement_id' => $record->id,
+                    'driver_id' => $record->driver_id,
+                    'triggered_by_user_id' => auth()->id(),
+                    'recipient' => $recipient,
+                    'status' => 'failed',
+                    'error_message' => $this->sanitizeUtf8($exception->getMessage()) ?? 'Erro desconhecido',
+                ]);
+
+                throw $exception;
+            }
+        });
     }
 
     /**
@@ -1361,6 +1390,34 @@ class DriverSettlementsReport extends Page implements HasTable
                 'type' => $this->sanitizeUtf8($movement->type),
                 'description' => $this->sanitizeUtf8($movement->description),
                 'created_at' => $movement->created_at,
+            ])
+            ->all();
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    private function emailLogsForSettlement(DriverSettlement $settlement): array
+    {
+        return SettlementEmailLog::query()
+            ->where('driver_settlement_id', $settlement->id)
+            ->orderByDesc('id')
+            ->limit(20)
+            ->get([
+                'recipient',
+                'status',
+                'message_id',
+                'error_message',
+                'triggered_by_user_id',
+                'created_at',
+            ])
+            ->map(fn (SettlementEmailLog $row): array => [
+                'recipient' => $this->sanitizeUtf8($row->recipient),
+                'status' => $this->sanitizeUtf8($row->status),
+                'message_id' => $this->sanitizeUtf8($row->message_id),
+                'error_message' => $this->sanitizeUtf8($row->error_message),
+                'triggered_by_user_id' => $row->triggered_by_user_id,
+                'created_at' => $row->created_at,
             ])
             ->all();
     }
