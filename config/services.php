@@ -35,4 +35,23 @@ return [
         ],
     ],
 
+    'platform_reports' => [
+        'bolt' => [
+            'directory' => env('BOLT_REPORTS_DIRECTORY', 'storage/app/platform-reports/bolt'),
+        ],
+        'uber' => [
+            'directory' => env('UBER_REPORTS_DIRECTORY', 'storage/app/platform-reports/uber'),
+        ],
+    ],
+
+    'uber_collector' => [
+        'login_url' => env('UBER_COLLECTOR_LOGIN_URL', 'https://supplier.uber.com/sign-in'),
+        'reports_url' => env('UBER_COLLECTOR_REPORTS_URL', 'https://supplier.uber.com/reports'),
+        'email' => env('UBER_COLLECTOR_EMAIL'),
+        'password' => env('UBER_COLLECTOR_PASSWORD'),
+        'otp' => env('UBER_COLLECTOR_OTP'),
+        'storage_state' => env('UBER_COLLECTOR_STORAGE_STATE', 'storage/app/private/uber-playwright-state.json'),
+        'user_data_dir' => env('UBER_COLLECTOR_USER_DATA_DIR', 'storage/app/private/uber-playwright-profile'),
+    ],
+
 ];

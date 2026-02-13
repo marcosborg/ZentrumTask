@@ -29,6 +29,7 @@ return new class extends Migration
                 ->update(['source' => 'private']);
 
             Schema::table('vehicles', function (Blueprint $table) {
+                $table->dropIndex('vehicles_is_tvde_index');
                 $table->dropColumn('is_tvde');
             });
         }
@@ -54,6 +55,7 @@ return new class extends Migration
             ->update(['is_tvde' => false]);
 
         Schema::table('vehicles', function (Blueprint $table) {
+            $table->dropIndex('vehicles_source_index');
             $table->dropColumn('source');
         });
     }

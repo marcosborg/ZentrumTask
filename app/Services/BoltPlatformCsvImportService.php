@@ -260,17 +260,23 @@ class BoltPlatformCsvImportService
             throw new RuntimeException('CSV Bolt invalido: falta coluna Identificador do motorista ou Identificador individual');
         }
 
-        $netLabel = "Ganhos l\u{00ED}quidos|\u{20AC}";
-        $tipsLabel = "Gorjetas dos passageiros|\u{20AC}";
+        $netCandidates = [
+            "Ganhos l\u{00ED}quidos|\u{20AC}",
+            'Ganhos liquidos|EUR',
+        ];
+        $tipsCandidates = [
+            "Gorjetas dos passageiros|\u{20AC}",
+            'Gorjetas dos passageiros|EUR',
+        ];
 
-        $netColumn = $this->findExactHeader($headers, [$netLabel]);
+        $netColumn = $this->findExactHeader($headers, $netCandidates);
         if ($netColumn === null) {
-            throw new RuntimeException("CSV Bolt invalido: falta coluna {$netLabel}");
+            throw new RuntimeException('CSV Bolt invalido: falta coluna de ganhos liquidos.');
         }
 
-        $tipsColumn = $this->findExactHeader($headers, [$tipsLabel]);
+        $tipsColumn = $this->findExactHeader($headers, $tipsCandidates);
         if ($tipsColumn === null) {
-            throw new RuntimeException("CSV Bolt invalido: falta coluna {$tipsLabel}");
+            throw new RuntimeException('CSV Bolt invalido: falta coluna de gorjetas.');
         }
 
         $dateColumn = $this->resolveDateColumn($headers);

@@ -49,6 +49,7 @@ class UberPlatformCsvImportService
         $columnMap = $this->resolveColumnMap($headers, $headerMap);
 
         $period = $this->resolvePeriod($path, $rows, $columnMap['date'] ?? null, $options);
+        $period = $this->normalizeWeeklyPeriod($period);
 
         $inserted = 0;
         $skipped = 0;
@@ -470,5 +471,31 @@ class UberPlatformCsvImportService
         $value = trim((string) $value);
 
         return $value === '' ? null : $value;
+    }
+
+    /**
+     * Uber exports may represent weekly ranges as [Monday, next Monday),
+     * while the application stores inclusive ranges (Monday to Sunday).
+     *
+     * @param  array{start: Carbon, end: Carbon}  $period
+     * @return array{start: Carbon, end: Carbon}
+     */
+    private function normalizeWeeklyPeriod(array $period): array
+    {
+        $start = $period['start']->copy()->startOfDay();
+        $end = $period['end']->copy()->startOfDay();
+
+        if (
+            $start->isMonday()
+            && $end->isMonday()
+            && (int) $start->diffInDays($end) === 7
+        ) {
+            return [
+                'start' => $start,
+                'end' => $end->subDay()->endOfDay(),
+            ];
+        }
+
+        return $period;
     }
 }
