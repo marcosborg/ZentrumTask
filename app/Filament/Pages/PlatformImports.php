@@ -100,7 +100,7 @@ class PlatformImports extends Page implements HasForms, HasTable
                     ->required()
                     ->native(false),
                 FileUpload::make('file')
-                    ->label('CSV')
+                    ->label('Ficheiro')
                     ->disk('local')
                     ->directory('platform-imports')
                     ->preserveFilenames()
@@ -108,6 +108,7 @@ class PlatformImports extends Page implements HasForms, HasTable
                         'text/csv',
                         'text/plain',
                         'application/vnd.ms-excel',
+                        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
                     ])
                     ->required()
                     ->columnSpanFull(),
@@ -138,7 +139,7 @@ class PlatformImports extends Page implements HasForms, HasTable
         if (! $platform || ! $file) {
             Notification::make()
                 ->danger()
-                ->title('Selecione a plataforma e o ficheiro CSV')
+                ->title('Selecione a plataforma e o ficheiro')
                 ->send();
 
             return;

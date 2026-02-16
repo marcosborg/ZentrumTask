@@ -29,7 +29,7 @@ class ViaVerdeCsvImportService
     public function import(string $path): array
     {
         if (! is_file($path)) {
-            throw new RuntimeException('CSV nao encontrado: '.$path);
+            throw new RuntimeException('Ficheiro nao encontrado: '.$path);
         }
 
         $plate = $this->extractPlateFromFilename(basename($path));
@@ -48,10 +48,10 @@ class ViaVerdeCsvImportService
             }
         }
 
-        [$rows, $headers, $headerMap] = $this->readCsv($path);
+        [$rows, $headers, $headerMap] = $this->readRows($path);
 
         if ($rows === []) {
-            throw new RuntimeException('CSV sem linhas.');
+            throw new RuntimeException('Ficheiro sem linhas.');
         }
 
         $columnMap = $this->resolveColumnMap($headers, $headerMap);
@@ -197,6 +197,20 @@ class ViaVerdeCsvImportService
     /**
      * @return array{0: array<int, array<string, mixed>>, 1: array<int, string>, 2: array<string, string>}
      */
+    private function readRows(string $path): array
+    {
+        $extension = strtolower((string) pathinfo($path, PATHINFO_EXTENSION));
+
+        if ($extension === 'xlsx') {
+            return $this->readXlsx($path);
+        }
+
+        return $this->readCsv($path);
+    }
+
+    /**
+     * @return array{0: array<int, array<string, mixed>>, 1: array<int, string>, 2: array<string, string>}
+     */
     private function readCsv(string $path): array
     {
         $handle = fopen($path, 'r');
@@ -267,6 +281,241 @@ class ViaVerdeCsvImportService
     }
 
     /**
+     * @return array{0: array<int, array<string, mixed>>, 1: array<int, string>, 2: array<string, string>}
+     */
+    private function readXlsx(string $path): array
+    {
+        try {
+            $archive = new \PharData($path);
+        } catch (Throwable $exception) {
+            throw new RuntimeException('Nao foi possivel abrir o ficheiro XLSX.');
+        }
+
+        $sharedStrings = $this->readXlsxSharedStrings($archive);
+        $sheetXml = $this->readFirstWorksheetXml($archive);
+
+        if ($sheetXml === null) {
+            throw new RuntimeException('XLSX sem folhas.');
+        }
+
+        $rowsRaw = $this->parseXlsxSheetRows($sheetXml, $sharedStrings);
+
+        if ($rowsRaw === []) {
+            throw new RuntimeException('XLSX sem linhas.');
+        }
+
+        $header = null;
+        $dataRows = [];
+
+        foreach ($rowsRaw as $row) {
+            $hasContent = count(array_filter($row, fn ($value): bool => trim((string) $value) !== '')) > 0;
+
+            if (! $hasContent) {
+                continue;
+            }
+
+            if ($header === null) {
+                $normalizedCandidate = array_map(
+                    fn ($value) => $this->normalizeHeader((string) $value),
+                    $row
+                );
+
+                if ($this->isLikelyHeader($normalizedCandidate)) {
+                    $header = $row;
+
+                    continue;
+                }
+            }
+
+            if ($header !== null) {
+                $dataRows[] = $row;
+            }
+        }
+
+        if (! is_array($header)) {
+            throw new RuntimeException('XLSX sem cabecalho.');
+        }
+
+        $normalizedHeader = array_map(fn ($value) => $this->normalizeHeader((string) $value), $header);
+        $normalizedToOriginal = [];
+        foreach ($header as $index => $original) {
+            $normalized = $normalizedHeader[$index] ?? 'col_'.$index;
+            if (! array_key_exists($normalized, $normalizedToOriginal)) {
+                $normalizedToOriginal[$normalized] = (string) $original;
+            }
+        }
+
+        $rows = [];
+        foreach ($dataRows as $data) {
+            $row = [];
+            $max = max(count($data), count($normalizedHeader));
+
+            for ($index = 0; $index < $max; $index++) {
+                $key = $normalizedHeader[$index] ?? 'col_'.$index;
+                $value = $data[$index] ?? null;
+                $row[$key] = is_string($value) ? trim($value) : $value;
+            }
+
+            if (count($row) === 1 && ($row['col_0'] ?? '') === '') {
+                continue;
+            }
+
+            $rows[] = $row;
+        }
+
+        return [$rows, $normalizedHeader, $normalizedToOriginal];
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function readXlsxSharedStrings(\PharData $archive): array
+    {
+        $xml = $this->readArchiveFile($archive, 'xl/sharedStrings.xml');
+
+        if ($xml === null || trim($xml) === '') {
+            return [];
+        }
+
+        $document = @simplexml_load_string($xml);
+
+        if ($document === false) {
+            return [];
+        }
+
+        $namespace = 'http://schemas.openxmlformats.org/spreadsheetml/2006/main';
+        $document->registerXPathNamespace('s', $namespace);
+
+        $values = [];
+        $nodes = $document->xpath('//s:si') ?: [];
+
+        foreach ($nodes as $node) {
+            $parts = $node->xpath('.//*[local-name()="t"]') ?: [];
+            $text = collect($parts)
+                ->map(fn ($part): string => (string) $part)
+                ->implode('');
+            $values[] = $text;
+        }
+
+        return $values;
+    }
+
+    private function readFirstWorksheetXml(\PharData $archive): ?string
+    {
+        return $this->readArchiveFile($archive, 'xl/worksheets/sheet1.xml');
+    }
+
+    private function readArchiveFile(\PharData $archive, string $internalPath): ?string
+    {
+        $pharPath = 'phar://'.str_replace('\\', '/', $archive->getPath()).'/'.$internalPath;
+        $contents = @file_get_contents($pharPath);
+
+        return $contents === false ? null : $contents;
+    }
+
+    /**
+     * @param  array<int, string>  $sharedStrings
+     * @return array<int, array<int, string>>
+     */
+    private function parseXlsxSheetRows(string $sheetXml, array $sharedStrings): array
+    {
+        $document = @simplexml_load_string($sheetXml);
+
+        if ($document === false) {
+            return [];
+        }
+
+        $namespace = 'http://schemas.openxmlformats.org/spreadsheetml/2006/main';
+        $document->registerXPathNamespace('s', $namespace);
+
+        $rows = [];
+        $rowNodes = $document->xpath('//s:sheetData/s:row') ?: [];
+
+        foreach ($rowNodes as $rowNode) {
+            $columns = [];
+            $maxColumn = -1;
+            $cells = $rowNode->xpath('./*[local-name()="c"]') ?: [];
+
+            foreach ($cells as $cell) {
+                $reference = (string) ($cell['r'] ?? '');
+                $columnIndex = $this->columnReferenceToIndex($reference);
+
+                if ($columnIndex === null) {
+                    continue;
+                }
+
+                $type = (string) ($cell['t'] ?? '');
+                $value = $this->extractXlsxCellValue($cell, $type, $sharedStrings);
+                $columns[$columnIndex] = $value;
+                $maxColumn = max($maxColumn, $columnIndex);
+            }
+
+            if ($maxColumn < 0) {
+                $rows[] = [];
+
+                continue;
+            }
+
+            $row = [];
+            for ($column = 0; $column <= $maxColumn; $column++) {
+                $row[] = $columns[$column] ?? '';
+            }
+
+            $rows[] = $row;
+        }
+
+        return $rows;
+    }
+
+    /**
+     * @param  array<int, string>  $sharedStrings
+     */
+    private function extractXlsxCellValue(\SimpleXMLElement $cell, string $type, array $sharedStrings): string
+    {
+        if ($type === 'inlineStr') {
+            $nodes = $cell->xpath('./*[local-name()="is"]/*[local-name()="t"]') ?: [];
+
+            return collect($nodes)
+                ->map(fn ($node): string => (string) $node)
+                ->implode('');
+        }
+
+        $raw = trim((string) ($cell->v ?? ''));
+
+        if ($raw === '') {
+            return '';
+        }
+
+        if ($type === 's') {
+            $index = (int) $raw;
+
+            return (string) ($sharedStrings[$index] ?? '');
+        }
+
+        if ($type === 'b') {
+            return $raw === '1' ? '1' : '0';
+        }
+
+        return $raw;
+    }
+
+    private function columnReferenceToIndex(string $reference): ?int
+    {
+        if (! preg_match('/^([A-Z]+)\d+$/i', $reference, $matches)) {
+            return null;
+        }
+
+        $letters = strtoupper($matches[1]);
+        $index = 0;
+
+        for ($i = 0; $i < strlen($letters); $i++) {
+            $index = ($index * 26) + (ord($letters[$i]) - 64);
+        }
+
+        return $index - 1;
+    }
+
+    /**
      * @param  resource  $handle
      */
     private function detectDelimiter($handle): string
@@ -302,7 +551,11 @@ class ViaVerdeCsvImportService
 
         $hasDate = in_array('data', $set, true) || in_array('entrydate', $set, true);
         $hasTime = in_array('hora', $set, true) || in_array('entrydate', $set, true);
-        $hasAmount = in_array('valor', $set, true) || in_array('value', $set, true) || in_array('liquidvalue', $set, true);
+        $hasAmount = in_array('valor', $set, true)
+            || in_array('value', $set, true)
+            || in_array('liquidvalue', $set, true)
+            || in_array('total', $set, true)
+            || in_array('totaleur', $set, true);
 
         return $hasDate && $hasTime && $hasAmount;
     }
@@ -350,13 +603,21 @@ class ViaVerdeCsvImportService
             'HoraMovimento',
         ]);
         $location = $this->findExactHeader($headers, ['LOCAL', 'Local']);
-        $entryPoint = $this->findExactHeader($headers, ['Entry Point', 'EntryPoint']);
-        $exitPoint = $this->findExactHeader($headers, ['Exit Point', 'ExitPoint']);
+        $entryPoint = $this->findExactHeader($headers, ['Entry Point', 'EntryPoint', 'Entrada']);
+        $exitPoint = $this->findExactHeader($headers, ['Exit Point', 'ExitPoint', 'Saida', 'Saída', 'Sada']);
         $type = $this->findExactHeader($headers, ['TIPO', 'Tipo', 'Service Description', 'ServiceDescription', 'Market Description', 'MarketDescription']);
         $liquidAmount = $this->findExactHeader($headers, ['Liquid Value', 'LiquidValue', 'Valor S/ IVA', 'Valor Sem IVA', 'ValorSemIVA']);
-        $valueAmount = $this->findExactHeader($headers, ['VALOR', 'Valor', 'Value']);
+        $valueAmount = $this->findExactHeader($headers, [
+            'VALOR',
+            'Valor',
+            'Value',
+            'TOTAL',
+            'Total',
+            'Total (€)',
+            'Total EUR',
+        ]);
         $amount = $liquidAmount ?? $valueAmount;
-        $plate = $this->findExactHeader($headers, ['License Plate', 'LicensePlate', 'Matricula', 'MATRICULA']);
+        $plate = $this->findExactHeader($headers, ['License Plate', 'LicensePlate', 'Matricula', 'MATRICULA', 'Matrcula']);
 
         $missing = [];
         if (! $date) {
