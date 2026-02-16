@@ -720,7 +720,14 @@ class DriverSettlementsReport extends Page implements HasTable
             $payload = $this->settlementEmailPayload($record);
 
             try {
-                $sentMessage = Mail::to($recipient)->send(new DriverSettlementSummaryMail($payload));
+                $mail = Mail::to($recipient);
+                $copyRecipient = $this->settlementCopyRecipient();
+
+                if ($copyRecipient !== null) {
+                    $mail->bcc($copyRecipient);
+                }
+
+                $sentMessage = $mail->send(new DriverSettlementSummaryMail($payload));
 
                 $record->forceFill([
                     'email_sent_count' => ((int) $record->email_sent_count) + 1,
@@ -821,6 +828,17 @@ class DriverSettlementsReport extends Page implements HasTable
     private function settlementTestRecipient(): ?string
     {
         $recipient = trim((string) config('mail.settlement_test_recipient'));
+
+        if ($recipient === '' || filter_var($recipient, FILTER_VALIDATE_EMAIL) === false) {
+            return null;
+        }
+
+        return $recipient;
+    }
+
+    private function settlementCopyRecipient(): ?string
+    {
+        $recipient = trim((string) config('mail.settlement_copy_recipient'));
 
         if ($recipient === '' || filter_var($recipient, FILTER_VALIDATE_EMAIL) === false) {
             return null;

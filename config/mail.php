@@ -116,6 +116,7 @@ return [
     ],
 
     'settlement_test_recipient' => env('SETTLEMENT_TEST_EMAIL', env('MAIL_FROM_ADDRESS')),
-    'settlement_delivery_mode' => env('SETTLEMENT_EMAIL_MODE', 'test'),
+    'settlement_copy_recipient' => env('SETTLEMENT_COPY_EMAIL'),
+    'settlement_delivery_mode' => env('SETTLEMENT_EMAIL_MODE', 'production'),
 
 ];
