@@ -19,7 +19,26 @@
     }
 }
 
-.vehicle-photo-upload .filepond--file-info,
 .vehicle-photo-upload .filepond--file-status {
     display: none;
+}
+
+.vehicle-photo-upload .filepond--file-info {
+    position: absolute;
+    top: 0.375rem;
+    left: 0.375rem;
+    z-index: 10;
+    width: auto;
+    margin: 0;
+}
+
+.vehicle-photo-upload .filepond--file-info-main {
+    font-size: 0;
+    line-height: 0;
+}
+
+.vehicle-photo-upload .filepond--open-icon,
+.vehicle-photo-upload .filepond--download-icon {
+    width: 1.25rem;
+    height: 1.25rem;
 }

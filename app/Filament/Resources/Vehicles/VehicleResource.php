@@ -42,8 +42,8 @@ class VehicleResource extends Resource
     public static function getRelations(): array
     {
         return [
-            RelationManagers\VehicleDocumentsRelationManager::class,
             RelationManagers\VehicleAllocationsRelationManager::class,
+            RelationManagers\VehicleDocumentsRelationManager::class,
         ];
     }
 
