@@ -32,21 +32,9 @@ class ViaVerdeCsvImportService
             throw new RuntimeException('Ficheiro nao encontrado: '.$path);
         }
 
-        $plate = $this->extractPlateFromFilename(basename($path));
-
-        if (! $plate) {
-            $plate = null;
-        }
-
-        $vehicle = $plate
-            ? Vehicle::query()->where('license_plate', $plate)->first()
-            : null;
-
-        if (! $vehicle) {
-            if ($plate) {
-                throw new RuntimeException("Viatura nao encontrada para matricula {$plate}.");
-            }
-        }
+        $defaultPlate = $this->extractPlateFromFilename(basename($path));
+        $defaultPlate = $defaultPlate ? $this->normalizePlate($defaultPlate) : null;
+        $vehicleByPlate = [];
 
         [$rows, $headers, $headerMap] = $this->readRows($path);
 
@@ -88,17 +76,19 @@ class ViaVerdeCsvImportService
             $typeRaw = $this->normalizeNullable($row[$columnMap['type']] ?? null);
             $type = $this->mapType($typeRaw);
             $externalRef = $this->buildExternalRef($occurredAt, $location, $amount, $type);
+            $candidatePlate = $this->normalizeNullable($row[$columnMap['plate']] ?? null);
+            $plate = $candidatePlate ? $this->normalizePlate($candidatePlate) : $defaultPlate;
 
-            if (! $vehicle && $plate === null) {
-                $candidatePlate = $this->normalizeNullable($row[$columnMap['plate']] ?? null);
-                if ($candidatePlate) {
-                    $plate = $this->normalizePlate($candidatePlate);
-                    $vehicle = Vehicle::query()->where('license_plate', $plate)->first();
-                }
+            if (! $plate) {
+                throw new RuntimeException('Nao foi possivel identificar a matricula no ficheiro Via Verde.');
             }
 
+            $vehicle = $vehicleByPlate[$plate] ??= Vehicle::query()
+                ->where('license_plate', $plate)
+                ->first();
+
             if (! $vehicle) {
-                throw new RuntimeException('Viatura nao encontrada para matricula '.$plate.'.');
+                throw new RuntimeException("Viatura nao encontrada para matricula {$plate}.");
             }
 
             $parsedRows[] = [
@@ -136,21 +126,28 @@ class ViaVerdeCsvImportService
             ];
         }
 
-        $allocations = $this->loadAllocations($vehicle->id, $occurredAtMin, $occurredAtMax);
-
-        foreach ($parsedRows as &$row) {
-            $match = $this->resolveDriverForTransaction($allocations, $row['occurred_at']);
-            $row['driver_id'] = $match['driver_id'];
-            $row['assignment_status'] = $match['status'];
-        }
-        unset($row);
-
         $inserted = 0;
         $updated = 0;
         $unassignedDriver = 0;
+        $vehicleIds = collect($parsedRows)
+            ->pluck('vehicle_id')
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+        $allocationsByVehicle = $this->loadAllocationsByVehicle(
+            $vehicleIds,
+            $occurredAtMin,
+            $occurredAtMax
+        );
 
-        DB::transaction(function () use ($parsedRows, $path, &$inserted, &$updated, &$unassignedDriver): void {
+        DB::transaction(function () use ($parsedRows, $path, $allocationsByVehicle, &$inserted, &$updated, &$unassignedDriver): void {
             foreach ($parsedRows as $row) {
+                $match = $this->resolveDriverForTransaction(
+                    $allocationsByVehicle->get((int) $row['vehicle_id'], collect()),
+                    $row['occurred_at']
+                );
+
                 $model = ViaVerdeTransaction::query()->updateOrCreate(
                     [
                         'vehicle_id' => $row['vehicle_id'],
@@ -162,8 +159,8 @@ class ViaVerdeCsvImportService
                         'location' => $row['location'],
                         'type' => $row['type'],
                         'amount' => $row['amount'],
-                        'driver_id' => $row['driver_id'],
-                        'assignment_status' => $row['assignment_status'],
+                        'driver_id' => $match['driver_id'],
+                        'assignment_status' => $match['status'],
                         'raw_row' => $row['raw_row'],
                         'imported_at' => now(),
                         'source_file' => basename($path),
@@ -176,7 +173,7 @@ class ViaVerdeCsvImportService
                     $updated++;
                 }
 
-                if ($row['assignment_status'] !== 'ok') {
+                if ($match['status'] !== 'ok') {
                     $unassignedDriver++;
                 }
             }
@@ -724,23 +721,25 @@ class ViaVerdeCsvImportService
     }
 
     /**
-     * @return Collection<int, VehicleAllocation>
+     * @param  array<int, int>  $vehicleIds
+     * @return Collection<int, Collection<int, VehicleAllocation>>
      */
-    private function loadAllocations(int $vehicleId, ?Carbon $min, ?Carbon $max): Collection
+    private function loadAllocationsByVehicle(array $vehicleIds, ?Carbon $min, ?Carbon $max): Collection
     {
-        if (! $min || ! $max) {
+        if ($vehicleIds === [] || ! $min || ! $max) {
             return collect();
         }
 
         return VehicleAllocation::query()
-            ->where('vehicle_id', $vehicleId)
+            ->whereIn('vehicle_id', $vehicleIds)
             ->where('starts_at', '<=', $max)
             ->where(function ($query) use ($min): void {
                 $query->whereNull('ends_at')
                     ->orWhere('ends_at', '>=', $min);
             })
             ->orderBy('starts_at')
-            ->get();
+            ->get()
+            ->groupBy('vehicle_id');
     }
 
     /**

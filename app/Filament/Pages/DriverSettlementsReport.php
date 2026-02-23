@@ -769,8 +769,20 @@ class DriverSettlementsReport extends Page implements HasTable
         $balances = $this->balancesForSettlement($record);
         $billing = $this->billingFor($record);
         $balanceMovements = $this->balanceMovementsForSettlement($record);
+        $prioExpenses = $this->prioExpensesForSettlement($record);
+        $viaVerdeExpenses = $this->viaVerdeExpensesForSettlement($record);
+        $adjustments = $this->adjustmentsForSettlement($record);
         $uberNet = collect($balances)->where('platform', 'uber')->sum('net_amount');
         $boltNet = collect($balances)->where('platform', 'bolt')->sum('net_amount');
+        $tipsTotal = (float) ($record->tips_total ?? 0);
+        $expensesTotal = (float) ($record->expenses_total ?? 0);
+        $carryOverBalance = (float) ($record->carry_over_balance ?? 0);
+        $driverShare = (float) ($record->driver_share ?? 0);
+        $rentTotal = (float) ($billing['rent_total'] ?? 0);
+        $weekValue = $driverShare + $tipsTotal - $expensesTotal - $rentTotal;
+        $amountDue = (float) ($record->amount_due ?? 0);
+        $amountPayable = (float) ($record->amount_payable ?? $amountDue);
+        $calculationDifference = round($amountDue - ($carryOverBalance + $weekValue), 2);
 
         return [
             'driver' => [
@@ -781,11 +793,58 @@ class DriverSettlementsReport extends Page implements HasTable
             'totals' => [
                 'uber_net' => $this->formatMoney($uberNet),
                 'bolt_net' => $this->formatMoney($boltNet),
-                'tips_total' => $this->formatMoney($record->tips_total ?? 0),
-                'expenses_total' => $this->formatMoney($record->expenses_total ?? 0),
-                'rent_total' => $this->formatMoney($billing['rent_total'] ?? 0),
-                'carry_over_balance' => $this->formatMoney($record->carry_over_balance ?? 0),
-                'amount_due' => $this->formatMoney($record->amount_due ?? 0),
+                'tips_total' => $this->formatMoney($tipsTotal),
+                'expenses_total' => $this->formatMoney($expensesTotal),
+                'rent_total' => $this->formatMoney($rentTotal),
+                'carry_over_balance' => $this->formatMoney($carryOverBalance),
+                'amount_payable' => $this->formatMoney($amountPayable),
+                'amount_due' => $this->formatMoney($amountDue),
+            ],
+            'calculation' => [
+                'driver_share' => $this->formatMoney($driverShare),
+                'tips_total' => $this->formatMoney($tipsTotal),
+                'expenses_total' => $this->formatMoney($expensesTotal),
+                'rent_total' => $this->formatMoney($rentTotal),
+                'week_value' => $this->formatMoney($weekValue),
+                'carry_over_balance' => $this->formatMoney($carryOverBalance),
+                'amount_due' => $this->formatMoney($amountDue),
+                'calculation_difference' => $this->formatMoney($calculationDifference),
+                'is_consistent' => abs($calculationDifference) < 0.01,
+            ],
+            'billing' => [
+                'profile' => $billing['billing_profile_label'] ?? '-',
+                'profile_status' => $billing['profile_status'] ?? 'missing',
+                'rental_days' => (int) ($billing['rental_days'] ?? 0),
+                'rent_total' => $this->formatMoney($rentTotal),
+                'percent_company' => $this->formatPercent($billing['percent_company'] ?? null),
+                'percent_driver' => $this->formatPercent($billing['percent_driver'] ?? null),
+                'withholding_label' => (string) ($billing['withholding_label'] ?? '-'),
+                'vat_label' => (string) ($billing['vat_label'] ?? '-'),
+                'vat_refund_mode' => (string) ($billing['vat_refund_mode'] ?? '-'),
+            ],
+            'expenses' => [
+                'prio_total' => $this->formatMoney($prioExpenses['total'] ?? 0),
+                'via_verde_total' => $this->formatMoney($viaVerdeExpenses['total'] ?? 0),
+                'adjustments_total' => $this->formatMoney($adjustments['total'] ?? 0),
+                'total' => $this->formatMoney($expensesTotal),
+                'prio_rows' => collect($prioExpenses['rows'] ?? [])->map(fn (array $row): array => [
+                    'occurred_at' => $row['occurred_at'] instanceof Carbon ? $row['occurred_at']->format('d/m/Y H:i') : '-',
+                    'card_code' => (string) ($row['card_code'] ?? '-'),
+                    'vehicle_plate' => (string) ($row['vehicle_plate'] ?? '-'),
+                    'amount' => $this->formatMoney($row['net_amount'] ?? 0),
+                ])->values()->all(),
+                'via_verde_rows' => collect($viaVerdeExpenses['rows'] ?? [])->map(fn (array $row): array => [
+                    'occurred_at' => $row['occurred_at'] instanceof Carbon ? $row['occurred_at']->format('d/m/Y H:i') : '-',
+                    'vehicle_plate' => (string) ($row['vehicle_plate'] ?? '-'),
+                    'location' => (string) ($row['location'] ?? '-'),
+                    'amount' => $this->formatMoney($row['amount'] ?? 0),
+                ])->values()->all(),
+                'adjustment_rows' => collect($adjustments['rows'] ?? [])->map(fn (array $row): array => [
+                    'occurred_at' => $row['occurred_at'] instanceof Carbon ? $row['occurred_at']->format('d/m/Y') : '-',
+                    'category' => (string) ($row['category'] ?? '-'),
+                    'description' => (string) ($row['description'] ?? '-'),
+                    'amount' => $this->formatMoney($row['amount'] ?? 0),
+                ])->values()->all(),
             ],
             'balances' => collect($balances)->map(fn (array $row): array => [
                 'platform' => strtoupper((string) ($row['platform'] ?? '-')),

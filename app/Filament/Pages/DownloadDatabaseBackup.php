@@ -196,6 +196,10 @@ class DownloadDatabaseBackup extends Page
             $configuration['database'],
         ];
 
+        foreach ($this->ignoredReplicationTables($configuration['database']) as $table) {
+            $command[] = '--ignore-table='.$table;
+        }
+
         $process = new Process($command, base_path());
         $process->setEnv($this->processEnvironment((string) ($configuration['password'] ?? '')));
         $process->setTimeout(300);
@@ -407,6 +411,26 @@ class DownloadDatabaseBackup extends Page
         }
 
         return $driver === 'mariadb' ? 'mariadb' : 'mysql';
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    protected function ignoredReplicationTables(string $database): array
+    {
+        $tables = [
+            'sessions',
+            'cache',
+            'cache_locks',
+            'jobs',
+            'job_batches',
+            'failed_jobs',
+        ];
+
+        return array_map(
+            fn (string $table): string => "{$database}.{$table}",
+            $tables
+        );
     }
 
     /**
