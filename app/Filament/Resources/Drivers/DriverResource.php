@@ -212,6 +212,7 @@ class DriverResource extends Resource
     {
         return [
             RelationManagers\BillingProfilesRelationManager::class,
+            RelationManagers\VehicleAllocationsRelationManager::class,
             RelationManagers\WeekStatementsRelationManager::class,
             RelationManagers\CandidateApplicationRelationManager::class,
         ];

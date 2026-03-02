@@ -2,21 +2,25 @@
 
 namespace App\Filament\Resources\Drivers\Tables;
 
+use App\Models\VehicleAllocation;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
 
 class DriversTable
 {
     public static function configure(Table $table): Table
     {
         return $table
-            ->modifyQueryUsing(fn ($query) => $query->withExists([
-                'billingProfiles as has_active_billing_profile' => fn ($q) => $q->active(),
-            ]))
+            ->modifyQueryUsing(fn ($query) => $query
+                ->with(['currentAllocation.vehicle'])
+                ->withExists([
+                    'billingProfiles as has_active_billing_profile' => fn ($q) => $q->active(),
+                ]))
             ->columns([
                 TextColumn::make('name')
                     ->label('Nome')
@@ -44,6 +48,22 @@ class DriversTable
                     ->label('Codigo Uber')
                     ->searchable()
                     ->toggleable(),
+                TextColumn::make('currentAllocation.vehicle.license_plate')
+                    ->label('Viatura atual')
+                    ->placeholder('-')
+                    ->sortable(query: function (Builder $query, string $direction): Builder {
+                        return $query->orderBy(
+                            VehicleAllocation::query()
+                                ->select('vehicles.license_plate')
+                                ->join('vehicles', 'vehicles.id', '=', 'vehicle_allocations.vehicle_id')
+                                ->whereColumn('vehicle_allocations.driver_id', 'drivers.id')
+                                ->where('vehicle_allocations.status', 'active')
+                                ->whereNull('vehicle_allocations.ends_at')
+                                ->orderByDesc('vehicle_allocations.starts_at')
+                                ->limit(1),
+                            $direction,
+                        );
+                    }),
                 IconColumn::make('has_active_billing_profile')
                     ->label('Perfil ativo')
                     ->boolean()

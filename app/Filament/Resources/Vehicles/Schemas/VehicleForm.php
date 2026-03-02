@@ -131,6 +131,7 @@ class VehicleForm
                 Section::make('Fotos')
                     ->columnSpanFull()
                     ->columns(1)
+                    ->visible(fn (): bool => ! request()->routeIs('filament.*.resources.vehicles.edit') || request()->boolean('photos'))
                     ->components([
                         SpatieMediaLibraryFileUpload::make('vehicle_photos')
                             ->label('Fotos')

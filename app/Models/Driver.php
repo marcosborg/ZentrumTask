@@ -57,6 +57,19 @@ class Driver extends Model
         return $this->hasMany(DriverBillingProfile::class);
     }
 
+    public function allocations(): HasMany
+    {
+        return $this->hasMany(VehicleAllocation::class);
+    }
+
+    public function currentAllocation(): HasOne
+    {
+        return $this->hasOne(VehicleAllocation::class)
+            ->where('status', 'active')
+            ->whereNull('ends_at')
+            ->latest('starts_at');
+    }
+
     public function weekStatements(): HasMany
     {
         return $this->hasMany(DriverWeekStatement::class);
