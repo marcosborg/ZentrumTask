@@ -35,3 +35,17 @@ Route::middleware(['auth'])->get('/admin/ajustes/exemplo.csv', function () {
         'Content-Type' => 'text/csv; charset=UTF-8',
     ]);
 })->name('driver-adjustments.sample');
+
+Route::middleware(['auth'])->get('/admin/km-semanais/exemplo.csv', function () {
+    $content = implode("\n", [
+        'matricula,km_semana',
+        '"11-AA-22",2150',
+        '"33-BB-44",1890',
+    ]);
+
+    return response()->streamDownload(function () use ($content): void {
+        echo $content;
+    }, 'exemplo-km-semanais.csv', [
+        'Content-Type' => 'text/csv; charset=UTF-8',
+    ]);
+})->name('weekly-km.sample');

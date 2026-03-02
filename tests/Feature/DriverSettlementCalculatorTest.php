@@ -7,6 +7,7 @@ use App\Models\DriverSettlement;
 use App\Models\PrioTransaction;
 use App\Models\Vehicle;
 use App\Models\VehicleAllocation;
+use App\Models\VehicleWeeklyMileage;
 use App\Models\ViaVerdeTransaction;
 use App\Services\DriverSettlementCalculator;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -310,4 +311,65 @@ it('calculates prio and via verde by allocation day window excluding only paused
         ->and($settlement->expenses_total)->toBe('44.00')
         ->and($settlement->amount_payable)->toBe('16.00')
         ->and($settlement->amount_due)->toBe('16.00');
+});
+
+it('adds extra km charges based on billing profile limit and rate', function () {
+    $driver = Driver::factory()->create();
+    $vehicle = Vehicle::query()->create([
+        'license_plate' => 'ZZ-22-YY',
+        'make' => 'Renault',
+        'model' => 'Megane',
+        'status' => 'available',
+    ]);
+
+    DriverBillingProfile::factory()->create([
+        'driver_id' => $driver->id,
+        'active' => true,
+        'valid_from' => '2026-01-01',
+        'valid_to' => null,
+        'percent_company' => 40,
+        'percent_driver' => 60,
+        'vat_percent' => 23,
+        'vat_refund_mode' => VatRefundMode::None,
+        'extra_km_limit' => 2000,
+        'extra_km_rate' => 0.12,
+    ]);
+
+    DB::table('platform_driver_balances')->insert([
+        'platform' => 'uber',
+        'driver_code' => 'driver-test-5',
+        'driver_id' => $driver->id,
+        'period_start' => '2026-02-02',
+        'period_end' => '2026-02-08',
+        'net_amount' => 1000.00,
+        'tips_amount' => 100.00,
+        'source_file' => 'test.csv',
+        'imported_at' => now(),
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    VehicleWeeklyMileage::query()->create([
+        'vehicle_id' => $vehicle->id,
+        'driver_id' => $driver->id,
+        'period_start' => '2026-02-02',
+        'period_end' => '2026-02-08',
+        'weekly_km' => 2250,
+        'assignment_status' => 'ok',
+        'source_file' => 'km-week.csv',
+        'imported_at' => now(),
+    ]);
+
+    $result = app(DriverSettlementCalculator::class)->calculate('2026-02-02', '2026-02-08', $driver->id);
+
+    $settlement = DriverSettlement::query()
+        ->where('driver_id', $driver->id)
+        ->whereDate('period_start', '2026-02-02')
+        ->whereDate('period_end', '2026-02-08')
+        ->firstOrFail();
+
+    expect($result['created'])->toBe(1)
+        ->and($settlement->expenses_total)->toBe('30.00')
+        ->and($settlement->amount_payable)->toBe('610.00')
+        ->and($settlement->amount_due)->toBe('610.00');
 });

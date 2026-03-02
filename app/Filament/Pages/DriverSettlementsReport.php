@@ -12,6 +12,7 @@ use App\Models\DriverSettlement;
 use App\Models\PlatformDriverBalance;
 use App\Models\SettlementEmailLog;
 use App\Models\VehicleAllocation;
+use App\Models\VehicleWeeklyMileage;
 use App\Services\DriverSettlementCalculator;
 use App\Services\SettlementBillingResolver;
 use BackedEnum;
@@ -251,6 +252,11 @@ class DriverSettlementsReport extends Page implements HasTable
                     ->label('Ajustes')
                     ->alignRight()
                     ->state(fn (DriverSettlement $record): float => $this->adjustmentsForSettlement($record)['total'])
+                    ->formatStateUsing(fn ($state): string => $this->formatMoney($state)),
+                TextColumn::make('extra_km_expenses')
+                    ->label('Km extra')
+                    ->alignRight()
+                    ->state(fn (DriverSettlement $record): float => $this->extraKmExpensesForSettlement($record)['total'])
                     ->formatStateUsing(fn ($state): string => $this->formatMoney($state)),
                 TextColumn::make('expenses_total')
                     ->label('Despesas')
@@ -1530,6 +1536,77 @@ class DriverSettlementsReport extends Page implements HasTable
                 $total += (float) $adjustment->amount;
             }
         }
+
+        return [
+            'total' => round($total, 2),
+            'count' => count($rows),
+            'rows' => $rows,
+        ];
+    }
+
+    /**
+     * @return array{total: float, count: int, rows: array<int, array<string, mixed>>}
+     */
+    private function extraKmExpensesForSettlement(DriverSettlement $settlement): array
+    {
+        $billing = $this->billingFor($settlement);
+        $profileId = (int) ($billing['billing_profile_id'] ?? 0);
+
+        if ($profileId <= 0) {
+            return [
+                'total' => 0.0,
+                'count' => 0,
+                'rows' => [],
+            ];
+        }
+
+        $profile = DriverBillingProfile::query()->find($profileId);
+
+        if (! $profile) {
+            return [
+                'total' => 0.0,
+                'count' => 0,
+                'rows' => [],
+            ];
+        }
+
+        $limit = (float) ($profile->extra_km_limit ?? 0);
+        $rate = (float) ($profile->extra_km_rate ?? 0);
+
+        if ($limit <= 0 || $rate <= 0) {
+            return [
+                'total' => 0.0,
+                'count' => 0,
+                'rows' => [],
+            ];
+        }
+
+        $rows = VehicleWeeklyMileage::query()
+            ->where('driver_id', $settlement->driver_id)
+            ->where('assignment_status', 'ok')
+            ->whereDate('period_start', '>=', $settlement->period_start)
+            ->whereDate('period_end', '<=', $settlement->period_end)
+            ->orderBy('period_start')
+            ->get(['period_start', 'period_end', 'weekly_km', 'vehicle_id'])
+            ->map(function (VehicleWeeklyMileage $row) use ($limit, $rate): array {
+                $weeklyKm = (float) $row->weekly_km;
+                $extraKm = max(0.0, $weeklyKm - $limit);
+                $amount = round($extraKm * $rate, 2);
+
+                return [
+                    'period_start' => $row->period_start,
+                    'period_end' => $row->period_end,
+                    'weekly_km' => $weeklyKm,
+                    'extra_km' => $extraKm,
+                    'amount' => $amount,
+                    'vehicle_id' => $row->vehicle_id,
+                ];
+            })
+            ->filter(fn (array $row): bool => $row['amount'] > 0)
+            ->values()
+            ->all();
+
+        $total = array_reduce($rows, fn (float $carry, array $row): float => $carry + (float) $row['amount'], 0.0);
 
         return [
             'total' => round($total, 2),

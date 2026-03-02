@@ -113,6 +113,19 @@ class DriverBillingProfileForm
                     ->numeric()
                     ->step(0.01)
                     ->prefix('€'),
+                TextInput::make('extra_km_limit')
+                    ->label('Limite km semanais')
+                    ->numeric()
+                    ->step(1)
+                    ->minValue(0)
+                    ->default(2000),
+                TextInput::make('extra_km_rate')
+                    ->label('Valor km extra')
+                    ->numeric()
+                    ->step(0.0001)
+                    ->minValue(0)
+                    ->prefix('€')
+                    ->default(0.12),
                 TextInput::make('additional_fixed_fee')
                     ->label('Taxa administrativa fixa')
                     ->numeric()

@@ -62,6 +62,16 @@ class DriverBillingProfilesTable
                     ->badge()
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
+                TextColumn::make('extra_km_limit')
+                    ->label('Limite km')
+                    ->numeric(decimalPlaces: 2)
+                    ->sortable()
+                    ->toggleable(isToggledHiddenByDefault: true),
+                TextColumn::make('extra_km_rate')
+                    ->label('Km extra')
+                    ->money('EUR')
+                    ->sortable()
+                    ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('additional_fixed_fee')
                     ->label('Taxa fixa')
                     ->money('EUR')

@@ -8,11 +8,13 @@ use App\Models\PlatformDriverBalance;
 use App\Models\PrioTransaction;
 use App\Models\Vehicle;
 use App\Models\VehicleAllocation;
+use App\Models\VehicleWeeklyMileage;
 use App\Models\ViaVerdeTransaction;
 use App\Services\BoltPlatformCsvImportService;
 use App\Services\DriverAdjustmentsCsvImportService;
 use App\Services\PrioFuelCsvImportService;
 use App\Services\UberPlatformCsvImportService;
+use App\Services\VehicleWeeklyMileageImportService;
 use App\Services\ViaVerdeCsvImportService;
 use BackedEnum;
 use Filament\Actions\Action;
@@ -74,7 +76,23 @@ class PlatformImports extends Page implements HasForms, HasTable
 
     public ?string $adjustmentError = null;
 
+    /** @var list<string> */
+    public array $missingWeeklyKmPlates = [];
+
+    /** @var array<string, mixed>|null */
+    public ?array $weeklyKmResult = null;
+
+    public ?string $weeklyKmError = null;
+
     public ?string $errorMessage = null;
+
+    public string $importsPlatformFilter = 'all';
+
+    public string $importsStatusFilter = 'all';
+
+    public string $importsLimit = '25';
+
+    public string $importsSearch = '';
 
     public function mount(): void
     {
@@ -298,6 +316,75 @@ class PlatformImports extends Page implements HasForms, HasTable
                     Notification::make()
                         ->danger()
                         ->title('Falha ao importar ajustes')
+                        ->body($exception->getMessage())
+                        ->send();
+                }
+            });
+    }
+
+    public function importWeeklyKmAction(): Action
+    {
+        return Action::make('importWeeklyKm')
+            ->label('Importar km semanais')
+            ->icon(Heroicon::OutlinedArrowUpTray)
+            ->modalHeading('Importar km semanais por matricula')
+            ->form([
+                DatePicker::make('period_start')
+                    ->label('Periodo inicio')
+                    ->required()
+                    ->native(false),
+                DatePicker::make('period_end')
+                    ->label('Periodo fim')
+                    ->required()
+                    ->native(false),
+                FileUpload::make('file')
+                    ->label('CSV ou XLSX')
+                    ->disk('local')
+                    ->directory('weekly-km-imports')
+                    ->preserveFilenames()
+                    ->acceptedFileTypes([
+                        'text/csv',
+                        'text/plain',
+                        'application/vnd.ms-excel',
+                        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                    ])
+                    ->required(),
+            ])
+            ->action(function (array $data): void {
+                $this->weeklyKmError = null;
+                $this->weeklyKmResult = null;
+                $this->missingWeeklyKmPlates = [];
+
+                $file = $data['file'] ?? null;
+                $periodStart = $data['period_start'] ?? null;
+                $periodEnd = $data['period_end'] ?? null;
+
+                if (! $file || ! $periodStart || ! $periodEnd) {
+                    Notification::make()
+                        ->danger()
+                        ->title('Preencha ficheiro e periodo')
+                        ->send();
+
+                    return;
+                }
+
+                try {
+                    $path = Storage::disk('local')->path($file);
+                    $result = app(VehicleWeeklyMileageImportService::class)->import($path, (string) $periodStart, (string) $periodEnd);
+
+                    $this->missingWeeklyKmPlates = $result['missing_plates'] ?? [];
+                    $this->weeklyKmResult = $result;
+
+                    Notification::make()
+                        ->success()
+                        ->title('Km semanais importados')
+                        ->send();
+                } catch (RuntimeException $exception) {
+                    $this->weeklyKmError = $exception->getMessage();
+
+                    Notification::make()
+                        ->danger()
+                        ->title('Falha ao importar km semanais')
                         ->body($exception->getMessage())
                         ->send();
                 }
@@ -538,6 +625,7 @@ class PlatformImports extends Page implements HasForms, HasTable
         }
 
         $adjustmentImports = [];
+        $weeklyKmImports = [];
 
         if (DB::getSchemaBuilder()->hasTable('driver_adjustments')) {
             $adjustmentImports = DriverAdjustment::query()
@@ -555,11 +643,79 @@ class PlatformImports extends Page implements HasForms, HasTable
                 ->all();
         }
 
+        if (DB::getSchemaBuilder()->hasTable('vehicle_weekly_mileages')) {
+            $weeklyKmImports = VehicleWeeklyMileage::query()
+                ->selectRaw('source_file, period_start, period_end')
+                ->selectRaw('COUNT(*) as total_records')
+                ->selectRaw("SUM(CASE WHEN assignment_status = 'ok' THEN 1 ELSE 0 END) as allocated_count")
+                ->selectRaw("SUM(CASE WHEN assignment_status != 'ok' THEN 1 ELSE 0 END) as pending_count")
+                ->groupBy('source_file', 'period_start', 'period_end')
+                ->orderByDesc('period_start')
+                ->get()
+                ->map(fn ($row): array => [
+                    'source_file' => $row->source_file,
+                    'period_start' => $row->period_start,
+                    'period_end' => $row->period_end,
+                    'total_records' => (int) $row->total_records,
+                    'allocated_count' => (int) $row->allocated_count,
+                    'pending_count' => (int) $row->pending_count,
+                ])
+                ->all();
+        }
+
+        $importsHistory = collect(array_merge($prioImports, $viaVerdeImports, $imports))
+            ->sortByDesc(fn (array $row): int => (int) Carbon::parse($row['period_start'] ?? now())->timestamp)
+            ->values();
+
+        $filteredImportsHistory = $this->filterImportsHistory($importsHistory);
+        $totalImportsCount = $importsHistory->count();
+
         return [
-            'importsHistory' => array_merge($prioImports, $viaVerdeImports, $imports),
+            'importsHistory' => $filteredImportsHistory->all(),
+            'importsHistoryTotal' => $totalImportsCount,
+            'importsHistoryFilteredTotal' => $filteredImportsHistory->count(),
             'viaVerdePending' => $viaVerdePending,
             'adjustmentImports' => $adjustmentImports,
+            'weeklyKmImports' => $weeklyKmImports,
         ];
+    }
+
+    /**
+     * @param  Collection<int, array<string, mixed>>  $importsHistory
+     * @return Collection<int, array<string, mixed>>
+     */
+    private function filterImportsHistory(Collection $importsHistory): Collection
+    {
+        $platformFilter = trim(strtolower($this->importsPlatformFilter));
+        $statusFilter = trim(strtolower($this->importsStatusFilter));
+        $search = trim(strtolower($this->importsSearch));
+        $limit = trim($this->importsLimit);
+
+        $rows = $importsHistory
+            ->when($platformFilter !== '' && $platformFilter !== 'all', function (Collection $collection) use ($platformFilter): Collection {
+                return $collection->filter(function (array $row) use ($platformFilter): bool {
+                    return strtolower((string) ($row['platform'] ?? '')) === $platformFilter;
+                })->values();
+            })
+            ->when($statusFilter !== '' && $statusFilter !== 'all', function (Collection $collection) use ($statusFilter): Collection {
+                return $collection->filter(function (array $row) use ($statusFilter): bool {
+                    return strtolower((string) ($row['status_color'] ?? '')) === $statusFilter;
+                })->values();
+            })
+            ->when($search !== '', function (Collection $collection) use ($search): Collection {
+                return $collection->filter(function (array $row) use ($search): bool {
+                    $file = strtolower((string) ($row['source_file'] ?? ''));
+                    $platform = strtolower((string) ($row['platform_label'] ?? $row['platform'] ?? ''));
+
+                    return str_contains($file, $search) || str_contains($platform, $search);
+                })->values();
+            });
+
+        if (in_array($limit, ['10', '25', '50'], true)) {
+            $rows = $rows->take((int) $limit)->values();
+        }
+
+        return $rows;
     }
 
     private function resolveAssignmentLabel(string $status): string
@@ -718,6 +874,30 @@ class PlatformImports extends Page implements HasForms, HasTable
             ->action(function (array $arguments): void {
                 DriverAdjustment::query()
                     ->where('source_file', $arguments['source_file'] ?? null)
+                    ->delete();
+            })
+            ->livewire($this);
+    }
+
+    public function deleteWeeklyKmImportAction(): Action
+    {
+        return Action::make('deleteWeeklyKmImport')
+            ->label('Eliminar import')
+            ->color('danger')
+            ->size('sm')
+            ->requiresConfirmation()
+            ->modalDescription('Remove os registos de km semanais deste ficheiro e periodo.')
+            ->action(function (array $arguments): void {
+                VehicleWeeklyMileage::query()
+                    ->where('source_file', $arguments['source_file'] ?? null)
+                    ->when(
+                        $this->normalizeDateArgument($arguments['period_start'] ?? null),
+                        fn ($query, string $date) => $query->whereDate('period_start', $date)
+                    )
+                    ->when(
+                        $this->normalizeDateArgument($arguments['period_end'] ?? null),
+                        fn ($query, string $date) => $query->whereDate('period_end', $date)
+                    )
                     ->delete();
             })
             ->livewire($this);

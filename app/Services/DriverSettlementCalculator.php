@@ -11,6 +11,7 @@ use App\Models\DriverSettlement;
 use App\Models\PlatformDriverBalance;
 use App\Models\PrioTransaction;
 use App\Models\VehicleAllocation;
+use App\Models\VehicleWeeklyMileage;
 use App\Models\ViaVerdeTransaction;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
@@ -92,12 +93,13 @@ class DriverSettlementCalculator
             $tipsTotal = (float) $driverBalances->sum('tips_amount');
             $prioTotal = $this->sumPrioExpensesForDriver((int) $driverId, $start, $end);
             $viaVerdeTotal = $this->sumViaVerdeExpensesForDriver((int) $driverId, $start, $end);
+            $extraKmTotal = $this->sumExtraKmChargesForDriver((int) $driverId, $profile, $start, $end);
             $adjustmentsTotal = $this->sumAdjustmentsForPeriod(
                 $adjustmentExpenses[$driverId] ?? collect(),
                 $start,
                 $end
             );
-            $expensesTotal = round($prioTotal + $viaVerdeTotal + $adjustmentsTotal, 2);
+            $expensesTotal = round($prioTotal + $viaVerdeTotal + $extraKmTotal + $adjustmentsTotal, 2);
 
             $percentCompany = (float) $profile->percent_company;
             $percentDriver = (float) $profile->percent_driver;
@@ -169,6 +171,9 @@ class DriverSettlementCalculator
                     'vat_percent' => $vatPercent,
                     'vat_refund_mode' => $profile->vat_refund_mode?->value ?? null,
                     'vat_multiplier' => $vatMultiplier,
+                    'extra_km_total' => $extraKmTotal,
+                    'extra_km_limit' => (float) ($profile->extra_km_limit ?? 0),
+                    'extra_km_rate' => (float) ($profile->extra_km_rate ?? 0),
                     'amount_due' => $amountDue,
                 ],
             ]);
@@ -332,5 +337,36 @@ class DriverSettlementCalculator
             ->sum('amount');
 
         return round((float) $total, 2);
+    }
+
+    private function sumExtraKmChargesForDriver(int $driverId, DriverBillingProfile $profile, Carbon $start, Carbon $end): float
+    {
+        $limit = (float) ($profile->extra_km_limit ?? 0);
+        $rate = (float) ($profile->extra_km_rate ?? 0);
+
+        if ($limit <= 0 || $rate <= 0) {
+            return 0.0;
+        }
+
+        $rows = VehicleWeeklyMileage::query()
+            ->where('driver_id', $driverId)
+            ->where('assignment_status', 'ok')
+            ->whereDate('period_start', '>=', $start->toDateString())
+            ->whereDate('period_end', '<=', $end->toDateString())
+            ->get(['weekly_km']);
+
+        if ($rows->isEmpty()) {
+            return 0.0;
+        }
+
+        $total = 0.0;
+
+        foreach ($rows as $row) {
+            $weeklyKm = (float) $row->weekly_km;
+            $extraKm = max(0.0, $weeklyKm - $limit);
+            $total += $extraKm * $rate;
+        }
+
+        return round($total, 2);
     }
 }

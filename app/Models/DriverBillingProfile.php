@@ -31,6 +31,8 @@ class DriverBillingProfile extends Model
         'tips_to_driver',
         'vehicle_rent_type',
         'vehicle_rent_value',
+        'extra_km_limit',
+        'extra_km_rate',
         'additional_fixed_fee',
         'additional_percent_fee',
     ];
@@ -49,6 +51,8 @@ class DriverBillingProfile extends Model
         'tips_to_driver' => 'boolean',
         'vehicle_rent_type' => VehicleRentType::class,
         'vehicle_rent_value' => 'decimal:2',
+        'extra_km_limit' => 'decimal:2',
+        'extra_km_rate' => 'decimal:4',
         'additional_fixed_fee' => 'decimal:2',
         'additional_percent_fee' => 'decimal:2',
     ];

@@ -35,6 +35,8 @@ class DriverBillingProfileFactory extends Factory
             'tips_to_driver' => true,
             'vehicle_rent_type' => VehicleRentType::None,
             'vehicle_rent_value' => null,
+            'extra_km_limit' => 2000,
+            'extra_km_rate' => 0.12,
             'additional_fixed_fee' => 0,
             'additional_percent_fee' => 0,
         ];
