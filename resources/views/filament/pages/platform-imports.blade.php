@@ -329,7 +329,7 @@
 
         <x-filament::section heading="Importar km semanais (km extra)">
             <div class="text-sm text-gray-400">
-                CSV/XLSX com colunas obrigatorias: matricula e km_semana. Defina o periodo da semana no modal.
+                CSV/XLSX com colunas obrigatorias: matricula e km_total (odometro acumulado). O sistema calcula a diferenca para a semana anterior.
             </div>
             <div class="mt-4">
                 <x-filament::actions

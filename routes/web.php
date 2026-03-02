@@ -38,9 +38,9 @@ Route::middleware(['auth'])->get('/admin/ajustes/exemplo.csv', function () {
 
 Route::middleware(['auth'])->get('/admin/km-semanais/exemplo.csv', function () {
     $content = implode("\n", [
-        'matricula,km_semana',
-        '"11-AA-22",2150',
-        '"33-BB-44",1890',
+        'matricula,km_total',
+        '"11-AA-22",152340',
+        '"33-BB-44",98320',
     ]);
 
     return response()->streamDownload(function () use ($content): void {

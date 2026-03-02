@@ -325,9 +325,9 @@ class PlatformImports extends Page implements HasForms, HasTable
     public function importWeeklyKmAction(): Action
     {
         return Action::make('importWeeklyKm')
-            ->label('Importar km semanais')
+            ->label('Importar km totais')
             ->icon(Heroicon::OutlinedArrowUpTray)
-            ->modalHeading('Importar km semanais por matricula')
+            ->modalHeading('Importar km totais por matricula')
             ->form([
                 DatePicker::make('period_start')
                     ->label('Periodo inicio')

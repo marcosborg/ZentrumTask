@@ -1589,13 +1589,33 @@ class DriverSettlementsReport extends Page implements HasTable
             ->orderBy('period_start')
             ->get(['period_start', 'period_end', 'weekly_km', 'vehicle_id'])
             ->map(function (VehicleWeeklyMileage $row) use ($limit, $rate): array {
-                $weeklyKm = (float) $row->weekly_km;
+                $previous = VehicleWeeklyMileage::query()
+                    ->where('vehicle_id', $row->vehicle_id)
+                    ->whereDate('period_end', '<', $row->period_start)
+                    ->orderByDesc('period_end')
+                    ->orderByDesc('id')
+                    ->first(['weekly_km']);
+
+                if (! $previous) {
+                    return [
+                        'period_start' => $row->period_start,
+                        'period_end' => $row->period_end,
+                        'total_km' => (float) $row->weekly_km,
+                        'weekly_km' => 0.0,
+                        'extra_km' => 0.0,
+                        'amount' => 0.0,
+                        'vehicle_id' => $row->vehicle_id,
+                    ];
+                }
+
+                $weeklyKm = max(0.0, (float) $row->weekly_km - (float) $previous->weekly_km);
                 $extraKm = max(0.0, $weeklyKm - $limit);
                 $amount = round($extraKm * $rate, 2);
 
                 return [
                     'period_start' => $row->period_start,
                     'period_end' => $row->period_end,
+                    'total_km' => (float) $row->weekly_km,
                     'weekly_km' => $weeklyKm,
                     'extra_km' => $extraKm,
                     'amount' => $amount,

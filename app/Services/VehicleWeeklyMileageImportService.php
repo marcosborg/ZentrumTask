@@ -56,7 +56,7 @@ class VehicleWeeklyMileageImportService
 
         foreach ($rows as $row) {
             $plateRaw = $this->normalizeNullable($row[$columnMap['plate']] ?? null);
-            $weeklyKmRaw = $this->normalizeNullable($row[$columnMap['weekly_km']] ?? null);
+            $weeklyKmRaw = $this->normalizeNullable($row[$columnMap['total_km']] ?? null);
 
             if (! $plateRaw || ! $weeklyKmRaw) {
                 $invalidRows++;
@@ -370,12 +370,12 @@ class VehicleWeeklyMileageImportService
 
     /**
      * @param  array<int, string>  $headers
-     * @return array{plate:string, weekly_km:string}
+     * @return array{plate:string, total_km:string}
      */
     private function resolveColumnMap(array $headers): array
     {
         $plate = $this->findExactHeader($headers, ['matricula', 'plate', 'vehicleplate', 'licenceplate', 'licenseplate']);
-        $weeklyKm = $this->findExactHeader($headers, ['kmsemana', 'kmdasemana', 'kmweek', 'weeklykm', 'kms', 'km']);
+        $weeklyKm = $this->findExactHeader($headers, ['kmtotal', 'kmacumulado', 'odometro', 'odometer', 'totalkm', 'km', 'kmsemana', 'kmdasemana']);
 
         $missing = [];
 
@@ -384,7 +384,7 @@ class VehicleWeeklyMileageImportService
         }
 
         if (! $weeklyKm) {
-            $missing[] = 'KM_SEMANA';
+            $missing[] = 'KM_TOTAL';
         }
 
         if ($missing !== []) {
@@ -393,7 +393,7 @@ class VehicleWeeklyMileageImportService
 
         return [
             'plate' => $plate,
-            'weekly_km' => $weeklyKm,
+            'total_km' => $weeklyKm,
         ];
     }
 

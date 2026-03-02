@@ -352,6 +352,17 @@ it('adds extra km charges based on billing profile limit and rate', function () 
     VehicleWeeklyMileage::query()->create([
         'vehicle_id' => $vehicle->id,
         'driver_id' => $driver->id,
+        'period_start' => '2026-01-26',
+        'period_end' => '2026-02-01',
+        'weekly_km' => 0,
+        'assignment_status' => 'ok',
+        'source_file' => 'km-week.csv',
+        'imported_at' => now(),
+    ]);
+
+    VehicleWeeklyMileage::query()->create([
+        'vehicle_id' => $vehicle->id,
+        'driver_id' => $driver->id,
         'period_start' => '2026-02-02',
         'period_end' => '2026-02-08',
         'weekly_km' => 2250,
