@@ -782,7 +782,9 @@ class DriverSettlementsReport extends Page implements HasTable
         $weekValue = $driverShare + $tipsTotal - $expensesTotal - $rentTotal;
         $amountDue = (float) ($record->amount_due ?? 0);
         $amountPayable = (float) ($record->amount_payable ?? $amountDue);
-        $calculationDifference = round($amountDue - ($carryOverBalance + $weekValue), 2);
+        $vatMultiplier = $this->resolveVatMultiplierFromSettlement($record);
+        $expectedAmountDue = round(($carryOverBalance + $weekValue) * $vatMultiplier, 2);
+        $calculationDifference = round($amountDue - $expectedAmountDue, 2);
 
         return [
             'driver' => [
@@ -1193,7 +1195,7 @@ class DriverSettlementsReport extends Page implements HasTable
             })
             ->orderBy('period_start')
             ->orderBy('id')
-            ->get(['id', 'carry_over_balance', 'amount_payable', 'amount_due', 'is_paid', 'paid_at']);
+            ->get(['id', 'carry_over_balance', 'amount_payable', 'amount_due', 'rules_snapshot', 'is_paid', 'paid_at']);
 
         if ($settlements->isEmpty()) {
             return;
@@ -1202,17 +1204,59 @@ class DriverSettlementsReport extends Page implements HasTable
         $currentCarry = round($targetCarry, 2);
 
         foreach ($settlements as $settlement) {
-            $amountDue = round($currentCarry + (float) $settlement->amount_payable, 2);
+            $rules = is_array($settlement->rules_snapshot) ? $settlement->rules_snapshot : [];
+            $amountPayableBase = round((float) ($rules['amount_payable_base'] ?? $settlement->amount_payable ?? 0), 2);
+            $vatMultiplier = $this->resolveVatMultiplierFromRulesSnapshot($rules, $amountPayableBase, (float) $settlement->amount_payable);
+            $amountPayable = round($amountPayableBase * $vatMultiplier, 2);
+            $amountDue = round(($currentCarry + $amountPayableBase) * $vatMultiplier, 2);
+
+            $rules['amount_payable_base'] = $amountPayableBase;
+            $rules['vat_multiplier'] = $vatMultiplier;
+            $rules['carry_over_balance'] = $currentCarry;
+            $rules['amount_due'] = $amountDue;
 
             $settlement->forceFill([
                 'carry_over_balance' => $currentCarry,
+                'amount_payable' => $amountPayable,
                 'amount_due' => $amountDue,
+                'rules_snapshot' => $rules,
                 'is_paid' => false,
                 'paid_at' => null,
             ])->save();
 
             $currentCarry = $amountDue;
         }
+    }
+
+    private function resolveVatMultiplierFromSettlement(DriverSettlement $settlement): float
+    {
+        $rules = is_array($settlement->rules_snapshot) ? $settlement->rules_snapshot : [];
+        $amountPayableBase = round((float) ($rules['amount_payable_base'] ?? $settlement->amount_payable ?? 0), 2);
+
+        return $this->resolveVatMultiplierFromRulesSnapshot($rules, $amountPayableBase, (float) $settlement->amount_payable);
+    }
+
+    /**
+     * @param  array<string, mixed>  $rules
+     */
+    private function resolveVatMultiplierFromRulesSnapshot(array $rules, float $amountPayableBase, float $amountPayable): float
+    {
+        $mode = (string) ($rules['vat_refund_mode'] ?? '');
+        $percent = (float) ($rules['vat_percent'] ?? 0);
+
+        if (in_array($mode, ['driver_delivers_vat', 'driver', 'refund_to_driver'], true) && $percent > 0) {
+            return round(1 + ($percent / 100), 6);
+        }
+
+        if (isset($rules['vat_multiplier']) && is_numeric($rules['vat_multiplier']) && (float) $rules['vat_multiplier'] > 0) {
+            return round((float) $rules['vat_multiplier'], 6);
+        }
+
+        if ($amountPayableBase !== 0.0) {
+            return round(max(0.0, $amountPayable / $amountPayableBase), 6);
+        }
+
+        return 1.0;
     }
 
     private function markPaidAction(): Action
@@ -1323,10 +1367,34 @@ class DriverSettlementsReport extends Page implements HasTable
     private function prioExpensesForSettlement(DriverSettlement $settlement): array
     {
         $rows = \App\Models\PrioTransaction::query()
-            ->where('driver_id', $settlement->driver_id)
-            ->where('assignment_status', 'ok')
             ->whereDate('occurred_at', '>=', $settlement->period_start)
             ->whereDate('occurred_at', '<=', $settlement->period_end)
+            ->where(function (Builder $query) use ($settlement): void {
+                $query
+                    ->where(function (Builder $query) use ($settlement): void {
+                        $query
+                            ->whereNotNull('vehicle_id')
+                            ->whereExists(function (QueryBuilder $allocationQuery) use ($settlement): void {
+                                $allocationQuery
+                                    ->selectRaw('1')
+                                    ->from('vehicle_allocations')
+                                    ->where('vehicle_allocations.driver_id', $settlement->driver_id)
+                                    ->whereColumn('vehicle_allocations.vehicle_id', 'prio_transactions.vehicle_id')
+                                    ->whereRaw('DATE(prio_transactions.occurred_at) >= DATE(vehicle_allocations.starts_at)')
+                                    ->where(function (QueryBuilder $dateOverlapQuery): void {
+                                        $dateOverlapQuery
+                                            ->whereNull('vehicle_allocations.ends_at')
+                                            ->orWhereRaw('DATE(prio_transactions.occurred_at) <= DATE(vehicle_allocations.ends_at)');
+                                    });
+                            });
+                    })
+                    ->orWhere(function (Builder $query) use ($settlement): void {
+                        $query
+                            ->whereNull('vehicle_id')
+                            ->where('driver_id', $settlement->driver_id)
+                            ->where('assignment_status', 'ok');
+                    });
+            })
             ->orderBy('occurred_at')
             ->get([
                 'occurred_at',
@@ -1357,10 +1425,34 @@ class DriverSettlementsReport extends Page implements HasTable
     private function viaVerdeExpensesForSettlement(DriverSettlement $settlement): array
     {
         $rows = \App\Models\ViaVerdeTransaction::query()
-            ->where('driver_id', $settlement->driver_id)
-            ->where('assignment_status', 'ok')
             ->whereDate('occurred_at', '>=', $settlement->period_start)
             ->whereDate('occurred_at', '<=', $settlement->period_end)
+            ->where(function (Builder $query) use ($settlement): void {
+                $query
+                    ->where(function (Builder $query) use ($settlement): void {
+                        $query
+                            ->whereNotNull('vehicle_id')
+                            ->whereExists(function (QueryBuilder $allocationQuery) use ($settlement): void {
+                                $allocationQuery
+                                    ->selectRaw('1')
+                                    ->from('vehicle_allocations')
+                                    ->where('vehicle_allocations.driver_id', $settlement->driver_id)
+                                    ->whereColumn('vehicle_allocations.vehicle_id', 'via_verde_transactions.vehicle_id')
+                                    ->whereRaw('DATE(via_verde_transactions.occurred_at) >= DATE(vehicle_allocations.starts_at)')
+                                    ->where(function (QueryBuilder $dateOverlapQuery): void {
+                                        $dateOverlapQuery
+                                            ->whereNull('vehicle_allocations.ends_at')
+                                            ->orWhereRaw('DATE(via_verde_transactions.occurred_at) <= DATE(vehicle_allocations.ends_at)');
+                                    });
+                            });
+                    })
+                    ->orWhere(function (Builder $query) use ($settlement): void {
+                        $query
+                            ->whereNull('vehicle_id')
+                            ->where('driver_id', $settlement->driver_id)
+                            ->where('assignment_status', 'ok');
+                    });
+            })
             ->orderBy('occurred_at')
             ->get([
                 'occurred_at',

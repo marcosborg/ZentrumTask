@@ -12,6 +12,7 @@ use App\Models\PlatformDriverBalance;
 use App\Models\PrioTransaction;
 use App\Models\VehicleAllocation;
 use App\Models\ViaVerdeTransaction;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Log;
 
@@ -33,26 +34,6 @@ class DriverSettlementCalculator
             ->get(['driver_id', 'net_amount', 'tips_amount']);
 
         $grouped = $balances->groupBy('driver_id');
-
-        $prioExpenses = PrioTransaction::query()
-            ->whereNotNull('driver_id')
-            ->where('assignment_status', 'ok')
-            ->whereBetween('occurred_at', [$start, $end])
-            ->when($driverId, fn ($query) => $query->where('driver_id', $driverId))
-            ->selectRaw('driver_id, COALESCE(SUM(net_amount), 0) as total')
-            ->groupBy('driver_id')
-            ->get()
-            ->keyBy('driver_id');
-
-        $viaVerdeExpenses = ViaVerdeTransaction::query()
-            ->whereNotNull('driver_id')
-            ->where('assignment_status', 'ok')
-            ->whereBetween('occurred_at', [$start, $end])
-            ->when($driverId, fn ($query) => $query->where('driver_id', $driverId))
-            ->selectRaw('driver_id, COALESCE(SUM(amount), 0) as total')
-            ->groupBy('driver_id')
-            ->get()
-            ->keyBy('driver_id');
 
         $adjustmentExpenses = DriverAdjustment::query()
             ->whereDate('starts_at', '<=', $end->toDateString())
@@ -109,8 +90,8 @@ class DriverSettlementCalculator
 
             $netTotal = round((float) $driverBalances->sum('net_amount'), 2);
             $tipsTotal = (float) $driverBalances->sum('tips_amount');
-            $prioTotal = (float) ($prioExpenses[$driverId]->total ?? 0);
-            $viaVerdeTotal = (float) ($viaVerdeExpenses[$driverId]->total ?? 0);
+            $prioTotal = $this->sumPrioExpensesForDriver((int) $driverId, $start, $end);
+            $viaVerdeTotal = $this->sumViaVerdeExpensesForDriver((int) $driverId, $start, $end);
             $adjustmentsTotal = $this->sumAdjustmentsForPeriod(
                 $adjustmentExpenses[$driverId] ?? collect(),
                 $start,
@@ -159,7 +140,7 @@ class DriverSettlementCalculator
                 ]
             );
             $carryOverBalance = $this->resolveCarryOverBalance((int) $driverId, $start, $balance);
-            $amountDue = round($carryOverBalance + $amountPayable, 2);
+            $amountDue = round(($carryOverBalance + $amountPayableBase) * $vatMultiplier, 2);
 
             $settlement = DriverSettlement::query()->create([
                 'driver_id' => $driverId,
@@ -185,6 +166,9 @@ class DriverSettlementCalculator
                     'net_without_tips' => $netWithoutTips,
                     'amount_payable_base' => $amountPayableBase,
                     'carry_over_balance' => $carryOverBalance,
+                    'vat_percent' => $vatPercent,
+                    'vat_refund_mode' => $profile->vat_refund_mode?->value ?? null,
+                    'vat_multiplier' => $vatMultiplier,
                     'amount_due' => $amountDue,
                 ],
             ]);
@@ -278,5 +262,75 @@ class DriverSettlementCalculator
         }
 
         return round($total, 2);
+    }
+
+    private function sumPrioExpensesForDriver(int $driverId, Carbon $start, Carbon $end): float
+    {
+        $total = PrioTransaction::query()
+            ->whereBetween('occurred_at', [$start, $end])
+            ->where(function (Builder $query) use ($driverId): void {
+                $query
+                    ->where(function (Builder $query) use ($driverId): void {
+                        $query
+                            ->whereNotNull('vehicle_id')
+                            ->whereExists(function ($allocationQuery) use ($driverId): void {
+                                $allocationQuery
+                                    ->selectRaw('1')
+                                    ->from('vehicle_allocations')
+                                    ->where('vehicle_allocations.driver_id', $driverId)
+                                    ->whereColumn('vehicle_allocations.vehicle_id', 'prio_transactions.vehicle_id')
+                                    ->whereRaw('DATE(prio_transactions.occurred_at) >= DATE(vehicle_allocations.starts_at)')
+                                    ->where(function ($dateOverlapQuery): void {
+                                        $dateOverlapQuery
+                                            ->whereNull('vehicle_allocations.ends_at')
+                                            ->orWhereRaw('DATE(prio_transactions.occurred_at) <= DATE(vehicle_allocations.ends_at)');
+                                    });
+                            });
+                    })
+                    ->orWhere(function (Builder $query) use ($driverId): void {
+                        $query
+                            ->whereNull('vehicle_id')
+                            ->where('driver_id', $driverId)
+                            ->where('assignment_status', 'ok');
+                    });
+            })
+            ->sum('net_amount');
+
+        return round((float) $total, 2);
+    }
+
+    private function sumViaVerdeExpensesForDriver(int $driverId, Carbon $start, Carbon $end): float
+    {
+        $total = ViaVerdeTransaction::query()
+            ->whereBetween('occurred_at', [$start, $end])
+            ->where(function (Builder $query) use ($driverId): void {
+                $query
+                    ->where(function (Builder $query) use ($driverId): void {
+                        $query
+                            ->whereNotNull('vehicle_id')
+                            ->whereExists(function ($allocationQuery) use ($driverId): void {
+                                $allocationQuery
+                                    ->selectRaw('1')
+                                    ->from('vehicle_allocations')
+                                    ->where('vehicle_allocations.driver_id', $driverId)
+                                    ->whereColumn('vehicle_allocations.vehicle_id', 'via_verde_transactions.vehicle_id')
+                                    ->whereRaw('DATE(via_verde_transactions.occurred_at) >= DATE(vehicle_allocations.starts_at)')
+                                    ->where(function ($dateOverlapQuery): void {
+                                        $dateOverlapQuery
+                                            ->whereNull('vehicle_allocations.ends_at')
+                                            ->orWhereRaw('DATE(via_verde_transactions.occurred_at) <= DATE(vehicle_allocations.ends_at)');
+                                    });
+                            });
+                    })
+                    ->orWhere(function (Builder $query) use ($driverId): void {
+                        $query
+                            ->whereNull('vehicle_id')
+                            ->where('driver_id', $driverId)
+                            ->where('assignment_status', 'ok');
+                    });
+            })
+            ->sum('amount');
+
+        return round((float) $total, 2);
     }
 }
