@@ -3,6 +3,7 @@
 use App\Http\Controllers\BlogController;
 use App\Http\Controllers\CandidateApplicationController;
 use App\Http\Controllers\MediaProxyController;
+use App\Http\Controllers\WebsiteChatController;
 use App\Http\Controllers\WebsiteController;
 use Illuminate\Support\Facades\Route;
 
@@ -16,6 +17,12 @@ Route::get('/candidatura', [CandidateApplicationController::class, 'show'])->nam
 Route::post('/candidatura/save', [CandidateApplicationController::class, 'save'])->name('candidatura.save');
 Route::post('/candidatura/submit', [CandidateApplicationController::class, 'submit'])->name('candidatura.submit');
 Route::post('/candidatura/upload', [CandidateApplicationController::class, 'upload'])->name('candidatura.upload');
+Route::post('/chat/session', [WebsiteChatController::class, 'start'])
+    ->middleware('throttle:30,1')
+    ->name('website.chat.session');
+Route::post('/chat/message', [WebsiteChatController::class, 'message'])
+    ->middleware('throttle:30,1')
+    ->name('website.chat.message');
 
 Route::get('/media-proxy/{uuid}/{conversion?}', [MediaProxyController::class, 'show'])
     ->whereUuid('uuid')

@@ -54,4 +54,10 @@ return [
         'user_data_dir' => env('UBER_COLLECTOR_USER_DATA_DIR', 'storage/app/private/uber-playwright-profile'),
     ],
 
+    'openai' => [
+        'api_key' => env('OPENAI_API_KEY'),
+        'base_url' => env('OPENAI_BASE_URL', 'https://api.openai.com/v1'),
+        'model' => env('OPENAI_MODEL', 'gpt-4.1-mini'),
+    ],
+
 ];

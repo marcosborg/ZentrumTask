@@ -58,6 +58,12 @@
                 </div>
             </div>
             <div>
+                <div class="text-xs uppercase text-gray-400">Transferido</div>
+                <div class="text-sm font-semibold text-gray-100">
+                    {{ number_format((float) ($settlement->amount_transferred ?? 0), 2, ',', ' ') }} &euro;
+                </div>
+            </div>
+            <div>
                 <div class="text-xs uppercase text-gray-400">Estado</div>
                 <div class="text-sm font-semibold text-gray-100">
                     {{ $settlement->is_paid ? 'Pago' : 'Pendente' }}

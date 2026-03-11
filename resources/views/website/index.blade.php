@@ -20,4 +20,6 @@
 
     <x-contact /> 
 
+    <x-website-chat />
+
 @endsection

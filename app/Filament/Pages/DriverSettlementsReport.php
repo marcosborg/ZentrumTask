@@ -335,6 +335,11 @@ class DriverSettlementsReport extends Page implements HasTable
                     ->alignRight()
                     ->state(fn (DriverSettlement $record): float => (float) $record->amount_due)
                     ->formatStateUsing(fn ($state): string => $this->formatMoney($state)),
+                TextColumn::make('amount_transferred')
+                    ->label('Valor transferido')
+                    ->alignRight()
+                    ->state(fn (DriverSettlement $record): float => (float) ($record->amount_transferred ?? 0))
+                    ->formatStateUsing(fn ($state): string => $this->formatMoney($state)),
                 TextColumn::make('is_paid')
                     ->label('Pago')
                     ->badge()
@@ -1278,6 +1283,7 @@ class DriverSettlementsReport extends Page implements HasTable
                 DB::transaction(function () use ($record): void {
                     $balance = $this->resolveBalance((int) $record->driver_id);
                     $current = round((float) $balance->current_balance, 2);
+                    $transferredAmount = round((float) ($record->amount_due ?? 0), 2);
 
                     if ($current !== 0.0) {
                         DriverBalanceMovement::query()->create([
@@ -1299,6 +1305,7 @@ class DriverSettlementsReport extends Page implements HasTable
 
                     $record->forceFill([
                         'amount_due' => 0,
+                        'amount_transferred' => $transferredAmount,
                         'is_paid' => true,
                         'paid_at' => now(),
                     ])->save();
