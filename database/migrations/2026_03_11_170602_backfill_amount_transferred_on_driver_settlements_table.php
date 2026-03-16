@@ -19,6 +19,22 @@ return new class extends Migration
             return;
         }
 
+        if (DB::getDriverName() === 'sqlite') {
+            DB::statement(<<<'SQL'
+                UPDATE driver_settlements
+                SET amount_transferred = COALESCE((
+                    SELECT ROUND(SUM(ABS(amount)), 2)
+                    FROM driver_balance_movements
+                    WHERE type = 'payment'
+                      AND driver_settlement_id = driver_settlements.id
+                ), 0)
+                WHERE is_paid = 1
+                  AND amount_transferred = 0
+            SQL);
+
+            return;
+        }
+
         DB::statement(<<<'SQL'
             UPDATE driver_settlements ds
             LEFT JOIN (

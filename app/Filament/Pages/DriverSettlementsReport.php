@@ -123,6 +123,32 @@ class DriverSettlementsReport extends Page implements HasTable
         }
     }
 
+    public function deleteManualAdjustment(int $driverId, int $adjustmentId): void
+    {
+        $adjustment = DriverAdjustment::query()
+            ->where('driver_id', $driverId)
+            ->find($adjustmentId);
+
+        if (! $adjustment) {
+            Notification::make()
+                ->danger()
+                ->title('Ajuste nao encontrado')
+                ->send();
+
+            return;
+        }
+
+        $adjustment->delete();
+
+        $this->resetBillingCache();
+        $this->resetTable();
+
+        Notification::make()
+            ->success()
+            ->title('Ajuste removido')
+            ->send();
+    }
+
     public function filtersForm(Schema $schema): Schema
     {
         return $schema->schema($this->getFiltersFormSchema());
@@ -1077,28 +1103,7 @@ class DriverSettlementsReport extends Page implements HasTable
                 }
 
                 if ($operation === 'delete') {
-                    $adjustment = DriverAdjustment::query()
-                        ->where('driver_id', $record->driver_id)
-                        ->find($adjustmentId);
-
-                    if (! $adjustment) {
-                        Notification::make()
-                            ->danger()
-                            ->title('Ajuste nao encontrado')
-                            ->send();
-
-                        return;
-                    }
-
-                    $adjustment->delete();
-
-                    $this->resetBillingCache();
-                    $this->resetTable();
-
-                    Notification::make()
-                        ->success()
-                        ->title('Ajuste removido')
-                        ->send();
+                    $this->deleteManualAdjustment((int) $record->driver_id, $adjustmentId);
 
                     return;
                 }

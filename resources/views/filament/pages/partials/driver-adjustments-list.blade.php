@@ -14,17 +14,31 @@
                             <th class="px-2 py-1 text-left">Descricao</th>
                             <th class="px-2 py-1 text-right">Valor</th>
                             <th class="px-2 py-1 text-left">Origem</th>
+                            <th class="px-2 py-1 text-right">Acao</th>
                         </tr>
                     </thead>
                 <tbody>
                     @foreach ($adjustments as $adjustment)
-                        <tr class="border-t border-gray-200 dark:border-gray-700">
+                        <tr class="border-t border-gray-200 dark:border-gray-700" wire:key="driver-adjustment-{{ $adjustment['id'] }}">
                             <td class="px-2 py-1">{{ $adjustment['starts_at']?->format('d/m/Y') ?? '-' }}</td>
                             <td class="px-2 py-1">{{ $adjustment['recurrence_weeks'] ?? 1 }}</td>
                             <td class="px-2 py-1">{{ $adjustment['category'] }}</td>
                             <td class="px-2 py-1">{{ $adjustment['description'] }}</td>
                             <td class="px-2 py-1 text-right">{{ number_format((float) $adjustment['amount'], 2, ',', ' ') }} &euro;</td>
                             <td class="px-2 py-1">{{ $adjustment['source_file'] ?? '-' }}</td>
+                            <td class="px-2 py-1 text-right">
+                                <x-filament::button
+                                    color="danger"
+                                    size="xs"
+                                    type="button"
+                                    wire:click="deleteManualAdjustment({{ (int) $driverId }}, {{ (int) $adjustment['id'] }})"
+                                    wire:confirm="Eliminar este ajuste?"
+                                    wire:loading.attr="disabled"
+                                    wire:target="deleteManualAdjustment({{ (int) $driverId }}, {{ (int) $adjustment['id'] }})"
+                                >
+                                    Eliminar
+                                </x-filament::button>
+                            </td>
                         </tr>
                     @endforeach
                 </tbody>
