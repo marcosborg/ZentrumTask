@@ -395,6 +395,7 @@ class DriverSettlementsReport extends Page implements HasTable
                 $this->manageAdjustmentsAction(),
                 $this->adjustBalanceAction(),
                 $this->markPaidAction(),
+                $this->recalculateSettlementAction(),
                 $this->viewDetailsAction(),
                 $this->deleteSettlementAction(),
             ])
@@ -564,6 +565,31 @@ class DriverSettlementsReport extends Page implements HasTable
             });
     }
 
+    public function recalculateSettlement(DriverSettlement $record): array
+    {
+        return DB::transaction(function () use ($record): array {
+            $deleted = $this->deleteSettlementsForPeriod(
+                $record->period_start?->toDateString() ?? '',
+                $record->period_end?->toDateString() ?? '',
+                (int) $record->driver_id
+            );
+
+            $calculated = app(DriverSettlementCalculator::class)
+                ->calculate(
+                    $record->period_start?->toDateString() ?? '',
+                    $record->period_end?->toDateString() ?? '',
+                    (int) $record->driver_id
+                );
+
+            return [
+                'deleted' => $deleted,
+                'created' => $calculated['created'] ?? 0,
+                'skipped' => $calculated['skipped'] ?? 0,
+                'missing_profiles' => $calculated['missing_profiles'] ?? 0,
+            ];
+        });
+    }
+
     private function sendSettlementEmailAction(): Action
     {
         return Action::make('sendSettlementEmail')
@@ -606,6 +632,28 @@ class DriverSettlementsReport extends Page implements HasTable
                     ->success()
                     ->title('Email enviado')
                     ->body("Destino: {$recipient} | Modo: ".$this->settlementDeliveryMode().' | Total enviados neste settlement: '.((int) $record->email_sent_count))
+                    ->send();
+            });
+    }
+
+    private function recalculateSettlementAction(): Action
+    {
+        return Action::make('recalculateSettlement')
+            ->label('Recalcular')
+            ->color('primary')
+            ->icon(Heroicon::OutlinedArrowPath)
+            ->requiresConfirmation()
+            ->modalDescription('Apaga este settlement e recalcula apenas este motorista neste periodo.')
+            ->action(function (DriverSettlement $record): void {
+                $result = $this->recalculateSettlement($record);
+
+                $this->resetBillingCache();
+                $this->resetTable();
+
+                Notification::make()
+                    ->success()
+                    ->title('Settlement recalculado')
+                    ->body("Removidos: {$result['deleted']} | Criados: {$result['created']} | Skips: {$result['skipped']} | Sem perfil: {$result['missing_profiles']}")
                     ->send();
             });
     }
