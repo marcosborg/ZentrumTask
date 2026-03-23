@@ -679,7 +679,7 @@ class ViaVerdeCsvImportService
         return round((float) $raw, 2);
     }
 
-    private function parseDateTime(string $date, ?string $time): Carbon
+    public function parseDateTime(string $date, ?string $time): Carbon
     {
         $date = trim(str_replace("\u{FEFF}", '', $date));
         $time = $time ? trim($time) : null;
@@ -687,9 +687,13 @@ class ViaVerdeCsvImportService
         $formats = [
             'Y-m-d H:i:s',
             'Y-m-d H:i',
+            'd-m-Y H:i:s',
             'd-m-Y H:i',
+            'd/m/Y H:i:s',
             'd/m/Y H:i',
+            'd-m-y H:i:s',
             'd-m-y H:i',
+            'd/m/y H:i:s',
             'd/m/y H:i',
         ];
 
@@ -707,6 +711,31 @@ class ViaVerdeCsvImportService
         }
 
         return Carbon::parse($time ? "{$date} {$time}" : $date);
+    }
+
+    /**
+     * @param  array<string, mixed>  $rawRow
+     */
+    public function extractOccurredAtFromRawRow(array $rawRow): ?Carbon
+    {
+        $normalizedRow = [];
+
+        foreach ($rawRow as $key => $value) {
+            $normalizedRow[$this->normalizeHeader((string) $key)] = is_string($value) ? trim($value) : $value;
+        }
+
+        $date = $this->normalizeNullable($normalizedRow['entrydate'] ?? $normalizedRow['data'] ?? $normalizedRow['datamovimento'] ?? $normalizedRow['exitdate'] ?? null);
+        $time = $this->normalizeNullable($normalizedRow['hora'] ?? $normalizedRow['horamovimento'] ?? null);
+
+        if (! $date) {
+            return null;
+        }
+
+        try {
+            return $this->parseDateTime($date, $time);
+        } catch (Throwable) {
+            return null;
+        }
     }
 
     private function normalizeNullable(mixed $value): ?string
@@ -833,7 +862,7 @@ class ViaVerdeCsvImportService
         return 'via_verde';
     }
 
-    private function buildExternalRef(Carbon $occurredAt, ?string $location, float $amount, string $type): string
+    public function buildExternalRef(Carbon $occurredAt, ?string $location, float $amount, string $type): string
     {
         return sha1($occurredAt->toIso8601String().'|'.($location ?? '').'|'.$amount.'|'.$type);
     }
