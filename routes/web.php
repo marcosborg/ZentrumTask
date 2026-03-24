@@ -48,6 +48,19 @@ Route::post('/app/candidatura/submit', [AppCandidateApplicationController::class
 Route::post('/app/candidatura/upload', [AppCandidateApplicationController::class, 'upload'])
     ->withoutMiddleware([VerifyCsrfToken::class])
     ->name('app.candidatura.upload');
+Route::options('/app/chat/{path}', fn () => response('', 204, [
+    'Access-Control-Allow-Origin' => '*',
+    'Access-Control-Allow-Methods' => 'POST, OPTIONS',
+    'Access-Control-Allow-Headers' => 'Content-Type, X-Requested-With, Accept',
+]))->where('path', '.*');
+Route::post('/app/chat/session', [WebsiteChatController::class, 'start'])
+    ->withoutMiddleware([VerifyCsrfToken::class])
+    ->middleware('throttle:30,1')
+    ->name('app.chat.session');
+Route::post('/app/chat/message', [WebsiteChatController::class, 'message'])
+    ->withoutMiddleware([VerifyCsrfToken::class])
+    ->middleware('throttle:30,1')
+    ->name('app.chat.message');
 Route::post('/contact', [WebsiteController::class, 'storeContact'])->name('contact.submit');
 Route::get('/cms/{page}/{slug?}', [WebsiteController::class, 'showCms'])->name('cms.show');
 Route::get('/blog', [BlogController::class, 'index'])->name('blog.index');

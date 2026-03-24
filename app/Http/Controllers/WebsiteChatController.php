@@ -36,7 +36,7 @@ class WebsiteChatController extends Controller
             ])->save();
         }
 
-        return response()->json([
+        return $this->jsonResponse([
             'enabled' => (bool) $setting->is_enabled,
             'session_token' => $session->session_token,
             'assistant_name' => (string) ($setting->name ?: 'Zentrum Assistant'),
@@ -50,7 +50,7 @@ class WebsiteChatController extends Controller
         $setting = ChatBotSetting::current();
 
         if (! $setting->is_enabled) {
-            return response()->json([
+            return $this->jsonResponse([
                 'message' => 'Chat desativado no momento.',
             ], 403);
         }
@@ -99,10 +99,19 @@ class WebsiteChatController extends Controller
             'last_message_at' => now(),
         ])->save();
 
-        return response()->json([
+        return $this->jsonResponse([
             'session_token' => $session->session_token,
             'user_message' => $this->formatMessage($userMessage),
             'assistant_message' => $this->formatMessage($assistantMessage),
+        ]);
+    }
+
+    private function jsonResponse(array $payload, int $status = 200): JsonResponse
+    {
+        return response()->json($payload, $status, [
+            'Access-Control-Allow-Origin' => '*',
+            'Access-Control-Allow-Methods' => 'POST, OPTIONS',
+            'Access-Control-Allow-Headers' => 'Content-Type, X-Requested-With, Accept',
         ]);
     }
 
