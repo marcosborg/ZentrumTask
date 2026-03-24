@@ -96,6 +96,8 @@ class KanbanBoard extends Page
 
     public array $taskAttachments = [];
 
+    public array $taskTimeline = [];
+
     public $attachmentUpload = null;
 
     public array $commentForm = [
@@ -457,6 +459,27 @@ class KanbanBoard extends Page
         $this->showAutomationPanel = false;
     }
 
+    public function deleteTask(): void
+    {
+        $taskId = $this->taskForm['id'] ?? $this->activeTaskId;
+
+        if (! $taskId) {
+            return;
+        }
+
+        $task = Task::findOrFail($taskId);
+        $task->delete();
+
+        Notification::make()->title('Tarefa eliminada')->success()->send();
+
+        $this->taskForm['id'] = null;
+        $this->taskComments = [];
+        $this->taskAttachments = [];
+        $this->taskTimeline = [];
+        $this->closeForms();
+        $this->loadBoard();
+    }
+
     public function getBoardsProperty(): Collection
     {
         return $this->boards;
@@ -474,6 +497,14 @@ class KanbanBoard extends Page
 
     protected function loadTaskMeta(Task $task): void
     {
+        $this->taskTimeline = [
+            'created_at' => optional($task->created_at)?->format('d/m/Y H:i'),
+            'first_interaction_at' => optional($task->first_interaction_at)?->format('d/m/Y H:i'),
+            'response_time' => $task->first_interaction_at && $task->created_at
+                ? $task->created_at->diffForHumans($task->first_interaction_at, true)
+                : null,
+        ];
+
         $this->taskComments = $task->comments
             ->sortByDesc('created_at')
             ->map(fn ($c) => [
@@ -572,6 +603,7 @@ class KanbanBoard extends Page
 
         $this->commentForm = ['body' => '', 'is_internal' => true];
         $task = Task::findOrFail($this->activeTaskId);
+        $task->markFirstInteraction();
         $this->loadTaskMeta($task->load(['comments.user', 'attachments']));
     }
 

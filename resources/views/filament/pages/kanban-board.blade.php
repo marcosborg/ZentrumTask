@@ -198,6 +198,14 @@
                                         @if($task->assignedTo) Respons+avel: {{ $task->assignedTo->name }} @endif
                                         @if($task->due_at) - Prazo: {{ $task->due_at->format('d/m H:i') }} @endif
                                     </div>
+                                    <div class="kb-muted" style="margin-top:6px;font-size:11px;line-height:1.4;">
+                                        <div>Entrada: {{ $task->created_at?->format('d/m H:i') ?? '-' }}</div>
+                                        @if($task->first_interaction_at)
+                                            <div>1a interacao: {{ $task->first_interaction_at->format('d/m H:i') }} ({{ $task->created_at?->diffForHumans($task->first_interaction_at, true) }})</div>
+                                        @else
+                                            <div>1a interacao: sem resposta</div>
+                                        @endif
+                                    </div>
                                     <div class="kb-row" style="gap:6px;margin-top:6px;">                                        <button type="button" class="kb-btn" wire:click="openTaskDetail({{ $task->id }})">Detalhes</button>
                                     </div>
                                 </div>
@@ -235,6 +243,15 @@
                                     @endif
                                 </div>
                                 <div class="kb-muted" style="margin-top:2px;">Preenche os campos e guarda para atualizar o quadro.</div>
+                                @if($showTaskDetail && $activeTaskId)
+                                    <div class="kb-muted" style="margin-top:6px;font-size:12px;line-height:1.5;">
+                                        <div>Entrada: {{ $taskTimeline['created_at'] ?? '-' }}</div>
+                                        <div>Primeira interacao: {{ $taskTimeline['first_interaction_at'] ?? 'Sem resposta' }}</div>
+                                        @if(!empty($taskTimeline['response_time']))
+                                            <div>Tempo ate primeira resposta: {{ $taskTimeline['response_time'] }}</div>
+                                        @endif
+                                    </div>
+                                @endif
                             </div>
                             <div class="kb-row" style="gap:8px;">
                                 <button type="button" class="kb-btn" wire:click="closeForms">Fechar</button>
@@ -342,6 +359,9 @@
                                 </div>
 
                                 <div style="grid-column:1/-1;display:flex;justify-content:flex-end;gap:8px;">
+                                    @if(!empty($taskForm['id']))
+                                        <button type="button" class="kb-btn" style="background:#3f1d1d;border-color:#7f1d1d;color:#fecaca;" wire:click="deleteTask" wire:confirm="Eliminar esta tarefa?">Eliminar</button>
+                                    @endif
                                     <button type="button" class="kb-btn" wire:click="closeForms">Cancelar</button>
                                     <button type="submit" class="kb-btn kb-btn-primary">Guardar tarefa</button>
                                 </div>
