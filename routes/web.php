@@ -1,13 +1,53 @@
 <?php
 
 use App\Http\Controllers\BlogController;
+use App\Http\Controllers\AppContactController;
+use App\Http\Controllers\AppCandidateApplicationController;
+use App\Http\Controllers\AppFrontpageDataController;
 use App\Http\Controllers\CandidateApplicationController;
 use App\Http\Controllers\MediaProxyController;
 use App\Http\Controllers\WebsiteChatController;
 use App\Http\Controllers\WebsiteController;
+use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', [WebsiteController::class, 'index']);
+Route::options('/app/frontpage', fn () => response('', 204, [
+    'Access-Control-Allow-Origin' => '*',
+    'Access-Control-Allow-Methods' => 'GET, OPTIONS',
+    'Access-Control-Allow-Headers' => 'Content-Type, X-Requested-With',
+]));
+Route::get('/app/frontpage', AppFrontpageDataController::class)->name('app.frontpage');
+Route::options('/app/contact', fn () => response('', 204, [
+    'Access-Control-Allow-Origin' => '*',
+    'Access-Control-Allow-Methods' => 'POST, OPTIONS',
+    'Access-Control-Allow-Headers' => 'Content-Type, X-Requested-With, Accept',
+]));
+Route::post('/app/contact', AppContactController::class)
+    ->withoutMiddleware([VerifyCsrfToken::class])
+    ->name('app.contact.submit');
+Route::options('/app/candidatura', fn () => response('', 204, [
+    'Access-Control-Allow-Origin' => '*',
+    'Access-Control-Allow-Methods' => 'GET, POST, OPTIONS',
+    'Access-Control-Allow-Headers' => 'Content-Type, X-Requested-With, Accept',
+]));
+Route::options('/app/candidatura/{path}', fn () => response('', 204, [
+    'Access-Control-Allow-Origin' => '*',
+    'Access-Control-Allow-Methods' => 'GET, POST, OPTIONS',
+    'Access-Control-Allow-Headers' => 'Content-Type, X-Requested-With, Accept',
+]))->where('path', '.*');
+Route::get('/app/candidatura', [AppCandidateApplicationController::class, 'show'])
+    ->withoutMiddleware([VerifyCsrfToken::class])
+    ->name('app.candidatura.show');
+Route::post('/app/candidatura/save', [AppCandidateApplicationController::class, 'save'])
+    ->withoutMiddleware([VerifyCsrfToken::class])
+    ->name('app.candidatura.save');
+Route::post('/app/candidatura/submit', [AppCandidateApplicationController::class, 'submit'])
+    ->withoutMiddleware([VerifyCsrfToken::class])
+    ->name('app.candidatura.submit');
+Route::post('/app/candidatura/upload', [AppCandidateApplicationController::class, 'upload'])
+    ->withoutMiddleware([VerifyCsrfToken::class])
+    ->name('app.candidatura.upload');
 Route::post('/contact', [WebsiteController::class, 'storeContact'])->name('contact.submit');
 Route::get('/cms/{page}/{slug?}', [WebsiteController::class, 'showCms'])->name('cms.show');
 Route::get('/blog', [BlogController::class, 'index'])->name('blog.index');

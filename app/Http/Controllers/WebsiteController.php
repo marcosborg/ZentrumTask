@@ -6,6 +6,7 @@ use App\Http\Requests\ContactTaskRequest;
 use App\Models\CmsPage;
 use App\Models\Stage;
 use App\Models\Task;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
@@ -16,43 +17,13 @@ class WebsiteController extends Controller
         return view('website.index');
     }
 
-    public function storeContact(ContactTaskRequest $request)
+    public function storeContact(ContactTaskRequest $request): RedirectResponse
     {
         $data = $request->validated();
 
-        $stage = Stage::query()
-            ->where('board_id', 1)
-            ->where('is_initial', true)
-            ->orderBy('position')
-            ->first()
-            ?? Stage::query()
-                ->where('board_id', 1)
-                ->orderBy('position')
-                ->first();
-
-        if (! $stage) {
-            return back()->withErrors(['message' => 'NÇœo foi possÇðvel criar a tarefa: nenhum estÇ­gio inicial configurado.']);
+        if (! self::createContactLead($data)) {
+            return back()->withErrors(['message' => 'Nao foi possivel criar a tarefa: nenhum estagio inicial configurado.']);
         }
-
-        DB::transaction(function () use ($data, $stage): void {
-            $nextPosition = (int) Task::query()
-                ->where('stage_id', $stage->id)
-                ->max('position');
-
-            Task::query()->create([
-                'board_id' => 1,
-                'stage_id' => $stage->id,
-                'title' => 'Lead: '.$data['name'],
-                'description' => $data['message']."\nTelefone: ".$data['phone'],
-                'priority' => 'normal',
-                'position' => $nextPosition + 1,
-                'meta' => [
-                    'email' => $data['email'],
-                    'phone' => $data['phone'],
-                    'source' => 'website_form',
-                ],
-            ]);
-        });
 
         return back()->with('contact_success', 'Pedido enviado com sucesso. Sera contactado brevemente.');
     }
@@ -76,7 +47,43 @@ class WebsiteController extends Controller
             'page' => $page,
         ]);
     }
+
+    public static function createContactLead(array $data, string $source = 'website_form'): bool
+    {
+        $stage = Stage::query()
+            ->where('board_id', 1)
+            ->where('is_initial', true)
+            ->orderBy('position')
+            ->first()
+            ?? Stage::query()
+                ->where('board_id', 1)
+                ->orderBy('position')
+                ->first();
+
+        if (! $stage) {
+            return false;
+        }
+
+        DB::transaction(function () use ($data, $stage, $source): void {
+            $nextPosition = (int) Task::query()
+                ->where('stage_id', $stage->id)
+                ->max('position');
+
+            Task::query()->create([
+                'board_id' => 1,
+                'stage_id' => $stage->id,
+                'title' => 'Lead: '.$data['name'],
+                'description' => $data['message']."\nTelefone: ".$data['phone'],
+                'priority' => 'normal',
+                'position' => $nextPosition + 1,
+                'meta' => [
+                    'email' => $data['email'],
+                    'phone' => $data['phone'],
+                    'source' => $source,
+                ],
+            ]);
+        });
+
+        return true;
+    }
 }
-
-
-
