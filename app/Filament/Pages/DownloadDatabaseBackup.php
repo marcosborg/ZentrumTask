@@ -2,6 +2,7 @@
 
 namespace App\Filament\Pages;
 
+use App\Support\DatabaseReplicationService;
 use BackedEnum;
 use Filament\Actions\Action;
 use Filament\Notifications\Notification;
@@ -9,9 +10,6 @@ use Filament\Pages\Page;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
-use Symfony\Component\Process\Process;
-use Throwable;
 use UnitEnum;
 
 class DownloadDatabaseBackup extends Page
@@ -61,227 +59,19 @@ class DownloadDatabaseBackup extends Page
 
     protected function replicateDatabase(string $sourceMode, string $targetMode): void
     {
-        $sourceProfile = $this->databaseProfile($sourceMode);
-        $targetProfile = $this->databaseProfile($targetMode);
+        $result = app(DatabaseReplicationService::class)->replicate($sourceMode, $targetMode);
 
-        if ($sourceProfile === null || $targetProfile === null) {
-            Notification::make()
-                ->danger()
-                ->title('Configuracao em falta')
-                ->body("Nao encontrei perfis para {$sourceMode} ou {$targetMode}. Atualize o .env.")
-                ->send();
+        $notification = Notification::make()
+            ->title($result->title)
+            ->body($result->message);
 
-            return;
+        if ($result->successful) {
+            $notification->success();
+        } else {
+            $notification->danger();
         }
 
-        if (! in_array($sourceProfile['driver'], ['mysql', 'mariadb'], true) || ! in_array($targetProfile['driver'], ['mysql', 'mariadb'], true)) {
-            Notification::make()
-                ->danger()
-                ->title('Driver nao suportado')
-                ->body('A copia so suporta MySQL/MariaDB.')
-                ->send();
-
-            return;
-        }
-
-        $dumpBinary = $this->resolveDumpBinary($sourceProfile['driver']);
-        $importBinary = $this->resolveImportBinary($targetProfile['driver']);
-
-        $dumpProcess = $this->buildDumpProcess($sourceProfile, $dumpBinary);
-        $dumpProcess->run();
-
-        if (! $dumpProcess->isSuccessful()) {
-            Log::error('Database dump failed', [
-                'source' => $sourceMode,
-                'command' => $dumpProcess->getCommandLine(),
-                'exit_code' => $dumpProcess->getExitCode(),
-                'error_output' => $dumpProcess->getErrorOutput(),
-                'output' => $dumpProcess->getOutput(),
-            ]);
-
-            Notification::make()
-                ->danger()
-                ->title('Erro a exportar base de dados')
-                ->body(trim($dumpProcess->getErrorOutput() ?: $dumpProcess->getOutput()))
-                ->send();
-
-            return;
-        }
-
-        $dumpContents = $dumpProcess->getOutput();
-
-        if ($dumpContents === '') {
-            Notification::make()
-                ->danger()
-                ->title('Backup vazio')
-                ->body('A exportacao nao devolveu dados. Verifique a ligacao de origem.')
-                ->send();
-
-            return;
-        }
-
-        if (! $this->ensureDatabaseExists($targetProfile, $importBinary)) {
-            return;
-        }
-
-        $importProcess = $this->buildImportProcess($targetProfile, $importBinary);
-        $importProcess->setInput($dumpContents);
-        try {
-            $importProcess->run();
-        } catch (Throwable $exception) {
-            Log::error('Database import crashed', [
-                'target' => $targetMode,
-                'command' => $importProcess->getCommandLine(),
-                'exception' => $exception->getMessage(),
-            ]);
-
-            Notification::make()
-                ->danger()
-                ->title('Erro a importar base de dados')
-                ->body("A importacao foi interrompida: {$exception->getMessage()}")
-                ->send();
-
-            return;
-        }
-
-        if (! $importProcess->isSuccessful()) {
-            Log::error('Database import failed', [
-                'target' => $targetMode,
-                'command' => $importProcess->getCommandLine(),
-                'exit_code' => $importProcess->getExitCode(),
-                'error_output' => $importProcess->getErrorOutput(),
-                'output' => $importProcess->getOutput(),
-            ]);
-
-            Notification::make()
-                ->danger()
-                ->title('Erro a importar base de dados')
-                ->body(trim($importProcess->getErrorOutput() ?: $importProcess->getOutput()))
-                ->send();
-
-            return;
-        }
-
-        Notification::make()
-            ->success()
-            ->title('Copia concluida')
-            ->body("Dados copiados de {$sourceMode} para {$targetMode}.")
-            ->send();
-    }
-
-    /**
-     * @param  array{
-     *     driver: string,
-     *     host: string,
-     *     port: string|int,
-     *     database: string,
-     *     username: string,
-     *     password: string|null
-     * }  $configuration
-     */
-    protected function buildDumpProcess(array $configuration, string $binary): Process
-    {
-        $command = [
-            $binary,
-            '--protocol=TCP',
-            '--host='.$configuration['host'],
-            '--port='.(string) $configuration['port'],
-            '--user='.$configuration['username'],
-            '--password='.(string) ($configuration['password'] ?? ''),
-            '--no-tablespaces',
-            '--single-transaction',
-            '--routines',
-            '--events',
-            '--add-drop-table',
-            $configuration['database'],
-        ];
-
-        foreach ($this->ignoredReplicationTables($configuration['database']) as $table) {
-            $command[] = '--ignore-table='.$table;
-        }
-
-        $process = new Process($command, base_path());
-        $process->setEnv($this->processEnvironment((string) ($configuration['password'] ?? '')));
-        $process->setTimeout(300);
-
-        return $process;
-    }
-
-    /**
-     * @param  array{
-     *     driver: string,
-     *     host: string,
-     *     port: string|int,
-     *     database: string,
-     *     username: string,
-     *     password: string|null
-     * }  $configuration
-     */
-    protected function buildImportProcess(array $configuration, string $binary): Process
-    {
-        $command = [
-            $binary,
-            '--protocol=TCP',
-            '--host='.$configuration['host'],
-            '--port='.(string) $configuration['port'],
-            '--user='.$configuration['username'],
-            '--password='.(string) ($configuration['password'] ?? ''),
-            '--database='.$configuration['database'],
-        ];
-
-        $process = new Process($command, base_path());
-        $process->setEnv($this->processEnvironment((string) ($configuration['password'] ?? '')));
-        $process->setTimeout(300);
-
-        return $process;
-    }
-
-    /**
-     * @param  array{
-     *     driver: string,
-     *     host: string,
-     *     port: string|int,
-     *     database: string,
-     *     username: string,
-     *     password: string|null
-     * }  $configuration
-     */
-    protected function ensureDatabaseExists(array $configuration, string $binary): bool
-    {
-        $command = [
-            $binary,
-            '--protocol=TCP',
-            '--host='.$configuration['host'],
-            '--port='.(string) $configuration['port'],
-            '--user='.$configuration['username'],
-            '--password='.(string) ($configuration['password'] ?? ''),
-            '--execute=CREATE DATABASE IF NOT EXISTS `'.$configuration['database'].'` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci',
-        ];
-
-        $process = new Process($command, base_path());
-        $process->setEnv($this->processEnvironment((string) ($configuration['password'] ?? '')));
-        $process->setTimeout(60);
-        $process->run();
-
-        if ($process->isSuccessful()) {
-            return true;
-        }
-
-        Log::error('Database create failed', [
-            'database' => $configuration['database'],
-            'command' => $process->getCommandLine(),
-            'exit_code' => $process->getExitCode(),
-            'error_output' => $process->getErrorOutput(),
-            'output' => $process->getOutput(),
-        ]);
-
-        Notification::make()
-            ->danger()
-            ->title('Erro a preparar base de dados')
-            ->body('Nao consegui preparar a base de dados de destino: '.trim($process->getErrorOutput() ?: $process->getOutput()))
-            ->send();
-
-        return false;
+        $notification->send();
     }
 
     protected function toggleLabel(): string
@@ -391,70 +181,4 @@ class DownloadDatabaseBackup extends Page
         }
     }
 
-    protected function resolveDumpBinary(string $driver): string
-    {
-        $preferred = (string) Config::get('database.backup.binary', '');
-
-        if ($preferred !== '') {
-            return $preferred;
-        }
-
-        return $driver === 'mariadb' ? 'mariadb-dump' : 'mysqldump';
-    }
-
-    protected function resolveImportBinary(string $driver): string
-    {
-        $preferred = (string) Config::get('database.restore.binary', '');
-
-        if ($preferred !== '') {
-            return $preferred;
-        }
-
-        return $driver === 'mariadb' ? 'mariadb' : 'mysql';
-    }
-
-    /**
-     * @return array<int, string>
-     */
-    protected function ignoredReplicationTables(string $database): array
-    {
-        $tables = [
-            'sessions',
-            'cache',
-            'cache_locks',
-            'jobs',
-            'job_batches',
-            'failed_jobs',
-        ];
-
-        return array_map(
-            fn (string $table): string => "{$database}.{$table}",
-            $tables
-        );
-    }
-
-    /**
-     * Build a minimal environment so mysqldump/mysql work under Apache on Windows.
-     *
-     * @return array<string, string>
-     */
-    protected function processEnvironment(?string $password): array
-    {
-        $systemRoot = $_SERVER['SystemRoot'] ?? getenv('SystemRoot') ?: '';
-        $path = $_SERVER['PATH'] ?? getenv('PATH') ?: '';
-        $temp = sys_get_temp_dir();
-        $env = [
-            'SystemRoot' => $systemRoot,
-            'WINDIR' => $_SERVER['WINDIR'] ?? getenv('WINDIR') ?: $systemRoot,
-            'PATH' => $path,
-            'TEMP' => $temp,
-            'TMP' => $temp,
-        ];
-
-        $filtered = array_filter($env, static fn (string $value): bool => $value !== '');
-
-        $filtered['MYSQL_PWD'] = (string) ($password ?? '');
-
-        return $filtered;
-    }
 }
