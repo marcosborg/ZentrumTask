@@ -22,6 +22,7 @@ use Illuminate\Cookie\Middleware\EncryptCookies;
 use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
 use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Session\Middleware\StartSession;
+use Illuminate\Support\Facades\File;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
 
 class AdminPanelProvider extends PanelProvider
@@ -45,7 +46,7 @@ class AdminPanelProvider extends PanelProvider
         $homeUrl = url('/');
         $defaultGroupsJson = $this->encodeForJs($collapsedGroupLabels);
 
-        return $panel
+        $panel = $panel
             ->default()
             ->id('admin')
             ->path('admin')
@@ -54,7 +55,6 @@ class AdminPanelProvider extends PanelProvider
             ->colors([
                 'primary' => Color::Amber,
             ])
-            ->viteTheme('resources/css/filament/admin/theme.css')
             ->navigationGroups($navigationGroups)
             ->renderHook(
                 PanelsRenderHook::BODY_END,
@@ -375,10 +375,22 @@ class AdminPanelProvider extends PanelProvider
             ->authMiddleware([
                 Authenticate::class,
             ]);
+
+        if ($this->hasBuiltViteAssets()) {
+            $panel->viteTheme('resources/css/filament/admin/theme.css');
+        }
+
+        return $panel;
     }
 
     private function encodeForJs(array $value): string
     {
         return json_encode($value, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?: '[]';
+    }
+
+    private function hasBuiltViteAssets(): bool
+    {
+        return File::exists(public_path('build/manifest.json'))
+            || File::exists(public_path('hot'));
     }
 }
