@@ -9,6 +9,7 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Throwable;
 
 class AndroidPushNotificationService
@@ -51,6 +52,15 @@ class AndroidPushNotificationService
                 $errorStatus = (string) data_get($response->json(), 'error.status', '');
                 $errorMessage = (string) data_get($response->json(), 'error.message', '');
 
+                Log::warning('FCM push rejected.', [
+                    'task_id' => $task->id,
+                    'device_token_hash' => $deviceToken->token_hash,
+                    'http_status' => $response->status(),
+                    'error_status' => $errorStatus,
+                    'error_message' => $errorMessage,
+                    'response_body' => $response->json() ?: $response->body(),
+                ]);
+
                 if (
                     in_array($response->status(), [400, 404], true)
                     && ($errorStatus === 'INVALID_ARGUMENT' || $errorStatus === 'NOT_FOUND' || str_contains($errorMessage, 'UNREGISTERED'))
@@ -78,13 +88,30 @@ class AndroidPushNotificationService
             return null;
         }
 
-        if (! Storage::disk('local')->exists($relativePath)) {
+        $resolvedPath = $this->resolveCredentialsPath($relativePath);
+
+        if ($resolvedPath === null) {
             return null;
         }
 
-        $decoded = json_decode(Storage::disk('local')->get($relativePath), true);
+        $decoded = json_decode(Storage::disk('local')->get($resolvedPath), true);
 
         return is_array($decoded) ? $decoded : null;
+    }
+
+    protected function resolveCredentialsPath(string $path): ?string
+    {
+        $candidates = collect([$path]);
+
+        if (Str::startsWith($path, 'private/')) {
+            $candidates->push(Str::after($path, 'private/'));
+        } else {
+            $candidates->push('private/'.$path);
+        }
+
+        return $candidates
+            ->map(fn (string $candidate) => trim($candidate, '/'))
+            ->first(fn (string $candidate) => Storage::disk('local')->exists($candidate));
     }
 
     protected function issueAccessToken(array $credentials): string
