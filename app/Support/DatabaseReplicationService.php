@@ -4,6 +4,7 @@ namespace App\Support;
 
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Log;
+use RuntimeException;
 use Symfony\Component\Process\Process;
 use Throwable;
 
@@ -24,8 +25,16 @@ class DatabaseReplicationService
             return DatabaseReplicationResult::failure('A copia so suporta MySQL/MariaDB.');
         }
 
-        $dumpBinary = $this->resolveDumpBinary($sourceProfile['driver']);
-        $importBinary = $this->resolveImportBinary($targetProfile['driver']);
+        try {
+            $dumpBinary = $this->resolveDumpBinary($sourceProfile['driver']);
+            $importBinary = $this->resolveImportBinary($targetProfile['driver']);
+        } catch (RuntimeException $exception) {
+            return DatabaseReplicationResult::failure(
+                $exception->getMessage(),
+                'Binario nao encontrado'
+            );
+        }
+
         $targetDatabaseExists = $this->databaseExists($targetProfile, $importBinary);
 
         if ($targetDatabaseExists === null) {
@@ -282,23 +291,21 @@ class DatabaseReplicationService
     protected function resolveDumpBinary(string $driver): string
     {
         $preferred = (string) Config::get('database.backup.binary', '');
+        $candidates = $driver === 'mariadb'
+            ? ['mariadb-dump', 'mysqldump']
+            : ['mysqldump', 'mariadb-dump'];
 
-        if ($preferred !== '') {
-            return $preferred;
-        }
-
-        return $driver === 'mariadb' ? 'mariadb-dump' : 'mysqldump';
+        return $this->resolveBinary($preferred, $candidates);
     }
 
     protected function resolveImportBinary(string $driver): string
     {
         $preferred = (string) Config::get('database.restore.binary', '');
+        $candidates = $driver === 'mariadb'
+            ? ['mariadb', 'mysql']
+            : ['mysql', 'mariadb'];
 
-        if ($preferred !== '') {
-            return $preferred;
-        }
-
-        return $driver === 'mariadb' ? 'mariadb' : 'mysql';
+        return $this->resolveBinary($preferred, $candidates);
     }
 
     protected function escapeSqlString(string $value): string
@@ -349,5 +356,77 @@ class DatabaseReplicationService
         $filtered['MYSQL_PWD'] = (string) ($password ?? '');
 
         return $filtered;
+    }
+
+    /**
+     * @param  array<int, string>  $fallbacks
+     */
+    protected function resolveBinary(string $preferred, array $fallbacks): string
+    {
+        $candidates = [];
+
+        if ($preferred !== '') {
+            $candidates[] = $preferred;
+        }
+
+        foreach ($fallbacks as $fallback) {
+            $candidates[] = $fallback;
+        }
+
+        foreach ($this->commonMampBinaryPaths($fallbacks) as $candidate) {
+            $candidates[] = $candidate;
+        }
+
+        foreach (array_values(array_unique($candidates)) as $candidate) {
+            if (! $this->looksUsableBinary($candidate)) {
+                continue;
+            }
+
+            return $candidate;
+        }
+
+        throw new RuntimeException('Nao encontrei um binario mysql/mysqldump executavel. Atualize DB_BACKUP_BINARY/DB_RESTORE_BINARY no .env.');
+    }
+
+    protected function looksUsableBinary(string $candidate): bool
+    {
+        if ($candidate === '') {
+            return false;
+        }
+
+        if ($this->isWindowsPath($candidate) && DIRECTORY_SEPARATOR !== '\\') {
+            return false;
+        }
+
+        if (str_contains($candidate, '/') || str_contains($candidate, '\\')) {
+            return is_file($candidate) && is_executable($candidate);
+        }
+
+        $probe = new Process(['sh', '-lc', 'command -v '.escapeshellarg($candidate)]);
+        $probe->setTimeout(5);
+        $probe->run();
+
+        return $probe->isSuccessful();
+    }
+
+    protected function isWindowsPath(string $path): bool
+    {
+        return preg_match('/^[A-Za-z]:[\\\\\\/]/', $path) === 1;
+    }
+
+    /**
+     * @param  array<int, string>  $fallbacks
+     * @return array<int, string>
+     */
+    protected function commonMampBinaryPaths(array $fallbacks): array
+    {
+        $paths = [];
+
+        foreach ($fallbacks as $binary) {
+            $paths[] = "/Applications/MAMP/Library/bin/mysql80/bin/{$binary}";
+            $paths[] = "/Applications/MAMP/Library/bin/mysql57/bin/{$binary}";
+        }
+
+        return $paths;
     }
 }
