@@ -14,6 +14,8 @@ use Throwable;
 
 class AndroidPushNotificationService
 {
+    protected const DEFAULT_ANDROID_CHANNEL_ID = 'new-contacts-alerts';
+
     public function sendNewContactTask(Task $task): void
     {
         $credentials = $this->loadCredentials();
@@ -179,12 +181,23 @@ class AndroidPushNotificationService
             'android' => [
                 'priority' => 'high',
                 'notification' => [
-                    'channel_id' => (string) config('services.fcm.android_channel_id', 'new-contacts'),
+                    'channel_id' => $this->resolveAndroidChannelId(),
                     'click_action' => 'OPEN_RESERVED_TASK',
                     'sound' => 'default',
                 ],
             ],
         ];
+    }
+
+    protected function resolveAndroidChannelId(): string
+    {
+        $configuredChannelId = trim((string) config('services.fcm.android_channel_id', ''));
+
+        if ($configuredChannelId === '' || $configuredChannelId === 'new-contacts') {
+            return self::DEFAULT_ANDROID_CHANNEL_ID;
+        }
+
+        return $configuredChannelId;
     }
 
     protected function resolveTokens(Task $task): Collection
