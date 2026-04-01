@@ -1,6 +1,8 @@
 <?php
 
 use App\Http\Controllers\BlogController;
+use App\Http\Controllers\AppAuthController;
+use App\Http\Controllers\AppKanbanController;
 use App\Http\Controllers\AppContactController;
 use App\Http\Controllers\AppCandidateApplicationController;
 use App\Http\Controllers\AppFrontpageDataController;
@@ -12,6 +14,45 @@ use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', [WebsiteController::class, 'index']);
+Route::options('/app/auth/login', fn () => response('', 204, [
+    'Access-Control-Allow-Origin' => '*',
+    'Access-Control-Allow-Methods' => 'POST, OPTIONS',
+    'Access-Control-Allow-Headers' => 'Authorization, Content-Type, X-Requested-With, Accept',
+]));
+Route::post('/app/auth/login', [AppAuthController::class, 'login'])
+    ->withoutMiddleware([VerifyCsrfToken::class])
+    ->middleware('throttle:20,1')
+    ->name('app.auth.login');
+Route::options('/app/auth/logout', fn () => response('', 204, [
+    'Access-Control-Allow-Origin' => '*',
+    'Access-Control-Allow-Methods' => 'POST, OPTIONS',
+    'Access-Control-Allow-Headers' => 'Authorization, Content-Type, X-Requested-With, Accept',
+]));
+Route::post('/app/auth/logout', [AppAuthController::class, 'logout'])
+    ->withoutMiddleware([VerifyCsrfToken::class])
+    ->middleware('throttle:20,1')
+    ->name('app.auth.logout');
+Route::options('/app/kanban/{path?}', fn () => response('', 204, [
+    'Access-Control-Allow-Origin' => '*',
+    'Access-Control-Allow-Methods' => 'GET, POST, OPTIONS',
+    'Access-Control-Allow-Headers' => 'Authorization, Content-Type, X-Requested-With, Accept',
+]))->where('path', '.*');
+Route::get('/app/kanban', [AppKanbanController::class, 'index'])
+    ->withoutMiddleware([VerifyCsrfToken::class])
+    ->middleware('throttle:60,1')
+    ->name('app.kanban.index');
+Route::get('/app/kanban/tasks/{task}', [AppKanbanController::class, 'show'])
+    ->withoutMiddleware([VerifyCsrfToken::class])
+    ->middleware('throttle:60,1')
+    ->name('app.kanban.tasks.show');
+Route::post('/app/kanban/tasks/{task}/comments', [AppKanbanController::class, 'addComment'])
+    ->withoutMiddleware([VerifyCsrfToken::class])
+    ->middleware('throttle:60,1')
+    ->name('app.kanban.tasks.comments');
+Route::post('/app/kanban/tasks/{task}/move', [AppKanbanController::class, 'move'])
+    ->withoutMiddleware([VerifyCsrfToken::class])
+    ->middleware('throttle:60,1')
+    ->name('app.kanban.tasks.move');
 Route::options('/app/frontpage', fn () => response('', 204, [
     'Access-Control-Allow-Origin' => '*',
     'Access-Control-Allow-Methods' => 'GET, OPTIONS',
