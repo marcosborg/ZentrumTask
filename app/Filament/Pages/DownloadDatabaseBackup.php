@@ -8,8 +8,10 @@ use Filament\Actions\Action;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Filament\Support\Icons\Heroicon;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
+use Throwable;
 use UnitEnum;
 
 class DownloadDatabaseBackup extends Page
@@ -30,6 +32,14 @@ class DownloadDatabaseBackup extends Page
     protected function getHeaderActions(): array
     {
         return [
+            Action::make('optimizeClear')
+                ->label('Correr optimize:clear')
+                ->color('primary')
+                ->icon(Heroicon::OutlinedWrenchScrewdriver)
+                ->requiresConfirmation()
+                ->modalHeading('Limpar caches do Laravel')
+                ->modalDescription('Corre o comando optimize:clear no servidor atual para limpar config, routes, views e caches.')
+                ->action(fn () => $this->runOptimizeClear()),
             Action::make('productionToSandbox')
                 ->label('Copiar producao -> sandbox')
                 ->color('danger')
@@ -72,6 +82,30 @@ class DownloadDatabaseBackup extends Page
         }
 
         $notification->send();
+    }
+
+    protected function runOptimizeClear(): void
+    {
+        try {
+            Artisan::call('optimize:clear');
+
+            $output = trim(Artisan::output());
+            $body = $output !== ''
+                ? mb_strimwidth($output, 0, 400, '...')
+                : 'Caches limpas com sucesso.';
+
+            Notification::make()
+                ->success()
+                ->title('optimize:clear executado')
+                ->body($body)
+                ->send();
+        } catch (Throwable $exception) {
+            Notification::make()
+                ->danger()
+                ->title('Falha ao correr optimize:clear')
+                ->body($exception->getMessage())
+                ->send();
+        }
     }
 
     protected function toggleLabel(): string
