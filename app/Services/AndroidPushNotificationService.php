@@ -21,12 +21,30 @@ class AndroidPushNotificationService
         $credentials = $this->loadCredentials();
 
         if ($credentials === null) {
+            Log::warning('PUSH_DEBUG fcm sendNewContactTask:missing_credentials', [
+                'task_id' => $task->id,
+                'service_account' => config('services.fcm.service_account'),
+            ]);
+
             return;
         }
 
         $tokens = $this->resolveTokens($task);
 
+        Log::info('PUSH_DEBUG fcm sendNewContactTask:resolved', [
+            'task_id' => $task->id,
+            'assigned_to_id' => $task->assigned_to_id,
+            'token_count' => $tokens->count(),
+            'token_hashes' => $tokens->pluck('token_hash')->values()->all(),
+            'project_id' => (string) Arr::get($credentials, 'project_id', config('services.fcm.project_id', '')),
+            'channel_id' => $this->resolveAndroidChannelId(),
+        ]);
+
         if ($tokens->isEmpty()) {
+            Log::warning('PUSH_DEBUG fcm sendNewContactTask:no_tokens', [
+                'task_id' => $task->id,
+            ]);
+
             return;
         }
 
@@ -35,6 +53,12 @@ class AndroidPushNotificationService
             $projectId = (string) Arr::get($credentials, 'project_id', config('services.fcm.project_id', ''));
 
             if ($accessToken === '' || $projectId === '') {
+                Log::warning('PUSH_DEBUG fcm sendNewContactTask:missing_access_token_or_project', [
+                    'task_id' => $task->id,
+                    'has_access_token' => $accessToken !== '',
+                    'project_id' => $projectId,
+                ]);
+
                 return;
             }
 
@@ -48,6 +72,12 @@ class AndroidPushNotificationService
                     ]);
 
                 if ($response->successful()) {
+                    Log::info('PUSH_DEBUG fcm sendNewContactTask:sent', [
+                        'task_id' => $task->id,
+                        'device_token_hash' => $deviceToken->token_hash,
+                        'http_status' => $response->status(),
+                    ]);
+
                     continue;
                 }
 
@@ -73,9 +103,19 @@ class AndroidPushNotificationService
 
             if ($invalidTokenHashes->isNotEmpty()) {
                 AppDeviceToken::query()->whereIn('token_hash', $invalidTokenHashes->all())->delete();
+
+                Log::warning('PUSH_DEBUG fcm sendNewContactTask:invalid_tokens_deleted', [
+                    'task_id' => $task->id,
+                    'invalid_token_hashes' => $invalidTokenHashes->values()->all(),
+                ]);
             }
         } catch (Throwable $exception) {
             Log::warning('FCM push failed.', [
+                'task_id' => $task->id,
+                'message' => $exception->getMessage(),
+            ]);
+
+            Log::warning('PUSH_DEBUG fcm sendNewContactTask:exception', [
                 'task_id' => $task->id,
                 'message' => $exception->getMessage(),
             ]);
