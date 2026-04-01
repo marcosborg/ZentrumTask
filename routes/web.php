@@ -2,6 +2,8 @@
 
 use App\Http\Controllers\BlogController;
 use App\Http\Controllers\AppAuthController;
+use App\Http\Controllers\AppDeviceTokenController;
+use App\Http\Controllers\AppOpsController;
 use App\Http\Controllers\AppKanbanController;
 use App\Http\Controllers\AppContactController;
 use App\Http\Controllers\AppCandidateApplicationController;
@@ -34,13 +36,39 @@ Route::post('/app/auth/logout', [AppAuthController::class, 'logout'])
     ->name('app.auth.logout');
 Route::options('/app/kanban/{path?}', fn () => response('', 204, [
     'Access-Control-Allow-Origin' => '*',
-    'Access-Control-Allow-Methods' => 'GET, POST, OPTIONS',
+    'Access-Control-Allow-Methods' => 'GET, POST, DELETE, OPTIONS',
+    'Access-Control-Allow-Headers' => 'Authorization, Content-Type, X-Requested-With, Accept',
+]))->where('path', '.*');
+Route::options('/app/ops/{path?}', fn () => response('', 204, [
+    'Access-Control-Allow-Origin' => '*',
+    'Access-Control-Allow-Methods' => 'GET, OPTIONS',
+    'Access-Control-Allow-Headers' => 'Authorization, Content-Type, X-Requested-With, Accept',
+]))->where('path', '.*');
+Route::options('/app/devices/{path?}', fn () => response('', 204, [
+    'Access-Control-Allow-Origin' => '*',
+    'Access-Control-Allow-Methods' => 'POST, OPTIONS',
     'Access-Control-Allow-Headers' => 'Authorization, Content-Type, X-Requested-With, Accept',
 ]))->where('path', '.*');
 Route::get('/app/kanban', [AppKanbanController::class, 'index'])
     ->withoutMiddleware([VerifyCsrfToken::class])
     ->middleware('throttle:60,1')
     ->name('app.kanban.index');
+Route::get('/app/kanban/search', [AppKanbanController::class, 'search'])
+    ->withoutMiddleware([VerifyCsrfToken::class])
+    ->middleware('throttle:60,1')
+    ->name('app.kanban.search');
+Route::get('/app/ops/overview', [AppOpsController::class, 'overview'])
+    ->withoutMiddleware([VerifyCsrfToken::class])
+    ->middleware('throttle:60,1')
+    ->name('app.ops.overview');
+Route::post('/app/devices/register', [AppDeviceTokenController::class, 'store'])
+    ->withoutMiddleware([VerifyCsrfToken::class])
+    ->middleware('throttle:120,1')
+    ->name('app.devices.register');
+Route::post('/app/devices/unregister', [AppDeviceTokenController::class, 'destroy'])
+    ->withoutMiddleware([VerifyCsrfToken::class])
+    ->middleware('throttle:120,1')
+    ->name('app.devices.unregister');
 Route::get('/app/kanban/tasks/{task}', [AppKanbanController::class, 'show'])
     ->withoutMiddleware([VerifyCsrfToken::class])
     ->middleware('throttle:60,1')
@@ -53,6 +81,18 @@ Route::post('/app/kanban/tasks/{task}/move', [AppKanbanController::class, 'move'
     ->withoutMiddleware([VerifyCsrfToken::class])
     ->middleware('throttle:60,1')
     ->name('app.kanban.tasks.move');
+Route::delete('/app/kanban/tasks/{task}', [AppKanbanController::class, 'destroy'])
+    ->withoutMiddleware([VerifyCsrfToken::class])
+    ->middleware('throttle:60,1')
+    ->name('app.kanban.tasks.destroy');
+Route::post('/app/kanban/tasks/{task}/restore', [AppKanbanController::class, 'restore'])
+    ->withoutMiddleware([VerifyCsrfToken::class])
+    ->middleware('throttle:60,1')
+    ->name('app.kanban.tasks.restore');
+Route::post('/app/kanban/contacts', [AppKanbanController::class, 'storeContact'])
+    ->withoutMiddleware([VerifyCsrfToken::class])
+    ->middleware('throttle:60,1')
+    ->name('app.kanban.contacts.store');
 Route::options('/app/frontpage', fn () => response('', 204, [
     'Access-Control-Allow-Origin' => '*',
     'Access-Control-Allow-Methods' => 'GET, OPTIONS',

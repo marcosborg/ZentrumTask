@@ -6,6 +6,7 @@ use App\Http\Requests\ContactTaskRequest;
 use App\Models\CmsPage;
 use App\Models\Stage;
 use App\Models\Task;
+use App\Services\AndroidPushNotificationService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -48,7 +49,7 @@ class WebsiteController extends Controller
         ]);
     }
 
-    public static function createContactLead(array $data, string $source = 'website_form'): bool
+    public static function createContactLead(array $data, string $source = 'website_form'): ?Task
     {
         $stage = Stage::query()
             ->where('board_id', 1)
@@ -61,15 +62,15 @@ class WebsiteController extends Controller
                 ->first();
 
         if (! $stage) {
-            return false;
+            return null;
         }
 
-        DB::transaction(function () use ($data, $stage, $source): void {
+        $task = DB::transaction(function () use ($data, $stage, $source): Task {
             $nextPosition = (int) Task::query()
                 ->where('stage_id', $stage->id)
                 ->max('position');
 
-            Task::query()->create([
+            return Task::query()->create([
                 'board_id' => 1,
                 'stage_id' => $stage->id,
                 'title' => 'Lead: '.$data['name'],
@@ -84,6 +85,10 @@ class WebsiteController extends Controller
             ]);
         });
 
-        return true;
+        $task->load(['assignedTo', 'stage']);
+
+        app(AndroidPushNotificationService::class)->sendNewContactTask($task);
+
+        return $task;
     }
 }

@@ -60,4 +60,10 @@ return [
         'model' => env('OPENAI_MODEL', 'gpt-4.1-mini'),
     ],
 
+    'fcm' => [
+        'service_account' => env('FCM_SERVICE_ACCOUNT', 'private/firebase-service-account.json'),
+        'project_id' => env('FCM_PROJECT_ID'),
+        'android_channel_id' => env('FCM_ANDROID_CHANNEL_ID', 'new-contacts'),
+    ],
+
 ];
