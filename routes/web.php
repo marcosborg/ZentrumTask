@@ -4,6 +4,7 @@ use App\Http\Controllers\BlogController;
 use App\Http\Controllers\AppAuthController;
 use App\Http\Controllers\AppDeviceTokenController;
 use App\Http\Controllers\AppOpsController;
+use App\Http\Controllers\AppVehicleHandoverProcedureController;
 use App\Http\Controllers\AppKanbanController;
 use App\Http\Controllers\AppContactController;
 use App\Http\Controllers\AppCandidateApplicationController;
@@ -41,7 +42,7 @@ Route::options('/app/kanban/{path?}', fn () => response('', 204, [
 ]))->where('path', '.*');
 Route::options('/app/ops/{path?}', fn () => response('', 204, [
     'Access-Control-Allow-Origin' => '*',
-    'Access-Control-Allow-Methods' => 'GET, OPTIONS',
+    'Access-Control-Allow-Methods' => 'GET, POST, OPTIONS',
     'Access-Control-Allow-Headers' => 'Authorization, Content-Type, X-Requested-With, Accept',
 ]))->where('path', '.*');
 Route::options('/app/devices/{path?}', fn () => response('', 204, [
@@ -61,6 +62,18 @@ Route::get('/app/ops/overview', [AppOpsController::class, 'overview'])
     ->withoutMiddleware([VerifyCsrfToken::class])
     ->middleware('throttle:60,1')
     ->name('app.ops.overview');
+Route::get('/app/ops/vehicle-handovers', [AppVehicleHandoverProcedureController::class, 'index'])
+    ->withoutMiddleware([VerifyCsrfToken::class])
+    ->middleware('throttle:60,1')
+    ->name('app.ops.vehicle-handovers.index');
+Route::post('/app/ops/vehicle-handovers', [AppVehicleHandoverProcedureController::class, 'store'])
+    ->withoutMiddleware([VerifyCsrfToken::class])
+    ->middleware('throttle:30,1')
+    ->name('app.ops.vehicle-handovers.store');
+Route::get('/app/ops/vehicle-handovers/{vehicleHandoverProcedure}', [AppVehicleHandoverProcedureController::class, 'show'])
+    ->withoutMiddleware([VerifyCsrfToken::class])
+    ->middleware('throttle:60,1')
+    ->name('app.ops.vehicle-handovers.show');
 Route::post('/app/devices/register', [AppDeviceTokenController::class, 'store'])
     ->withoutMiddleware([VerifyCsrfToken::class])
     ->middleware('throttle:120,1')
