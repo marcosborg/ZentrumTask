@@ -45,6 +45,7 @@ class Driver extends Model
         'tvde_platforms',
         'bank_account_holder',
         'deposit_amount',
+        'deposit_initial_amount',
         'deposit_paid_at',
         'deposit_payment_method',
         'contract_file',
@@ -85,6 +86,11 @@ class Driver extends Model
         return $this->hasMany(DriverBalanceMovement::class);
     }
 
+    public function depositDebits(): HasMany
+    {
+        return $this->hasMany(DriverDepositDebit::class);
+    }
+
     public function candidateApplication(): \Illuminate\Database\Eloquent\Relations\BelongsTo
     {
         return $this->belongsTo(CandidateApplication::class);
@@ -123,6 +129,7 @@ class Driver extends Model
             'deposit_paid_at' => 'date',
             'tvde_platforms' => 'array',
             'deposit_amount' => 'decimal:2',
+            'deposit_initial_amount' => 'decimal:2',
             'other_documents' => 'array',
         ];
     }

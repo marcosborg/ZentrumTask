@@ -371,11 +371,15 @@ class DriverSettlementCalculator
                 ->orderByDesc('id')
                 ->first(['weekly_km']);
 
-            if (! $previous) {
-                continue;
+            $weeklyKm = (float) $row->weekly_km;
+
+            if ($previous) {
+                $previousKm = (float) $previous->weekly_km;
+                $weeklyKm = $weeklyKm >= $previousKm
+                    ? max(0.0, $weeklyKm - $previousKm)
+                    : $weeklyKm;
             }
 
-            $weeklyKm = max(0.0, (float) $row->weekly_km - (float) $previous->weekly_km);
             $extraKm = max(0.0, $weeklyKm - $limit);
             $total += $extraKm * $rate;
         }

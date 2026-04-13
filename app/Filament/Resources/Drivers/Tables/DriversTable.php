@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\Drivers\Tables;
 
 use App\Models\VehicleAllocation;
+use App\Services\DriverDepositService;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
@@ -68,6 +69,14 @@ class DriversTable
                     ->label('Perfil ativo')
                     ->boolean()
                     ->sortable(),
+                TextColumn::make('deposit_balance')
+                    ->label('Caucao acumulada')
+                    ->state(function ($record): string {
+                        $summary = app(DriverDepositService::class)->summaryForDriver($record);
+
+                        return number_format((float) $summary['current_balance'], 2, ',', ' ').' €';
+                    })
+                    ->alignRight(),
                 TextColumn::make('created_at')
                     ->dateTime()
                     ->sortable()

@@ -58,8 +58,13 @@ class SettlementBillingResolver
         ];
     }
 
-    public function calculateRentalDays(Driver $driver, Carbon $start, Carbon $end, ?Collection $allocations = null): int
-    {
+    public function calculateRentalDays(
+        Driver $driver,
+        Carbon $start,
+        Carbon $end,
+        ?Collection $allocations = null,
+        ?DriverBillingProfile $profile = null
+    ): int {
         $allocations = $allocations ?? VehicleAllocation::query()
             ->where('driver_id', $driver->id)
             ->where('starts_at', '<=', $end)
@@ -73,6 +78,21 @@ class SettlementBillingResolver
             return 0;
         }
 
+        $billingStart = $start->copy();
+        $billingEnd = $end->copy();
+
+        if ($profile?->valid_from) {
+            $billingStart = $billingStart->max(Carbon::parse($profile->valid_from)->startOfDay());
+        }
+
+        if ($profile?->valid_to) {
+            $billingEnd = $billingEnd->min(Carbon::parse($profile->valid_to)->endOfDay());
+        }
+
+        if ($billingStart->gt($billingEnd)) {
+            return 0;
+        }
+
         $days = [];
 
         foreach ($allocations as $allocation) {
@@ -81,10 +101,10 @@ class SettlementBillingResolver
                 : Carbon::parse($allocation->starts_at);
             $allocationEnd = $allocation->ends_at
                 ? ($allocation->ends_at instanceof Carbon ? $allocation->ends_at : Carbon::parse($allocation->ends_at))
-                : $end;
+                : $billingEnd;
 
-            $overlapStart = $allocationStart->copy()->max($start)->startOfDay();
-            $overlapEnd = $allocationEnd->copy()->min($end)->endOfDay();
+            $overlapStart = $allocationStart->copy()->max($billingStart)->startOfDay();
+            $overlapEnd = $allocationEnd->copy()->min($billingEnd)->endOfDay();
 
             if ($overlapStart->gt($overlapEnd)) {
                 continue;
@@ -154,7 +174,7 @@ class SettlementBillingResolver
         $profile = $profileResult['profile'];
 
         $rentalDays = $status === 'ok'
-            ? $this->calculateRentalDays($driver, $start, $end, $allocations)
+            ? $this->calculateRentalDays($driver, $start, $end, $allocations, $profile)
             : 0;
 
         $rentTotal = $status === 'ok' && $profile

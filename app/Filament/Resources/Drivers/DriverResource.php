@@ -7,10 +7,12 @@ use App\Filament\Resources\Drivers\Pages\EditDriver;
 use App\Filament\Resources\Drivers\Pages\ListDrivers;
 use App\Filament\Resources\Drivers\Tables\DriversTable;
 use App\Models\Driver;
+use App\Services\DriverDepositService;
 use BackedEnum;
 use Filament\Forms\Components\CheckboxList;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\FileUpload;
+use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
@@ -180,15 +182,54 @@ class DriverResource extends Resource
                 Section::make('Caucao')
                     ->columns(3)
                     ->components([
-                        TextInput::make('deposit_amount')
-                            ->label('Valor caucao')
+                        TextInput::make('deposit_initial_amount')
+                            ->label('Valor acordado caucao')
                             ->numeric()
-                            ->step('0.01'),
+                            ->step('0.01')
+                            ->prefix('€'),
+                        TextInput::make('deposit_amount')
+                            ->label('Valor pago no ato inicial')
+                            ->numeric()
+                            ->step('0.01')
+                            ->prefix('€'),
                         DatePicker::make('deposit_paid_at')
                             ->label('Pago em'),
                         TextInput::make('deposit_payment_method')
                             ->label('Metodo de pagamento')
                             ->maxLength(255),
+                        Placeholder::make('deposit_adjustments_total')
+                            ->label('Ajustes caucao cobrados')
+                            ->content(function (?Driver $record): string {
+                                if (! $record) {
+                                    return '-';
+                                }
+
+                                $summary = app(DriverDepositService::class)->summaryForDriver($record);
+
+                                return number_format((float) $summary['adjustments_total'], 2, ',', ' ').' €';
+                            }),
+                        Placeholder::make('deposit_debits_total')
+                            ->label('Debitos caucao')
+                            ->content(function (?Driver $record): string {
+                                if (! $record) {
+                                    return '-';
+                                }
+
+                                $summary = app(DriverDepositService::class)->summaryForDriver($record);
+
+                                return number_format((float) $summary['debits_total'], 2, ',', ' ').' €';
+                            }),
+                        Placeholder::make('deposit_balance')
+                            ->label('Caucao acumulada')
+                            ->content(function (?Driver $record): string {
+                                if (! $record) {
+                                    return '-';
+                                }
+
+                                $summary = app(DriverDepositService::class)->summaryForDriver($record);
+
+                                return number_format((float) $summary['current_balance'], 2, ',', ' ').' €';
+                            }),
                     ]),
                 Section::make('Candidatura')
                     ->columns(2)

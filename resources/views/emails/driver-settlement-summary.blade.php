@@ -55,6 +55,12 @@
                     </tr>
                 </table>
 
+                @if (($payload['calculation']['tips_are_informative'] ?? false) === true)
+                    <p style="margin:0 0 20px 0; color:#1f2937; background:#eff6ff; border:1px solid #bfdbfe; padding:10px; border-radius:8px;">
+                        Nota: as gorjetas ja estao incluidas no liquido dos operadores e, neste perfil com 100% para o motorista, nao alteram o valor final a transferir.
+                    </p>
+                @endif
+
                 @if (($payload['calculation']['is_consistent'] ?? true) === false)
                     <p style="margin:0 0 20px 0; color:#92400e; background:#fffbeb; border:1px solid #fde68a; padding:10px; border-radius:8px;">
                         Nota tecnica: diferenca de arredondamento detetada ({{ $payload['calculation']['calculation_difference'] ?? '-' }}).

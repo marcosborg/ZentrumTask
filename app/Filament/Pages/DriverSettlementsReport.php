@@ -13,6 +13,7 @@ use App\Models\PlatformDriverBalance;
 use App\Models\SettlementEmailLog;
 use App\Models\VehicleAllocation;
 use App\Models\VehicleWeeklyMileage;
+use App\Services\DriverDepositService;
 use App\Services\DriverSettlementCalculator;
 use App\Services\SettlementBillingResolver;
 use BackedEnum;
@@ -263,32 +264,32 @@ class DriverSettlementsReport extends Page implements HasTable
                 TextColumn::make('tips_total_balance')
                     ->label('Tips')
                     ->alignRight()
-                    ->formatStateUsing(fn ($state): string => $this->formatMoney($state)),
+                    ->formatStateUsing(fn ($state): string => $this->formatEffectMoney($state, 'add')),
                 TextColumn::make('prio_expenses')
                     ->label('PRIO')
                     ->alignRight()
                     ->state(fn (DriverSettlement $record): float => $this->prioExpensesForSettlement($record)['total'])
-                    ->formatStateUsing(fn ($state): string => $this->formatMoney($state)),
+                    ->formatStateUsing(fn ($state): string => $this->formatEffectMoney($state, 'subtract')),
                 TextColumn::make('via_verde_expenses')
                     ->label('Via Verde')
                     ->alignRight()
                     ->state(fn (DriverSettlement $record): float => $this->viaVerdeExpensesForSettlement($record)['total'])
-                    ->formatStateUsing(fn ($state): string => $this->formatMoney($state)),
+                    ->formatStateUsing(fn ($state): string => $this->formatEffectMoney($state, 'subtract')),
                 TextColumn::make('adjustments_expenses')
                     ->label('Ajustes')
                     ->alignRight()
                     ->state(fn (DriverSettlement $record): float => $this->adjustmentsForSettlement($record)['total'])
-                    ->formatStateUsing(fn ($state): string => $this->formatMoney($state)),
+                    ->formatStateUsing(fn ($state): string => $this->formatEffectMoney(-1 * (float) $state, 'signed')),
                 TextColumn::make('extra_km_expenses')
                     ->label('Km extra')
                     ->alignRight()
                     ->state(fn (DriverSettlement $record): float => $this->extraKmExpensesForSettlement($record)['total'])
-                    ->formatStateUsing(fn ($state): string => $this->formatMoney($state)),
+                    ->formatStateUsing(fn ($state): string => $this->formatEffectMoney($state, 'subtract')),
                 TextColumn::make('expenses_total')
                     ->label('Despesas')
                     ->alignRight()
                     ->state(fn (DriverSettlement $record): float => (float) $record->expenses_total)
-                    ->formatStateUsing(fn ($state): string => $this->formatMoney($state))
+                    ->formatStateUsing(fn ($state): string => $this->formatEffectMoney(-1 * (float) $state, 'signed'))
                     ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('rental_days')
                     ->label('Dias')
@@ -299,7 +300,7 @@ class DriverSettlementsReport extends Page implements HasTable
                     ->label('Aluguer')
                     ->alignRight()
                     ->state(fn (DriverSettlement $record): float => $this->billingFor($record)['rent_total'])
-                    ->formatStateUsing(fn ($state): string => $this->formatMoney($state)),
+                    ->formatStateUsing(fn ($state): string => $this->formatEffectMoney($state, 'subtract')),
                 TextColumn::make('total_liquido_sem_tips')
                     ->label('Valor da semana')
                     ->alignRight()
@@ -314,7 +315,7 @@ class DriverSettlementsReport extends Page implements HasTable
                     ->label('Saldo transitado')
                     ->alignRight()
                     ->state(fn (DriverSettlement $record): float => (float) $record->carry_over_balance)
-                    ->formatStateUsing(fn ($state): string => $this->formatMoney($state)),
+                    ->formatStateUsing(fn ($state): string => $this->formatEffectMoney($state, 'signed')),
                 TextColumn::make('percent_company')
                     ->label('Empresa %')
                     ->alignRight()
@@ -644,7 +645,17 @@ class DriverSettlementsReport extends Page implements HasTable
             ->icon(Heroicon::OutlinedArrowPath)
             ->requiresConfirmation()
             ->modalDescription('Apaga este settlement e recalcula apenas este motorista neste periodo.')
-            ->action(function (DriverSettlement $record): void {
+            ->action(function (?DriverSettlement $record): void {
+                if (! $record) {
+                    Notification::make()
+                        ->danger()
+                        ->title('Settlement indisponivel')
+                        ->body('O registo original ja nao existe. Atualize a tabela e tente novamente.')
+                        ->send();
+
+                    return;
+                }
+
                 $result = $this->recalculateSettlement($record);
 
                 $this->resetBillingCache();
@@ -778,6 +789,8 @@ class DriverSettlementsReport extends Page implements HasTable
                 $prioExpenses = $this->prioExpensesForSettlement($record);
                 $viaVerdeExpenses = $this->viaVerdeExpensesForSettlement($record);
                 $adjustments = $this->adjustmentsForSettlement($record);
+                $depositSummary = $this->depositSummaryForDriver((int) $record->driver_id);
+                $depositHistory = $this->depositHistoryForDriver((int) $record->driver_id);
                 $balance = $this->resolveBalance((int) $record->driver_id);
                 $balanceMovements = $this->balanceMovementsForSettlement($record);
                 $emailLogs = $this->emailLogsForSettlement($record);
@@ -790,6 +803,8 @@ class DriverSettlementsReport extends Page implements HasTable
                     'prioExpenses' => $prioExpenses,
                     'viaVerdeExpenses' => $viaVerdeExpenses,
                     'adjustments' => $adjustments,
+                    'depositSummary' => $depositSummary,
+                    'depositHistory' => $depositHistory,
                     'balance' => $balance,
                     'balanceMovements' => $balanceMovements,
                     'emailLogs' => $emailLogs,
@@ -897,6 +912,8 @@ class DriverSettlementsReport extends Page implements HasTable
                 'amount_due' => $this->formatMoney($amountDue),
                 'calculation_difference' => $this->formatMoney($calculationDifference),
                 'is_consistent' => abs($calculationDifference) < 0.01,
+                'tips_are_informative' => (float) ($billing['percent_driver'] ?? 0) === 100.0
+                    && (float) ($billing['percent_company'] ?? 0) === 0.0,
             ],
             'billing' => [
                 'profile' => $billing['billing_profile_label'] ?? '-',
@@ -1661,14 +1678,18 @@ class DriverSettlementsReport extends Page implements HasTable
                         'period_start' => $row->period_start,
                         'period_end' => $row->period_end,
                         'total_km' => (float) $row->weekly_km,
-                        'weekly_km' => 0.0,
+                        'weekly_km' => (float) $row->weekly_km,
                         'extra_km' => 0.0,
                         'amount' => 0.0,
                         'vehicle_id' => $row->vehicle_id,
                     ];
                 }
 
-                $weeklyKm = max(0.0, (float) $row->weekly_km - (float) $previous->weekly_km);
+                $currentKm = (float) $row->weekly_km;
+                $previousKm = (float) $previous->weekly_km;
+                $weeklyKm = $currentKm >= $previousKm
+                    ? max(0.0, $currentKm - $previousKm)
+                    : $currentKm;
                 $extraKm = max(0.0, $weeklyKm - $limit);
                 $amount = round($extraKm * $rate, 2);
 
@@ -1717,6 +1738,22 @@ class DriverSettlementsReport extends Page implements HasTable
                 'source_file' => $this->sanitizeUtf8($adjustment->source_file),
             ])
             ->all();
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function depositSummaryForDriver(int $driverId): array
+    {
+        return app(DriverDepositService::class)->summaryForDriver($driverId);
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    private function depositHistoryForDriver(int $driverId): array
+    {
+        return app(DriverDepositService::class)->historyForDriver($driverId);
     }
 
     /**
@@ -1906,6 +1943,23 @@ class DriverSettlementsReport extends Page implements HasTable
         }
 
         return number_format((float) $value, 2, ',', ' ')." \u{20AC}";
+    }
+
+    private function formatEffectMoney(mixed $value, string $mode = 'signed'): string
+    {
+        if ($value === null) {
+            return '-';
+        }
+
+        $amount = match ($mode) {
+            'add' => abs((float) $value),
+            'subtract' => -1 * abs((float) $value),
+            default => (float) $value,
+        };
+
+        $sign = $amount > 0 ? '+' : ($amount < 0 ? '-' : '');
+
+        return $sign.number_format(abs($amount), 2, ',', ' ')." \u{20AC}";
     }
 
     private function formatPercent(mixed $value): string

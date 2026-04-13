@@ -205,6 +205,13 @@ class VehicleWeeklyMileageImportService
         }
 
         $normalizedHeader = array_map(fn ($value): string => $this->normalizeHeader((string) $value), $header);
+        $treatFirstRowAsData = $this->shouldTreatFirstCsvRowAsData($normalizedHeader, count($header));
+
+        if ($treatFirstRowAsData) {
+            $normalizedHeader = ['matricula', 'kmtotal'];
+            $header = ['MATRICULA', 'KM_TOTAL'];
+        }
+
         $normalizedToOriginal = [];
 
         foreach ($header as $index => $original) {
@@ -216,6 +223,17 @@ class VehicleWeeklyMileageImportService
         }
 
         $rows = [];
+
+        if ($treatFirstRowAsData) {
+            $row = [];
+
+            foreach ($candidate as $index => $value) {
+                $key = $normalizedHeader[$index] ?? 'col_'.$index;
+                $row[$key] = is_string($value) ? trim($value) : $value;
+            }
+
+            $rows[] = $row;
+        }
 
         while (($data = fgetcsv($handle, 0, $delimiter)) !== false) {
             $hasContent = count(array_filter($data, fn ($value): bool => trim((string) $value) !== '')) > 0;
@@ -237,6 +255,21 @@ class VehicleWeeklyMileageImportService
         fclose($handle);
 
         return [$rows, $normalizedHeader, $normalizedToOriginal];
+    }
+
+    /**
+     * @param  array<int, string>  $normalizedHeader
+     */
+    private function shouldTreatFirstCsvRowAsData(array $normalizedHeader, int $columnCount): bool
+    {
+        if ($columnCount !== 2) {
+            return false;
+        }
+
+        $hasPlateHeader = $this->findExactHeader($normalizedHeader, ['matricula', 'plate', 'vehicleplate', 'licenceplate', 'licenseplate']) !== null;
+        $hasKmHeader = $this->findExactHeader($normalizedHeader, ['kmtotal', 'kmacumulado', 'odometro', 'odometer', 'totalkm', 'km', 'kmsemana', 'kmdasemana']) !== null;
+
+        return ! $hasPlateHeader && ! $hasKmHeader;
     }
 
     /**

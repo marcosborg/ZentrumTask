@@ -366,4 +366,78 @@
             </div>
         @endif
     </x-filament::section>
+
+    <x-filament::section heading="Caucao">
+        <div class="grid gap-4 sm:grid-cols-4">
+            <div>
+                <div class="text-xs uppercase text-gray-400">Valor acordado</div>
+                <div class="text-sm font-semibold text-gray-100">
+                    {{ number_format((float) ($depositSummary['agreed_amount'] ?? 0), 2, ',', ' ') }} &euro;
+                </div>
+            </div>
+            <div>
+                <div class="text-xs uppercase text-gray-400">Pago no ato inicial</div>
+                <div class="text-sm font-semibold text-gray-100">
+                    {{ number_format((float) ($depositSummary['paid_amount'] ?? 0), 2, ',', ' ') }} &euro;
+                </div>
+            </div>
+            <div>
+                <div class="text-xs uppercase text-gray-400">Ajustes caucao cobrados</div>
+                <div class="text-sm font-semibold text-gray-100">
+                    {{ number_format((float) ($depositSummary['adjustments_total'] ?? 0), 2, ',', ' ') }} &euro;
+                </div>
+            </div>
+            <div>
+                <div class="text-xs uppercase text-gray-400">Debitos caucao</div>
+                <div class="text-sm font-semibold text-gray-100">
+                    {{ number_format((float) ($depositSummary['debits_total'] ?? 0), 2, ',', ' ') }} &euro;
+                </div>
+            </div>
+        </div>
+
+        <div class="mt-4">
+            <div class="text-xs uppercase text-gray-400">Saldo acumulado</div>
+            <div class="text-sm font-semibold text-gray-100">
+                {{ number_format((float) ($depositSummary['current_balance'] ?? 0), 2, ',', ' ') }} &euro;
+            </div>
+        </div>
+
+        @if (($depositHistory ?? []) !== [])
+            <div class="{{ $tableContainerClasses }}">
+                <div class="{{ $tableScrollClasses }}">
+                    <table class="{{ $tableClasses }}">
+                        <thead class="{{ $theadClasses }}">
+                            <tr>
+                                <th class="{{ $thClasses }} whitespace-nowrap">Data</th>
+                                <th class="{{ $thClasses }} whitespace-nowrap">Tipo</th>
+                                <th class="{{ $thClasses }}">Descricao</th>
+                                <th class="{{ $thClasses }} whitespace-nowrap">Settlement</th>
+                                <th class="{{ $thClasses }} whitespace-nowrap text-right">Movimento</th>
+                                <th class="{{ $thClasses }} whitespace-nowrap text-right">Saldo</th>
+                            </tr>
+                        </thead>
+                        <tbody class="{{ $tbodyClasses }}">
+                            @foreach ($depositHistory as $row)
+                                <tr class="odd:bg-white/[0.02]">
+                                    <td class="{{ $tdClasses }} whitespace-nowrap">{{ $row['occurred_at']?->format('d/m/Y') ?? '-' }}</td>
+                                    <td class="{{ $tdClasses }} whitespace-nowrap">{{ $row['type'] ?? '-' }}</td>
+                                    <td class="{{ $tdClasses }} break-words">
+                                        <div>{{ $row['description'] ?? '-' }}</div>
+                                        @if (! empty($row['notes']))
+                                            <div class="text-xs text-gray-400">{{ $row['notes'] }}</div>
+                                        @endif
+                                    </td>
+                                    <td class="{{ $tdClasses }} whitespace-nowrap">{{ $row['settlement_label'] ?? '-' }}</td>
+                                    <td class="{{ $tdClasses }} whitespace-nowrap text-right">{{ number_format((float) ($row['amount'] ?? 0), 2, ',', ' ') }} &euro;</td>
+                                    <td class="{{ $tdClasses }} whitespace-nowrap text-right">{{ number_format((float) ($row['balance_after'] ?? 0), 2, ',', ' ') }} &euro;</td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        @else
+            <p class="text-sm text-gray-500">Sem historico de caucao.</p>
+        @endif
+    </x-filament::section>
 </div>

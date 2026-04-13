@@ -6,11 +6,15 @@ use App\Filament\Resources\Drivers\DriverResource;
 use App\Models\Company;
 use App\Models\DocumentTemplate;
 use App\Models\VehicleAllocation;
+use App\Services\DriverDepositService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Filament\Actions\Action;
 use Filament\Actions\DeleteAction;
+use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Select;
+use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
+use Filament\Notifications\Notification;
 use Filament\Resources\Pages\EditRecord;
 
 class EditDriver extends EditRecord
@@ -21,6 +25,80 @@ class EditDriver extends EditRecord
     {
         return [
             DeleteAction::make(),
+            Action::make('createDepositDebit')
+                ->label('Debitar caucao')
+                ->icon('heroicon-o-minus-circle')
+                ->color('warning')
+                ->modalHeading('Registar debito de caucao')
+                ->modalSubmitActionLabel('Registar debito')
+                ->modalDescription('Regista um debito sobre a caucao acumulada do motorista.')
+                ->form([
+                    DatePicker::make('occurred_at')
+                        ->label('Data')
+                        ->default(now()->toDateString())
+                        ->required()
+                        ->native(false),
+                    TextInput::make('amount')
+                        ->label('Valor do debito')
+                        ->required()
+                        ->placeholder('Ex.: 75,00'),
+                    TextInput::make('description')
+                        ->label('Descricao')
+                        ->required()
+                        ->maxLength(255),
+                    Textarea::make('notes')
+                        ->label('Notas')
+                        ->rows(3),
+                ])
+                ->action(function (array $data): void {
+                    $amount = $this->parseLocalizedDecimal($data['amount'] ?? null);
+
+                    if ($amount === null || $amount <= 0) {
+                        Notification::make()
+                            ->danger()
+                            ->title('Preencha um valor valido')
+                            ->send();
+
+                        return;
+                    }
+
+                    $description = trim((string) ($data['description'] ?? ''));
+
+                    if ($description === '') {
+                        Notification::make()
+                            ->danger()
+                            ->title('Preencha uma descricao')
+                            ->send();
+
+                        return;
+                    }
+
+                    app(DriverDepositService::class)->createDebitForDriver($this->record, [
+                        'occurred_at' => $data['occurred_at'] ?? now()->toDateString(),
+                        'amount' => $amount,
+                        'description' => $description,
+                        'notes' => $data['notes'] ?? null,
+                    ]);
+
+                    Notification::make()
+                        ->success()
+                        ->title('Debito de caucao registado')
+                        ->send();
+                }),
+            Action::make('viewDepositHistory')
+                ->label('Historico caucao')
+                ->icon('heroicon-o-banknotes')
+                ->modalHeading('Historico de caucao')
+                ->modalSubmitAction(false)
+                ->modalCancelActionLabel('Fechar')
+                ->modalContent(function () {
+                    $service = app(DriverDepositService::class);
+
+                    return view('filament.pages.partials.driver-deposit-history-list', [
+                        'summary' => $service->summaryForDriver($this->record),
+                        'history' => $service->historyForDriver($this->record),
+                    ]);
+                }),
             Action::make('generatePdf')
                 ->label('Gerar documento PDF')
                 ->icon('heroicon-o-document-text')
@@ -218,5 +296,32 @@ HTML;
         } catch (\Throwable $e) {
             return (string) $value;
         }
+    }
+
+    private function parseLocalizedDecimal(mixed $value): ?float
+    {
+        if ($value === null) {
+            return null;
+        }
+
+        $normalized = trim((string) $value);
+
+        if ($normalized === '') {
+            return null;
+        }
+
+        $normalized = preg_replace('/[^\d,.\-]/', '', $normalized) ?? '';
+
+        if ($normalized === '') {
+            return null;
+        }
+
+        if (str_contains($normalized, ',') && str_contains($normalized, '.')) {
+            $normalized = str_replace('.', '', $normalized);
+        }
+
+        $normalized = str_replace(',', '.', $normalized);
+
+        return round((float) $normalized, 2);
     }
 }
