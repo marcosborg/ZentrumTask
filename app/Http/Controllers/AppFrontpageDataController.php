@@ -3,12 +3,12 @@
 namespace App\Http\Controllers;
 
 use App\Models\BlogPost;
-use App\Models\Fleet;
-use App\Models\Hero;
 use App\Models\CmsPage;
+use App\Models\Hero;
 use App\Models\Service;
 use App\Models\Stat;
 use App\Models\Testimonial;
+use App\Models\Vehicle;
 use App\Models\WebsiteMenuItem;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Schema;
@@ -55,8 +55,8 @@ class AppFrontpageDataController extends Controller
             ? Testimonial::query()->latest('id')->get()
             : collect();
 
-        $fleets = Schema::hasTable('fleets')
-            ? Fleet::query()->latest('id')->get()
+        $vehicles = Schema::hasTable('vehicles')
+            ? Vehicle::query()->with('websitePhotos')->websiteCatalog()->get()
             : collect();
 
         $blogPosts = Schema::hasTable('blog_posts')
@@ -115,12 +115,16 @@ class AppFrontpageDataController extends Controller
                     ? $this->productionUrl(asset('storage/'.$testimonial->photo_path))
                     : null,
             ])->values()->all(),
-            'fleets' => $fleets->map(fn (Fleet $fleet) => [
-                'id' => $fleet->id,
-                'name' => $fleet->name,
-                'image_url' => $this->productionUrl(
-                    $fleet->photo_path ? asset('storage/'.$fleet->photo_path) : asset('website/assets/car_sedan.png')
-                ),
+            'fleets' => $vehicles->map(fn (Vehicle $vehicle) => [
+                'id' => $vehicle->id,
+                'name' => $vehicle->displayName(),
+                'brand' => $vehicle->make,
+                'model' => trim((string) collect([$vehicle->model, $vehicle->trim])->filter()->implode(' ')),
+                'price' => null,
+                'availability' => $vehicle->websiteAvailabilityLabel(),
+                'availability_status' => $vehicle->status,
+                'url' => $this->productionUrl($vehicle->publicUrl()),
+                'image_url' => $this->productionUrl($vehicle->primaryImageUrl()),
             ])->values()->all(),
             'steps' => [
                 'Registe-se na plataforma',

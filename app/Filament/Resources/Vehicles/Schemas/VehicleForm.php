@@ -127,6 +127,11 @@ class VehicleForm
                             ->numeric()
                             ->step('0.01')
                             ->prefix('EUR'),
+                        TextInput::make('weekly_rental_price')
+                            ->label('Aluguer semanal')
+                            ->numeric()
+                            ->step('0.01')
+                            ->prefix('EUR'),
                     ]),
                 Section::make('Fotos')
                     ->columnSpanFull()

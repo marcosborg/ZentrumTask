@@ -76,6 +76,10 @@ class VehiclesTable
                         default => $state,
                     })
                     ->sortable(),
+                TextColumn::make('weekly_rental_price')
+                    ->label('Aluguer semanal')
+                    ->money('EUR')
+                    ->toggleable(),
                 TextColumn::make('currentAllocation.driver.name')
                     ->label('Motorista atual')
                     ->placeholder('-')

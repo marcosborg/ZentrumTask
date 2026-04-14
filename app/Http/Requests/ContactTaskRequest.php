@@ -18,6 +18,9 @@ class ContactTaskRequest extends FormRequest
             'email' => ['required', 'email', 'max:255'],
             'phone' => ['required', 'string', 'max:50'],
             'message' => ['required', 'string', 'max:2000'],
+            'vehicle_id' => ['nullable', 'integer', 'exists:vehicles,id'],
+            'page_url' => ['nullable', 'string', 'max:500'],
+            'source' => ['nullable', 'string', 'max:100'],
         ];
     }
 }

@@ -44,6 +44,7 @@ class VehicleResource extends Resource
         return [
             RelationManagers\VehicleAllocationsRelationManager::class,
             RelationManagers\VehicleDocumentsRelationManager::class,
+            RelationManagers\VehicleWebsitePhotosRelationManager::class,
         ];
     }
 

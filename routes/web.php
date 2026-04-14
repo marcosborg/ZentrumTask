@@ -1,14 +1,14 @@
 <?php
 
-use App\Http\Controllers\BlogController;
 use App\Http\Controllers\AppAuthController;
+use App\Http\Controllers\AppCandidateApplicationController;
+use App\Http\Controllers\AppContactController;
 use App\Http\Controllers\AppDeviceTokenController;
+use App\Http\Controllers\AppFrontpageDataController;
+use App\Http\Controllers\AppKanbanController;
 use App\Http\Controllers\AppOpsController;
 use App\Http\Controllers\AppVehicleHandoverProcedureController;
-use App\Http\Controllers\AppKanbanController;
-use App\Http\Controllers\AppContactController;
-use App\Http\Controllers\AppCandidateApplicationController;
-use App\Http\Controllers\AppFrontpageDataController;
+use App\Http\Controllers\BlogController;
 use App\Http\Controllers\CandidateApplicationController;
 use App\Http\Controllers\MediaProxyController;
 use App\Http\Controllers\WebsiteChatController;
@@ -120,6 +120,8 @@ Route::options('/app/contact', fn () => response('', 204, [
 Route::post('/app/contact', AppContactController::class)
     ->withoutMiddleware([VerifyCsrfToken::class])
     ->name('app.contact.submit');
+Route::get('/frota', [WebsiteController::class, 'listVehicles'])->name('vehicle.index');
+Route::get('/frota/{vehicle}/{slug?}', [WebsiteController::class, 'showVehicle'])->name('vehicle.show');
 Route::options('/app/candidatura', fn () => response('', 204, [
     'Access-Control-Allow-Origin' => '*',
     'Access-Control-Allow-Methods' => 'GET, POST, OPTIONS',

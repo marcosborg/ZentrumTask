@@ -2,7 +2,7 @@
 
 namespace App\View\Components;
 
-use App\Models\Fleet;
+use App\Models\Vehicle;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Schema;
@@ -10,21 +10,22 @@ use Illuminate\View\Component;
 
 class FleetFaqs extends Component
 {
-    public Collection $fleets;
+    public Collection $vehicles;
 
     public function __construct()
     {
-        $this->fleets = Schema::hasTable('fleets')
-            ? Fleet::query()
-                ->latest('id')
+        $this->vehicles = Schema::hasTable('vehicles')
+            ? Vehicle::query()
+                ->with('websitePhotos')
+                ->websiteAvailable()
                 ->get()
-            : (new Fleet)->newCollection();
+            : (new Vehicle)->newCollection();
     }
 
     public function render(): View
     {
         return view('components.fleet-faqs', [
-            'fleets' => $this->fleets,
+            'vehicles' => $this->vehicles,
         ]);
     }
 }

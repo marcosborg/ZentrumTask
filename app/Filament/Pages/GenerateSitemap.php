@@ -3,6 +3,7 @@
 namespace App\Filament\Pages;
 
 use App\Models\CmsPage;
+use App\Models\Vehicle;
 use App\Models\WebsiteMenuItem;
 use BackedEnum;
 use Filament\Actions\Action;
@@ -61,6 +62,7 @@ class GenerateSitemap extends Page
 
         $links = collect([
             $baseUrl.'/',
+            route('vehicle.index'),
         ]);
 
         $menuLinks = WebsiteMenuItem::query()
@@ -77,9 +79,15 @@ class GenerateSitemap extends Page
             ->get()
             ->map(fn (CmsPage $page) => url('/cms/'.$page->getKey().'/'.Str::slug($page->title)));
 
+        $fleetLinks = Vehicle::query()
+            ->websiteCatalog()
+            ->get()
+            ->map(fn (Vehicle $vehicle) => $vehicle->publicUrl());
+
         $links = $links
             ->merge($menuLinks)
             ->merge($cmsLinks)
+            ->merge($fleetLinks)
             ->unique()
             ->values();
 
