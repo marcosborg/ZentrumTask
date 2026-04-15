@@ -48,6 +48,13 @@
 
                     <h2 class="fleet-product-title" itemprop="name">{{ $vehicle->displayName() }}</h2>
 
+                    @if ($vehicle->maskedVin())
+                      <div class="fleet-product-subline">
+                        <span>Chassis</span>
+                        <strong>{{ $vehicle->maskedVin() }}</strong>
+                      </div>
+                    @endif
+
                     <div class="fleet-cta-row">
                       <span class="fleet-cta">Ver viatura</span>
                     </div>
@@ -152,6 +159,25 @@
       justify-content: space-between;
       gap: 0.75rem;
       flex-wrap: wrap;
+    }
+
+    .fleet-product-subline {
+      display: flex;
+      align-items: center;
+      gap: 0.45rem;
+      flex-wrap: wrap;
+      color: #5c748f;
+      font-size: 0.92rem;
+    }
+
+    .fleet-product-subline span {
+      font-weight: 700;
+    }
+
+    .fleet-product-subline strong {
+      color: #0f172a;
+      font-weight: 800;
+      letter-spacing: 0.04em;
     }
 
     .fleet-cta-row {

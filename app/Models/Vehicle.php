@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Storage;
 use Spatie\MediaLibrary\HasMedia;
 use Spatie\MediaLibrary\InteractsWithMedia;
 
@@ -121,6 +122,21 @@ class Vehicle extends Model implements HasMedia
         return trim((string) collect([$this->make, $this->model, $this->trim])->filter()->implode(' '));
     }
 
+    public function maskedVin(): ?string
+    {
+        $vin = strtoupper(trim((string) $this->vin));
+
+        if ($vin === '') {
+            return null;
+        }
+
+        if (strlen($vin) <= 4) {
+            return 'XXXX';
+        }
+
+        return substr($vin, 0, -4).'XXXX';
+    }
+
     public function publicSlug(): string
     {
         return Str::slug($this->displayName().' '.$this->license_plate) ?: 'viatura-'.$this->getKey();
@@ -169,7 +185,7 @@ class Vehicle extends Model implements HasMedia
         return $websitePhotos
             ->pluck('photo_path')
             ->filter()
-            ->map(fn (string $path): string => asset('storage/'.$path))
+            ->map(fn (string $path): string => Storage::disk('public')->url($path))
             ->values()
             ->all();
     }

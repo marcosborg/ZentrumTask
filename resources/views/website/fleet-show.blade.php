@@ -86,20 +86,32 @@
                 <span>Modelo</span>
                 <strong>{{ trim((string) collect([$vehicle->model, $vehicle->trim])->filter()->implode(' ')) ?: '-' }}</strong>
               </div>
+              @if ($vehicle->maskedVin())
+                <div class="fleet-detail-meta-item">
+                  <span>Chassis</span>
+                  <strong>{{ $vehicle->maskedVin() }}</strong>
+                </div>
+              @endif
             </div>
 
             <p class="fleet-detail-excerpt">{{ $vehicle->notes ?: 'Ficha publica da viatura TVDE com informacao de estado e contacto imediato para a equipa.' }}</p>
 
             <div class="fleet-detail-actions">
-              <a href="#pedido-viatura" class="btn btn-primary btn-lg fleet-detail-primary">Pedir contacto</a>
               <a href="tel:256112333" class="btn btn-outline-secondary btn-lg">Ligar agora</a>
             </div>
+          </div>
 
-            <div class="fleet-trust-list">
-              <span>URL propria para indexacao</span>
-              <span>Estado sincronizado com o backoffice</span>
-              <span>Contexto enviado para o kanban</span>
-            </div>
+          <div class="fleet-contact-shell mt-4" id="pedido-viatura">
+            <x-contact
+              :vehicle="$vehicle"
+              heading="Pedir contacto sobre esta viatura"
+              intro="A task sera criada com o titulo '{{ $vehicle->displayName() }} - ' + nome do contacto para acelerar o seguimento pela equipa."
+              submit-label="Quero saber mais"
+              source="website_vehicle_product"
+              anchor=""
+              container-class="p-0"
+              :show-success="true"
+            />
           </div>
         </div>
       </div>
@@ -108,29 +120,16 @@
 
   <section class="container pb-4">
     <div class="row g-4">
-      <div class="col-lg-7">
-        <div class="fleet-copy-card">
-          <h2>Descricao da viatura</h2>
-          <div class="fleet-copy-body">
-            {!! nl2br(e($vehicle->notes ?: 'Adicione notas operacionais na viatura para enriquecer a ficha publica. Esta pagina ja expõe marca, modelo, matricula, estado e fotos reais da viatura.')) !!}
+      @if (filled($vehicle->notes))
+        <div class="col-lg-7">
+          <div class="fleet-copy-card">
+            <h2>Descricao da viatura</h2>
+            <div class="fleet-copy-body">
+              {!! nl2br(e($vehicle->notes)) !!}
+            </div>
           </div>
         </div>
-      </div>
-
-      <div class="col-lg-5">
-        <div class="fleet-contact-shell" id="pedido-viatura">
-          <x-contact
-            :vehicle="$vehicle"
-            heading="Pedir contacto sobre esta viatura"
-            intro="A task sera criada com o titulo '{{ $vehicle->displayName() }} - ' + nome do contacto para acelerar o seguimento pela equipa."
-            submit-label="Quero saber mais"
-            source="website_vehicle_product"
-            anchor=""
-            container-class="p-0"
-            :show-success="true"
-          />
-        </div>
-      </div>
+      @endif
     </div>
   </section>
 @endsection
