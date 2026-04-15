@@ -284,6 +284,12 @@
       color: #0f172a;
     }
 
+    .fleet-cta-row {
+      display: flex;
+      align-items: center;
+      justify-content: flex-start;
+    }
+
     .fleet-cta {
       color: #2a66b5;
       font-weight: 800;
@@ -310,8 +316,3 @@
     }
   </style>
 @endpushOnce
-    .fleet-cta-row {
-      display: flex;
-      align-items: center;
-      justify-content: flex-start;
-    }
