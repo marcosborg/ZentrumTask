@@ -4,6 +4,7 @@ namespace App\Filament\Resources\Vehicles;
 
 use App\Filament\Resources\Vehicles\Pages\CreateVehicle;
 use App\Filament\Resources\Vehicles\Pages\EditVehicle;
+use App\Filament\Resources\Vehicles\Pages\EditVehicleInitialPhotos;
 use App\Filament\Resources\Vehicles\Pages\ListVehicles;
 use App\Filament\Resources\Vehicles\Schemas\VehicleForm;
 use App\Filament\Resources\Vehicles\Tables\VehiclesTable;
@@ -71,6 +72,7 @@ class VehicleResource extends Resource
             'index' => ListVehicles::route('/'),
             'create' => CreateVehicle::route('/create'),
             'edit' => EditVehicle::route('/{record}/edit'),
+            'initial-photos' => EditVehicleInitialPhotos::route('/{record}/initial-photos'),
         ];
     }
 }

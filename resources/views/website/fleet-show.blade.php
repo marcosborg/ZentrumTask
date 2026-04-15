@@ -86,10 +86,6 @@
                 <span>Modelo</span>
                 <strong>{{ trim((string) collect([$vehicle->model, $vehicle->trim])->filter()->implode(' ')) ?: '-' }}</strong>
               </div>
-              <div class="fleet-detail-meta-item">
-                <span>Matricula</span>
-                <strong>{{ $vehicle->license_plate }}</strong>
-              </div>
             </div>
 
             <p class="fleet-detail-excerpt">{{ $vehicle->notes ?: 'Ficha publica da viatura TVDE com informacao de estado e contacto imediato para a equipa.' }}</p>

@@ -14,13 +14,11 @@ class EditVehicle extends EditRecord
     protected function getHeaderActions(): array
     {
         return [
-            Action::make('togglePhotos')
-                ->label(request()->boolean('photos') ? 'Ocultar fotos' : 'Mostrar fotos')
+            Action::make('initialPhotos')
+                ->label('Fotografias iniciais')
                 ->icon('heroicon-o-photo')
                 ->color('gray')
-                ->url(fn (): string => request()->boolean('photos')
-                    ? request()->url()
-                    : request()->fullUrlWithQuery(['photos' => 1])),
+                ->url(VehicleResource::getUrl('initial-photos', ['record' => $this->record])),
             DeleteAction::make(),
         ];
     }

@@ -166,19 +166,10 @@ class Vehicle extends Model implements HasMedia
             ? $this->websitePhotos
             : $this->websitePhotos()->get();
 
-        if ($websitePhotos->isNotEmpty()) {
-            return $websitePhotos
-                ->pluck('photo_path')
-                ->filter()
-                ->map(fn (string $path): string => asset('storage/'.$path))
-                ->values()
-                ->all();
-        }
-
-        return collect($this->getMedia('vehicle_photos'))
-            ->map(fn ($media): string => route('media.proxy', [
-                'uuid' => $media->uuid,
-            ]))
+        return $websitePhotos
+            ->pluck('photo_path')
+            ->filter()
+            ->map(fn (string $path): string => asset('storage/'.$path))
             ->values()
             ->all();
     }

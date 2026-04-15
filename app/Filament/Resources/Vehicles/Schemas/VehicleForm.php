@@ -4,12 +4,10 @@ namespace App\Filament\Resources\Vehicles\Schemas;
 
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Select;
-use Filament\Forms\Components\SpatieMediaLibraryFileUpload;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
-use Spatie\MediaLibrary\MediaCollections\Models\Media;
 
 class VehicleForm
 {
@@ -132,47 +130,6 @@ class VehicleForm
                             ->numeric()
                             ->step('0.01')
                             ->prefix('EUR'),
-                    ]),
-                Section::make('Fotos')
-                    ->columnSpanFull()
-                    ->columns(1)
-                    ->visible(fn (): bool => ! request()->routeIs('filament.*.resources.vehicles.edit') || request()->boolean('photos'))
-                    ->components([
-                        SpatieMediaLibraryFileUpload::make('vehicle_photos')
-                            ->label('Fotos')
-                            ->collection('vehicle_photos')
-                            ->multiple()
-                            ->columnSpanFull()
-                            ->panelLayout('grid')
-                            ->itemPanelAspectRatio(1)
-                            ->imagePreviewHeight('96')
-                            ->imageResizeMode('cover')
-                            ->extraAttributes([
-                                'class' => 'vehicle-photo-upload',
-                            ])
-                            ->downloadable()
-                            ->openable()
-                            ->reorderable()
-                            ->preserveFilenames()
-                            ->getUploadedFileUsing(static function (SpatieMediaLibraryFileUpload $component, string $file): ?array {
-                                $media = Media::query()->where('uuid', $file)->first();
-
-                                if (! $media) {
-                                    return null;
-                                }
-
-                                $conversion = $component->getConversion();
-
-                                return [
-                                    'name' => $media->getAttributeValue('name') ?? $media->getAttributeValue('file_name'),
-                                    'size' => $media->getAttributeValue('size'),
-                                    'type' => $media->getAttributeValue('mime_type'),
-                                    'url' => route('media.proxy', [
-                                        'uuid' => $media->getAttributeValue('uuid'),
-                                        'conversion' => ($conversion && $media->hasGeneratedConversion($conversion)) ? $conversion : null,
-                                    ]),
-                                ];
-                            }),
                     ]),
             ]);
     }
