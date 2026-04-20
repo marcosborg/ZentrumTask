@@ -518,3 +518,76 @@ it('charges extra km when imported weekly km is lower than a previous cumulative
         ->and($settlement->amount_payable)->toBe('1108.97')
         ->and($settlement->amount_due)->toBe('1108.97');
 });
+
+it('treats imported weekly mileage as the week total even when a previous reading exists', function () {
+    $driver = Driver::factory()->create();
+    $vehicle = Vehicle::query()->create([
+        'license_plate' => 'QA-12-WE',
+        'make' => 'Toyota',
+        'model' => 'Prius',
+        'status' => 'available',
+    ]);
+
+    DriverBillingProfile::factory()->create([
+        'driver_id' => $driver->id,
+        'active' => true,
+        'valid_from' => '2026-01-01',
+        'valid_to' => null,
+        'percent_company' => 0,
+        'percent_driver' => 100,
+        'vat_percent' => 23,
+        'vat_refund_mode' => VatRefundMode::None,
+        'extra_km_limit' => 2000,
+        'extra_km_rate' => 0.12,
+    ]);
+
+    DB::table('platform_driver_balances')->insert([
+        'platform' => 'uber',
+        'driver_code' => 'driver-weekly-total',
+        'driver_id' => $driver->id,
+        'period_start' => '2026-04-13',
+        'period_end' => '2026-04-19',
+        'net_amount' => 1000.00,
+        'tips_amount' => 0.00,
+        'source_file' => 'test.csv',
+        'imported_at' => now(),
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    VehicleWeeklyMileage::query()->create([
+        'vehicle_id' => $vehicle->id,
+        'driver_id' => $driver->id,
+        'period_start' => '2026-04-06',
+        'period_end' => '2026-04-12',
+        'weekly_km' => 1200,
+        'assignment_status' => 'ok',
+        'source_file' => 'kms-old.csv',
+        'imported_at' => now(),
+    ]);
+
+    VehicleWeeklyMileage::query()->create([
+        'vehicle_id' => $vehicle->id,
+        'driver_id' => $driver->id,
+        'period_start' => '2026-04-13',
+        'period_end' => '2026-04-19',
+        'weekly_km' => 2500,
+        'assignment_status' => 'ok',
+        'source_file' => 'kms.csv',
+        'imported_at' => now(),
+    ]);
+
+    $result = app(DriverSettlementCalculator::class)->calculate('2026-04-13', '2026-04-19', $driver->id);
+
+    $settlement = DriverSettlement::query()
+        ->where('driver_id', $driver->id)
+        ->whereDate('period_start', '2026-04-13')
+        ->whereDate('period_end', '2026-04-19')
+        ->firstOrFail();
+
+    expect($result['created'])->toBe(1)
+        ->and((float) data_get($settlement->rules_snapshot, 'extra_km_total'))->toBe(60.0)
+        ->and($settlement->expenses_total)->toBe('60.00')
+        ->and($settlement->amount_payable)->toBe('940.00')
+        ->and($settlement->amount_due)->toBe('940.00');
+});

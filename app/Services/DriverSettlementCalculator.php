@@ -364,21 +364,7 @@ class DriverSettlementCalculator
         $total = 0.0;
 
         foreach ($rows as $row) {
-            $previous = VehicleWeeklyMileage::query()
-                ->where('vehicle_id', $row->vehicle_id)
-                ->whereDate('period_end', '<', $row->period_start)
-                ->orderByDesc('period_end')
-                ->orderByDesc('id')
-                ->first(['weekly_km']);
-
             $weeklyKm = (float) $row->weekly_km;
-
-            if ($previous) {
-                $previousKm = (float) $previous->weekly_km;
-                $weeklyKm = $weeklyKm >= $previousKm
-                    ? max(0.0, $weeklyKm - $previousKm)
-                    : $weeklyKm;
-            }
 
             $extraKm = max(0.0, $weeklyKm - $limit);
             $total += $extraKm * $rate;
