@@ -25,4 +25,9 @@ class VehicleType extends Model
             'weekly_rental_price' => 'decimal:2',
         ];
     }
+
+    public function getDisplayNameAttribute(): string
+    {
+        return trim((string) collect([$this->brand, $this->model, $this->version])->filter()->implode(' '));
+    }
 }

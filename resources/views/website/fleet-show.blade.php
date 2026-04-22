@@ -31,6 +31,7 @@
 
 @section('content')
   @php
+      $reservationOffer = \App\Support\ReservationOfferContent::data();
       $galleryImages = $vehicle->galleryImageUrls();
       $heroImage = $galleryImages[0] ?? asset('website/assets/car_sedan.png');
       $secondaryImages = collect($galleryImages)->slice(1, 4)->values();
@@ -38,7 +39,7 @@
       $reservationCtaId = 'reservation-cta-'.$vehicle->getKey();
       $isVehicleAvailable = $vehicle->status === 'available';
       $reservationUnavailableMessage = 'A viatura já não está disponível. Se desejar saber quais as viaturas disponiveis, queira entrar em contacto nos botões Ligar agora ou Pedir contacto';
-      $reservationTaxMessage = 'Acresce IVA à taxa em vigor.';
+      $reservationTaxMessage = $reservationOffer['tax_message'];
   @endphp
 
   <section class="fleet-product-hero">
@@ -149,7 +150,7 @@
               <div class="fleet-reservation-highlight-item">
                 <span>Caução inicial</span>
                 <div class="fleet-highlight-value">
-                  <strong>250€</strong>
+                  <strong>{{ $reservationOffer['formatted_base_amount'] }}</strong>
                   <span class="fleet-tax-popover fleet-tax-popover--inline">
                     <button type="button" class="fleet-tax-link fleet-tax-link--inline" aria-label="Informação sobre IVA">*</button>
                     <span class="fleet-tax-popover__bubble" role="tooltip">{{ $reservationTaxMessage }}</span>
@@ -158,56 +159,31 @@
               </div>
               <div class="fleet-reservation-highlight-item">
                 <span>Km incluídos</span>
-                <strong>2000 km/semana</strong>
+                <strong>{{ $reservationOffer['included_km'] }}</strong>
               </div>
               <div class="fleet-reservation-highlight-item">
                 <span>Extrato semanal</span>
-                <strong>Segunda até às 11:00</strong>
+                <strong>{{ $reservationOffer['statement_deadline'] }}</strong>
               </div>
             </div>
 
-            <div class="fleet-reservation-section">
-              <h3>O que está incluído</h3>
-              <ul class="fleet-reservation-list">
-                <li>Seguro contra todos os riscos.</li>
-                <li>Mudança de pneus.</li>
-                <li>Manutenções incluídas.</li>
-                <li>Reparações derivadas da normal utilização da viatura.</li>
-              </ul>
-            </div>
-
-            <div class="fleet-reservation-section">
-              <h3>Como funciona o aluguer e a caução</h3>
-              <ul class="fleet-reservation-list">
-                <li>O valor de aluguer da viatura é descontado semanalmente aos valores obtidos na Uber e Bolt.</li>
-                <li>Para reservar, é obrigatório o pagamento inicial de 250€
-                  <span class="fleet-tax-popover fleet-tax-popover--inline">
-                    <button type="button" class="fleet-tax-link fleet-tax-link--inline" aria-label="Informação sobre IVA">*</button>
-                    <span class="fleet-tax-popover__bubble" role="tooltip">{{ $reservationTaxMessage }}</span>
-                  </span>
-                  de caução.
-                </li>
-                <li>Nas 30 semanas seguintes são descontados 25€ adicionais, até perfazer 1000€ de caução retida.</li>
-                <li>A caução é devolvida quando a viatura é entregue de volta pelo motorista.</li>
-                <li>Estão incluídos 2000 km por semana.</li>
-                <li>Acima desse limite, o valor extra é de 0,12€ por km.</li>
-              </ul>
-            </div>
-
-            <div class="fleet-reservation-section">
-              <h3>Pagamentos e levantamentos</h3>
-              <ul class="fleet-reservation-list">
-                <li>O extrato semanal é entregue até às 11:00 de cada segunda-feira.</li>
-                <li>O pagamento ao motorista é transferido de imediato após receção do recibo verde ou fatura.</li>
-                <li>A viatura deve ser levantada nas nossas instalações em Santa Maria da Feira, após agendamento.</li>
-                <li>Quem vem de Lisboa pode viajar de Rede Expressos ou Flixbus até à central de camionagem de Santa Maria da Feira.</li>
-              </ul>
-            </div>
+            @foreach ($reservationOffer['sections'] as $section)
+              <div class="fleet-reservation-section">
+                <h3>{{ $section['title'] }}</h3>
+                <ul class="fleet-reservation-list">
+                  @foreach ($section['items'] as $item)
+                    <li>
+                      {!! str_replace($reservationOffer['formatted_base_amount'], $reservationOffer['formatted_base_amount'].'<span class="fleet-tax-popover fleet-tax-popover--inline"><button type="button" class="fleet-tax-link fleet-tax-link--inline" aria-label="Informação sobre IVA">*</button><span class="fleet-tax-popover__bubble" role="tooltip">'.$reservationTaxMessage.'</span></span>', e($item)) !!}
+                    </li>
+                  @endforeach
+                </ul>
+              </div>
+            @endforeach
 
             @if ($isVehicleAvailable)
               <div class="fleet-reservation-cta">
                 <p>
-                  Se esta viatura faz sentido para si, avance já com a reserva e prepare o pagamento dos 250€
+                  Se esta viatura faz sentido para si, avance já com a reserva e prepare o pagamento dos {{ $reservationOffer['formatted_base_amount'] }}
                   <span class="fleet-tax-popover">
                     <button type="button" class="fleet-tax-link" aria-label="Informação sobre IVA">*</button>
                     <span class="fleet-tax-popover__bubble" role="tooltip">{{ $reservationTaxMessage }}</span>

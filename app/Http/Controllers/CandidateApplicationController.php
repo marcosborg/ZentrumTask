@@ -2,12 +2,16 @@
 
 namespace App\Http\Controllers;
 
+use App\Mail\ReservationPaymentInstructionsMail;
 use App\Models\CandidateApplication;
 use App\Models\Vehicle;
 use App\Models\VehicleType;
 use App\Services\IfthenpayMultibancoService;
+use App\Support\ReservationOfferContent;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
@@ -56,6 +60,7 @@ class CandidateApplicationController extends Controller
     public function submit(Request $request): JsonResponse
     {
         $application = $this->findByToken($request->input('token'));
+        $wasAlreadySubmitted = $application->submitted_at !== null;
 
         $rules = [
             'full_name' => ['required', 'string', 'max:255'],
@@ -88,6 +93,28 @@ class CandidateApplicationController extends Controller
         $application->legal_ip = $request->ip();
         $application->legal_version = 'v1';
         $application->save();
+
+        $application->loadMissing('vehicleType');
+
+        $payment = app(IfthenpayMultibancoService::class)->ensureReference($application);
+
+        if (! $wasAlreadySubmitted && filled($application->email)) {
+            try {
+                Mail::to($application->email)->send(
+                    new ReservationPaymentInstructionsMail(
+                        $application->fresh('vehicleType'),
+                        $payment,
+                        ReservationOfferContent::data(),
+                    )
+                );
+            } catch (\Throwable $exception) {
+                Log::warning('reservation_payment_email_failed', [
+                    'application_id' => $application->getKey(),
+                    'email' => $application->email,
+                    'message' => $exception->getMessage(),
+                ]);
+            }
+        }
 
         return response()->json([
             'status' => 'submitted',
