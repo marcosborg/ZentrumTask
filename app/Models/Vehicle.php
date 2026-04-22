@@ -139,7 +139,7 @@ class Vehicle extends Model implements HasMedia
 
     public function publicSlug(): string
     {
-        return Str::slug($this->displayName().' '.$this->license_plate) ?: 'viatura-'.$this->getKey();
+        return Str::slug($this->displayName()) ?: 'viatura-'.$this->getKey();
     }
 
     public function publicUrl(): string

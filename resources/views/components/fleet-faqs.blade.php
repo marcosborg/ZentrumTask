@@ -2,10 +2,40 @@
     $vehicleItems = collect($vehicles ?? []);
 
     if ($vehicleItems->isEmpty() && \Illuminate\Support\Facades\Schema::hasTable('vehicles')) {
-        $vehicleItems = \App\Models\Vehicle::query()->websiteAvailable()->get();
+        $availableVehicles = \App\Models\Vehicle::query()
+            ->with('websitePhotos')
+            ->websiteCatalog()
+            ->where('status', 'available')
+            ->limit(4)
+            ->get();
+
+        $unavailableVehicles = \App\Models\Vehicle::query()
+            ->with('websitePhotos')
+            ->websiteCatalog()
+            ->where('status', '!=', 'available')
+            ->inRandomOrder()
+            ->limit(8)
+            ->get();
+
+        $vehicleItems = $availableVehicles->concat($unavailableVehicles)->values();
     }
 
-    $vehicleSlides = $vehicleItems->chunk(3)->values();
+    $availableVehicles = $vehicleItems
+        ->filter(fn ($vehicle) => $vehicle->status === 'available')
+        ->take(4)
+        ->values();
+
+    $unavailableVehicles = $vehicleItems
+        ->filter(fn ($vehicle) => $vehicle->status !== 'available')
+        ->take(max(0, 8 - $availableVehicles->count()))
+        ->values();
+
+    $featuredVehicles = $availableVehicles
+        ->concat($unavailableVehicles)
+        ->take(8)
+        ->values();
+
+    $vehicleRows = $featuredVehicles->chunk(4)->values();
 @endphp
 
 <section class="container pb-4 section-gap" id="frota">
@@ -20,64 +50,53 @@
       </div>
     </div>
 
-    @if ($vehicleSlides->isNotEmpty())
-      <div id="fleetCarousel" class="carousel slide fleet-carousel" data-bs-ride="carousel">
-        <div class="carousel-inner">
-          @foreach ($vehicleSlides as $slideIndex => $slideVehicles)
-            <div class="carousel-item @if($slideIndex === 0) active @endif">
-              <div class="row g-4">
-                @foreach ($slideVehicles as $vehicle)
-                  <div class="col-12 col-md-6 col-xl-4">
-                    <article class="fleet-product-card h-100" itemscope itemtype="https://schema.org/Product">
-                      <meta itemprop="name" content="{{ $vehicle->displayName() }}" />
-                      <meta itemprop="url" content="{{ $vehicle->publicUrl() }}" />
-                      <meta itemprop="brand" content="{{ $vehicle->make }}" />
-                      <meta itemprop="availability" content="https://schema.org/InStock" />
+    @if ($vehicleRows->isNotEmpty())
+      <div class="fleet-groups">
+        @foreach ($vehicleRows as $rowIndex => $rowVehicles)
+          <div class="fleet-group">
+            <div class="fleet-card-grid">
+              @foreach ($rowVehicles as $vehicle)
+                <div class="fleet-card-cell">
+                  <article class="fleet-product-card h-100" itemscope itemtype="https://schema.org/Product">
+                    <meta itemprop="name" content="{{ $vehicle->displayName() }}" />
+                    <meta itemprop="url" content="{{ $vehicle->publicUrl() }}" />
+                    <meta itemprop="brand" content="{{ $vehicle->make }}" />
+                    <meta itemprop="availability" content="{{ $vehicle->status === 'available' ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock' }}" />
 
-                      <a href="{{ $vehicle->publicUrl() }}" class="fleet-product-link">
-                        <div class="fleet-media">
-                          <img
-                            src="{{ $vehicle->primaryImageUrl() }}"
-                            alt="{{ $vehicle->displayName() }}"
-                            itemprop="image"
-                          />
+                    <a href="{{ $vehicle->publicUrl() }}" class="fleet-product-link">
+                      <div class="fleet-media">
+                        <img
+                          src="{{ $vehicle->primaryImageUrl() }}"
+                          alt="{{ $vehicle->displayName() }}"
+                          itemprop="image"
+                        />
+                      </div>
+
+                      <div class="fleet-product-body">
+                        <div class="fleet-product-topline">
+                          <span class="fleet-status fleet-status--{{ $vehicle->websiteAvailabilityColor() }}">{{ $vehicle->websiteAvailabilityLabel() }}</span>
                         </div>
 
-                        <div class="fleet-product-body">
-                          <div class="fleet-product-topline">
-                            <span class="fleet-status fleet-status--success">Disponivel</span>
+                        <h4 class="fleet-product-title" itemprop="name">{{ $vehicle->displayName() }}</h4>
+
+                        @if ($vehicle->maskedVin())
+                          <div class="fleet-product-subline">
+                            <span>Chassis</span>
+                            <strong>{{ $vehicle->maskedVin() }}</strong>
                           </div>
+                        @endif
 
-                          <h4 class="fleet-product-title" itemprop="name">{{ $vehicle->displayName() }}</h4>
-
-                          @if ($vehicle->maskedVin())
-                            <div class="fleet-product-subline">
-                              <span>Chassis</span>
-                              <strong>{{ $vehicle->maskedVin() }}</strong>
-                            </div>
-                          @endif
-
-                          <div class="fleet-cta-row">
-                            <span class="fleet-cta">Ver viatura</span>
-                          </div>
+                        <div class="fleet-cta-row">
+                          <span class="fleet-cta">Ver viatura</span>
                         </div>
-                      </a>
-                    </article>
-                  </div>
-                @endforeach
-              </div>
+                      </div>
+                    </a>
+                  </article>
+                </div>
+              @endforeach
             </div>
-          @endforeach
-        </div>
-
-        @if ($vehicleSlides->count() > 1)
-          <button class="carousel-control-prev fleet-carousel-control" type="button" data-bs-target="#fleetCarousel" data-bs-slide="prev" aria-label="Slide anterior">
-            <span class="carousel-control-prev-icon" aria-hidden="true"></span>
-          </button>
-          <button class="carousel-control-next fleet-carousel-control" type="button" data-bs-target="#fleetCarousel" data-bs-slide="next" aria-label="Slide seguinte">
-            <span class="carousel-control-next-icon" aria-hidden="true"></span>
-          </button>
-        @endif
+          </div>
+        @endforeach
       </div>
     @else
       <div class="col-12 text-light-subtle">Nenhuma viatura TVDE disponivel para destaque neste momento.</div>
@@ -105,8 +124,8 @@
       <div class="col-lg-8">
         <h3 class="mb-3">Perguntas frequentes</h3>
         <div class="faq-item">
-          <h6>Que viaturas aparecem no carrossel?</h6>
-          <p>Apenas viaturas com source TVDE e estado `available`.</p>
+          <h6>Que viaturas aparecem na home?</h6>
+          <p>Mostramos sempre 8 carros: primeiro entram os disponiveis ate ao limite de 4 e os lugares restantes sao preenchidos com indisponiveis aleatorios.</p>
         </div>
         <div class="faq-item">
           <h6>Onde vejo as indisponiveis?</h6>
@@ -191,26 +210,26 @@
       background: #1f4f90;
     }
 
-    .fleet-carousel {
-      padding: 0 3.4rem;
+    .fleet-groups {
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
     }
 
-    .fleet-carousel-control {
-      width: 46px;
-      height: 46px;
-      top: 50%;
-      transform: translateY(-50%);
-      border-radius: 999px;
-      background: #1d4f91;
-      opacity: 1;
+    .fleet-group {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
     }
 
-    .fleet-carousel .carousel-control-prev {
-      left: 0;
+    .fleet-card-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 1.5rem;
     }
 
-    .fleet-carousel .carousel-control-next {
-      right: 0;
+    .fleet-card-cell {
+      min-width: 0;
     }
 
     .fleet-product-card {
@@ -321,23 +340,23 @@
       font-weight: 800;
     }
 
-    @media (max-width: 991.98px) {
-      .fleet-carousel {
-        padding: 0;
-      }
-
-      .fleet-carousel-control {
-        display: none;
-      }
-    }
-
     @media (max-width: 767.98px) {
       .fleet-wrapper {
         padding: 22px;
       }
 
+      .fleet-card-grid {
+        grid-template-columns: 1fr;
+      }
+
       .fleet-product-title {
         font-size: 1.25rem;
+      }
+    }
+
+    @media (min-width: 768px) and (max-width: 1199.98px) {
+      .fleet-card-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
       }
     }
   </style>

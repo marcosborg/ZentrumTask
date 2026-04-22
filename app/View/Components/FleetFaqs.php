@@ -5,7 +5,6 @@ namespace App\View\Components;
 use App\Models\Vehicle;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\View\Component;
 
 class FleetFaqs extends Component
@@ -14,12 +13,7 @@ class FleetFaqs extends Component
 
     public function __construct()
     {
-        $this->vehicles = Schema::hasTable('vehicles')
-            ? Vehicle::query()
-                ->with('websitePhotos')
-                ->websiteAvailable()
-                ->get()
-            : (new Vehicle)->newCollection();
+        $this->vehicles = (new Vehicle)->newCollection();
     }
 
     public function render(): View
