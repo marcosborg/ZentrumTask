@@ -105,6 +105,7 @@ class Vehicle extends Model implements HasMedia
     {
         return $query
             ->where('source', 'tvde')
+            ->orderByRaw("CASE WHEN status = 'available' THEN 0 ELSE 1 END")
             ->orderBy('make')
             ->orderBy('model')
             ->orderBy('license_plate');

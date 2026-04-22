@@ -11,6 +11,8 @@ class EditCandidateApplication extends EditRecord
 {
     protected static string $resource = CandidateApplicationResource::class;
 
+    protected ?string $heading = 'Editar reserva';
+
     protected function getHeaderActions(): array
     {
         return [

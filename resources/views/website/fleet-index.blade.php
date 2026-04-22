@@ -9,11 +9,11 @@
 @section('content')
   <section class="fleet-index-hero">
     <div class="container">
-      <div class="fleet-breadcrumb">
+      <nav class="fleet-breadcrumb" aria-label="Breadcrumb">
         <a href="{{ url('/') }}">Inicio</a>
         <span>/</span>
-        <span>Frota TVDE</span>
-      </div>
+        <span>Frota</span>
+      </nav>
 
       <div class="fleet-index-shell">
         <div class="fleet-index-head">
@@ -78,6 +78,20 @@
       background:
         radial-gradient(circle at top left, rgba(70, 169, 253, 0.2), transparent 30%),
         linear-gradient(180deg, #f6fbff 0%, #eeeeee 100%);
+    }
+
+    .fleet-breadcrumb {
+      display: flex;
+      gap: 0.55rem;
+      flex-wrap: wrap;
+      margin-bottom: 1.5rem;
+      color: #5c748f;
+      font-size: 0.92rem;
+    }
+
+    .fleet-breadcrumb a {
+      color: #2a66b5;
+      text-decoration: none;
     }
 
     .fleet-index-shell {

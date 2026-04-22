@@ -162,7 +162,20 @@ Route::get('/cms/{page}/{slug?}', [WebsiteController::class, 'showCms'])->name('
 Route::get('/blog', [BlogController::class, 'index'])->name('blog.index');
 Route::get('/blog/{blogPost}/{slug?}', [BlogController::class, 'show'])->name('blog.show');
 
-Route::get('/candidatura', [CandidateApplicationController::class, 'show'])->name('candidatura.show');
+Route::get('/reserva', [CandidateApplicationController::class, 'show'])->name('reserva.show');
+Route::post('/reserva/save', [CandidateApplicationController::class, 'save'])->name('reserva.save');
+Route::post('/reserva/submit', [CandidateApplicationController::class, 'submit'])->name('reserva.submit');
+Route::post('/reserva/upload', [CandidateApplicationController::class, 'upload'])->name('reserva.upload');
+Route::post('/reserva/payment', [CandidateApplicationController::class, 'payment'])->name('reserva.payment');
+Route::get('/payments/ifthenpay/reserva/callback', [CandidateApplicationController::class, 'paymentCallback'])
+    ->withoutMiddleware([VerifyCsrfToken::class])
+    ->name('payments.ifthenpay.reserva.callback');
+
+Route::get('/candidatura', function () {
+    $query = request()->query();
+
+    return redirect()->route('reserva.show', $query);
+})->name('candidatura.show');
 Route::post('/candidatura/save', [CandidateApplicationController::class, 'save'])->name('candidatura.save');
 Route::post('/candidatura/submit', [CandidateApplicationController::class, 'submit'])->name('candidatura.submit');
 Route::post('/candidatura/upload', [CandidateApplicationController::class, 'upload'])->name('candidatura.upload');

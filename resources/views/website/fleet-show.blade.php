@@ -34,6 +34,11 @@
       $galleryImages = $vehicle->galleryImageUrls();
       $heroImage = $galleryImages[0] ?? asset('website/assets/car_sedan.png');
       $secondaryImages = collect($galleryImages)->slice(1, 4)->values();
+      $contactModalId = 'vehicle-contact-modal-'.$vehicle->getKey();
+      $reservationCtaId = 'reservation-cta-'.$vehicle->getKey();
+      $isVehicleAvailable = $vehicle->status === 'available';
+      $reservationUnavailableMessage = 'A viatura já não está disponível. Se desejar saber quais as viaturas disponiveis, queira entrar em contacto nos botões Ligar agora ou Pedir contacto';
+      $reservationTaxMessage = 'Acresce IVA à taxa em vigor.';
   @endphp
 
   <section class="fleet-product-hero">
@@ -98,20 +103,126 @@
 
             <div class="fleet-detail-actions">
               <a href="tel:256112333" class="btn btn-outline-secondary btn-lg">Ligar agora</a>
+              <button type="button" class="btn btn-primary btn-lg fleet-detail-primary" data-bs-toggle="modal" data-bs-target="#{{ $contactModalId }}">
+                Pedir contacto
+              </button>
+              <a
+                href="{{ $isVehicleAvailable ? '#'.$reservationCtaId : '#' }}"
+                class="btn btn-outline-primary btn-lg fleet-detail-reserve @unless($isVehicleAvailable) is-disabled @endunless"
+                @unless($isVehicleAvailable) data-unavailable-alert="true" aria-disabled="true" @endunless
+              >
+                Reserva imediata
+              </a>
+            </div>
+
+            <div class="fleet-unavailable-notice" id="fleet-unavailable-notice" hidden aria-live="polite">
+              <div class="fleet-unavailable-notice__icon" aria-hidden="true">!</div>
+              <div class="fleet-unavailable-notice__copy">
+                <strong>Viatura indisponível neste momento</strong>
+                <p>{{ $reservationUnavailableMessage }}</p>
+              </div>
             </div>
           </div>
 
-          <div class="fleet-contact-shell mt-4" id="pedido-viatura">
-            <x-contact
-              :vehicle="$vehicle"
-              heading="Pedir contacto sobre esta viatura"
-              intro="A task sera criada com o titulo '{{ $vehicle->displayName() }} - ' + nome do contacto para acelerar o seguimento pela equipa."
-              submit-label="Quero saber mais"
-              source="website_vehicle_product"
-              anchor=""
-              container-class="p-0"
-              :show-success="true"
-            />
+          <div class="fleet-reservation-card mt-4">
+            <div class="fleet-reservation-head">
+              <span class="fleet-reservation-kicker">Reserva imediata</span>
+              <h2>Reserve esta viatura com 250€
+                <span class="fleet-tax-popover">
+                  <button type="button" class="fleet-tax-link" aria-label="Informação sobre IVA">*</button>
+                  <span class="fleet-tax-popover__bubble" role="tooltip">{{ $reservationTaxMessage }}</span>
+                </span>
+                de caução inicial
+              </h2>
+              <p>
+                Garanta já a viatura, avance com a reserva e finalize o processo assim que liquidar a referência
+                multibanco dos 250€
+                <span class="fleet-tax-popover">
+                  <button type="button" class="fleet-tax-link" aria-label="Informação sobre IVA">*</button>
+                  <span class="fleet-tax-popover__bubble" role="tooltip">{{ $reservationTaxMessage }}</span>
+                </span>
+                iniciais.
+              </p>
+            </div>
+
+            <div class="fleet-reservation-highlight">
+              <div class="fleet-reservation-highlight-item">
+                <span>Caução inicial</span>
+                <div class="fleet-highlight-value">
+                  <strong>250€</strong>
+                  <span class="fleet-tax-popover fleet-tax-popover--inline">
+                    <button type="button" class="fleet-tax-link fleet-tax-link--inline" aria-label="Informação sobre IVA">*</button>
+                    <span class="fleet-tax-popover__bubble" role="tooltip">{{ $reservationTaxMessage }}</span>
+                  </span>
+                </div>
+              </div>
+              <div class="fleet-reservation-highlight-item">
+                <span>Km incluídos</span>
+                <strong>2000 km/semana</strong>
+              </div>
+              <div class="fleet-reservation-highlight-item">
+                <span>Extrato semanal</span>
+                <strong>Segunda até às 11:00</strong>
+              </div>
+            </div>
+
+            <div class="fleet-reservation-section">
+              <h3>O que está incluído</h3>
+              <ul class="fleet-reservation-list">
+                <li>Seguro contra todos os riscos.</li>
+                <li>Mudança de pneus.</li>
+                <li>Manutenções incluídas.</li>
+                <li>Reparações derivadas da normal utilização da viatura.</li>
+              </ul>
+            </div>
+
+            <div class="fleet-reservation-section">
+              <h3>Como funciona o aluguer e a caução</h3>
+              <ul class="fleet-reservation-list">
+                <li>O valor de aluguer da viatura é descontado semanalmente aos valores obtidos na Uber e Bolt.</li>
+                <li>Para reservar, é obrigatório o pagamento inicial de 250€
+                  <span class="fleet-tax-popover fleet-tax-popover--inline">
+                    <button type="button" class="fleet-tax-link fleet-tax-link--inline" aria-label="Informação sobre IVA">*</button>
+                    <span class="fleet-tax-popover__bubble" role="tooltip">{{ $reservationTaxMessage }}</span>
+                  </span>
+                  de caução.
+                </li>
+                <li>Nas 30 semanas seguintes são descontados 25€ adicionais, até perfazer 1000€ de caução retida.</li>
+                <li>A caução é devolvida quando a viatura é entregue de volta pelo motorista.</li>
+                <li>Estão incluídos 2000 km por semana.</li>
+                <li>Acima desse limite, o valor extra é de 0,12€ por km.</li>
+              </ul>
+            </div>
+
+            <div class="fleet-reservation-section">
+              <h3>Pagamentos e levantamentos</h3>
+              <ul class="fleet-reservation-list">
+                <li>O extrato semanal é entregue até às 11:00 de cada segunda-feira.</li>
+                <li>O pagamento ao motorista é transferido de imediato após receção do recibo verde ou fatura.</li>
+                <li>A viatura deve ser levantada nas nossas instalações em Santa Maria da Feira, após agendamento.</li>
+                <li>Quem vem de Lisboa pode viajar de Rede Expressos ou Flixbus até à central de camionagem de Santa Maria da Feira.</li>
+              </ul>
+            </div>
+
+            @if ($isVehicleAvailable)
+              <div class="fleet-reservation-cta">
+                <p>
+                  Se esta viatura faz sentido para si, avance já com a reserva e prepare o pagamento dos 250€
+                  <span class="fleet-tax-popover">
+                    <button type="button" class="fleet-tax-link" aria-label="Informação sobre IVA">*</button>
+                    <span class="fleet-tax-popover__bubble" role="tooltip">{{ $reservationTaxMessage }}</span>
+                  </span>
+                  iniciais para garantir a reserva.
+                </p>
+                <a
+                  href="{{ route('reserva.show', ['vehicle' => $vehicle->getKey()]) }}"
+                  class="btn btn-primary btn-lg"
+                  id="{{ $reservationCtaId }}"
+                >
+                  Iniciar reserva
+                </a>
+              </div>
+            @endif
           </div>
         </div>
       </div>
@@ -132,6 +243,33 @@
       @endif
     </div>
   </section>
+
+  <div class="modal fade fleet-contact-modal" id="{{ $contactModalId }}" tabindex="-1" aria-labelledby="{{ $contactModalId }}-label" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+      <div class="modal-content">
+        <div class="modal-header">
+          <div>
+            <span class="fleet-modal-kicker">{{ $vehicle->make ?: 'Viatura TVDE' }}</span>
+            <h2 class="modal-title" id="{{ $contactModalId }}-label">Pedir contacto</h2>
+          </div>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+        </div>
+        <div class="modal-body">
+          <x-contact
+            :vehicle="$vehicle"
+            heading=""
+            intro=""
+            submit-label="Quero saber mais"
+            source="website_vehicle_product"
+            anchor=""
+            container-class="p-0"
+            :showSuccess="true"
+            :hideFormOnSuccess="true"
+          />
+        </div>
+      </div>
+    </div>
+  </div>
 @endsection
 
 @pushOnce('styles')
@@ -157,9 +295,14 @@
       text-decoration: none;
     }
 
+    html {
+      scroll-behavior: smooth;
+    }
+
     .fleet-gallery-shell,
     .fleet-product-panel,
-    .fleet-copy-card {
+    .fleet-copy-card,
+    .fleet-reservation-card {
       background: #fff;
       border: 1px solid #dde7f2;
       border-radius: 24px;
@@ -189,8 +332,6 @@
 
     .fleet-product-panel {
       padding: 2rem;
-      position: sticky;
-      top: 96px;
     }
 
     .fleet-detail-kicker {
@@ -279,9 +420,230 @@
       border-color: #2a66b5;
     }
 
+    .fleet-detail-reserve {
+      border-color: #2a66b5;
+      color: #2a66b5;
+    }
+
+    .fleet-detail-reserve.is-disabled,
+    .fleet-reservation-cta .btn.is-disabled {
+      opacity: 0.55;
+      pointer-events: auto;
+      cursor: not-allowed;
+    }
+
+    .fleet-unavailable-notice {
+      display: flex;
+      gap: 0.9rem;
+      align-items: flex-start;
+      margin-top: 1rem;
+      padding: 1rem 1.05rem;
+      border-radius: 18px;
+      background: linear-gradient(180deg, #fff8eb 0%, #fff2d8 100%);
+      border: 1px solid #f4d7a1;
+      box-shadow: 0 12px 24px rgba(180, 120, 20, 0.08);
+    }
+
+    .fleet-unavailable-notice__icon {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 2rem;
+      height: 2rem;
+      flex: 0 0 2rem;
+      border-radius: 999px;
+      background: #f0a100;
+      color: #fff;
+      font-size: 1rem;
+      font-weight: 800;
+      line-height: 1;
+    }
+
+    .fleet-unavailable-notice__copy strong {
+      display: block;
+      margin-bottom: 0.2rem;
+      color: #6c4300;
+      font-size: 0.98rem;
+    }
+
+    .fleet-unavailable-notice__copy p {
+      margin: 0;
+      color: #7a5a1e;
+      font-size: 0.96rem;
+      line-height: 1.55;
+    }
+
     .fleet-copy-card {
       padding: 2rem;
       height: 100%;
+    }
+
+    .fleet-reservation-card {
+      padding: 1.75rem;
+    }
+
+    .fleet-reservation-head h2 {
+      margin-bottom: 0.75rem;
+      color: #0f172a;
+      font-size: clamp(1.55rem, 3vw, 2.15rem);
+      line-height: 1.05;
+    }
+
+    .fleet-reservation-head p,
+    .fleet-reservation-cta p {
+      color: #49627b;
+      font-size: 1rem;
+      line-height: 1.7;
+      margin: 0;
+    }
+
+    .fleet-tax-link {
+      display: inline-block;
+      margin: 0;
+      padding: 0;
+      border: none;
+      background: transparent;
+      color: #1d4f91;
+      font-weight: 800;
+      text-decoration: none;
+      line-height: 1;
+      vertical-align: super;
+      font-size: 0.8em;
+      cursor: pointer;
+    }
+
+    .fleet-tax-link--inline {
+      margin-left: 0.08rem;
+    }
+
+    .fleet-tax-popover {
+      position: relative;
+      display: inline-flex;
+      align-items: flex-start;
+    }
+
+    .fleet-tax-popover__bubble {
+      position: absolute;
+      left: 50%;
+      bottom: calc(100% + 0.65rem);
+      transform: translateX(-50%);
+      width: min(320px, 72vw);
+      padding: 0.8rem 0.9rem;
+      border-radius: 14px;
+      background: #0f172a;
+      color: #fff;
+      font-size: 0.88rem;
+      line-height: 1.55;
+      box-shadow: 0 18px 32px rgba(15, 23, 42, 0.22);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.18s ease, transform 0.18s ease;
+      z-index: 10;
+    }
+
+    .fleet-tax-popover__bubble::after {
+      content: '';
+      position: absolute;
+      left: 50%;
+      top: 100%;
+      transform: translateX(-50%);
+      border-width: 7px 6px 0 6px;
+      border-style: solid;
+      border-color: #0f172a transparent transparent transparent;
+    }
+
+    .fleet-tax-popover:hover .fleet-tax-popover__bubble,
+    .fleet-tax-popover:focus-within .fleet-tax-popover__bubble {
+      opacity: 1;
+      transform: translateX(-50%) translateY(-2px);
+    }
+
+    .fleet-reservation-kicker {
+      display: inline-flex;
+      margin-bottom: 0.7rem;
+      padding: 0.35rem 0.75rem;
+      border-radius: 999px;
+      background: #e8f2ff;
+      color: #1d4f91;
+      font-size: 0.82rem;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .fleet-reservation-highlight {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 0.85rem;
+      margin: 1.35rem 0 1.5rem;
+    }
+
+    .fleet-reservation-highlight-item {
+      background: linear-gradient(180deg, #f8fbff 0%, #eef5ff 100%);
+      border: 1px solid #d9e7fb;
+      border-radius: 18px;
+      padding: 1rem;
+    }
+
+    .fleet-reservation-highlight-item span {
+      display: block;
+      margin-bottom: 0.3rem;
+      color: #68819a;
+      font-size: 0.85rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .fleet-reservation-highlight-item strong {
+      color: #0f172a;
+      font-size: 1.15rem;
+      font-weight: 800;
+      line-height: 1.2;
+    }
+
+    .fleet-highlight-value {
+      display: inline-flex;
+      align-items: baseline;
+      gap: 0.08rem;
+      flex-wrap: nowrap;
+      white-space: nowrap;
+    }
+
+    .fleet-reservation-section + .fleet-reservation-section,
+    .fleet-reservation-section + .fleet-reservation-cta,
+    .fleet-reservation-head + .fleet-reservation-section {
+      margin-top: 1.35rem;
+    }
+
+    .fleet-reservation-section h3 {
+      margin-bottom: 0.75rem;
+      color: #0f172a;
+      font-size: 1.05rem;
+    }
+
+    .fleet-reservation-list {
+      margin: 0;
+      padding-left: 1.15rem;
+      color: #49627b;
+      line-height: 1.7;
+    }
+
+    .fleet-reservation-list li + li {
+      margin-top: 0.35rem;
+    }
+
+    .fleet-reservation-cta {
+      margin-top: 1.5rem;
+      padding: 1.2rem;
+      border-radius: 18px;
+      background: linear-gradient(180deg, #eef6ff 0%, #e3f0ff 100%);
+      border: 1px solid #d6e5fb;
+    }
+
+    .fleet-reservation-cta .btn {
+      margin-top: 0.95rem;
+      min-width: 220px;
     }
 
     .fleet-copy-card h2 {
@@ -299,16 +661,56 @@
       padding: 2rem;
     }
 
+    .fleet-contact-modal .modal-content {
+      border: 1px solid #dde7f2;
+      border-radius: 24px;
+      box-shadow: 0 16px 30px rgba(15, 23, 42, 0.12);
+    }
+
+    .fleet-contact-modal .modal-header {
+      border-bottom: none;
+      padding: 1.5rem 1.5rem 0.5rem;
+      align-items: start;
+    }
+
+    .fleet-contact-modal .modal-body {
+      padding: 0 1.5rem 1.5rem;
+    }
+
+    .fleet-modal-kicker {
+      display: inline-flex;
+      margin-bottom: 0.35rem;
+      color: #1d4f91;
+      font-size: 0.82rem;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .fleet-contact-modal .contact-section {
+      padding: 0;
+      margin: 0;
+      box-shadow: none;
+      border: none;
+      background: transparent;
+    }
+
     @media (max-width: 991.98px) {
-      .fleet-product-panel {
-        position: static;
-      }
     }
 
     @media (max-width: 767.98px) {
       .fleet-product-panel,
-      .fleet-copy-card {
+      .fleet-copy-card,
+      .fleet-reservation-card {
         padding: 1.4rem;
+      }
+
+      .fleet-detail-actions .btn {
+        width: 100%;
+      }
+
+      .fleet-reservation-highlight {
+        grid-template-columns: 1fr;
       }
 
       .fleet-detail-price {
@@ -316,4 +718,39 @@
       }
     }
   </style>
+@endpushOnce
+
+@pushOnce('scripts')
+  <script>
+    document.addEventListener('DOMContentLoaded', function () {
+      var unavailableNotice = document.getElementById('fleet-unavailable-notice');
+
+      document.querySelectorAll('[data-unavailable-alert="true"]').forEach(function (element) {
+        element.addEventListener('click', function (event) {
+          event.preventDefault();
+
+          if (! unavailableNotice) {
+            return;
+          }
+
+          unavailableNotice.hidden = false;
+          unavailableNotice.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        });
+      });
+    });
+  </script>
+
+  @if ($errors->any() || session('contact_success'))
+    <script>
+      document.addEventListener('DOMContentLoaded', function () {
+        var modalElement = document.getElementById(@json($contactModalId));
+
+        if (! modalElement || typeof bootstrap === 'undefined') {
+          return;
+        }
+
+        bootstrap.Modal.getOrCreateInstance(modalElement).show();
+      });
+    </script>
+  @endif
 @endpushOnce

@@ -66,4 +66,17 @@ return [
         'android_channel_id' => env('FCM_ANDROID_CHANNEL_ID', 'new-contacts-alerts'),
     ],
 
+    'ifthenpay' => [
+        'base_url' => env('IFTHENPAY_BASE_URL', 'https://api.ifthenpay.com'),
+        'sandbox' => env('IFTHENPAY_SANDBOX', false),
+        'mb_key' => env('IFTHENPAY_MB_KEY'),
+        'backoffice_key' => env('IFTHENPAY_BACKOFFICE_KEY'),
+        'entity' => env('IFTHENPAY_ENTITY', '12133'),
+        'sub_entity' => env('IFTHENPAY_SUB_ENTITY', '054'),
+        'anti_phishing_key' => env('IFTHENPAY_ANTI_PHISHING_KEY'),
+        'expiry_days' => env('IFTHENPAY_EXPIRY_DAYS'),
+        'initial_deposit_amount' => env('IFTHENPAY_INITIAL_DEPOSIT_AMOUNT', 250),
+        'initial_deposit_vat_rate' => env('IFTHENPAY_INITIAL_DEPOSIT_VAT_RATE', 23),
+    ],
+
 ];

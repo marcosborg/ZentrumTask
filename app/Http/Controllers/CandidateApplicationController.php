@@ -3,24 +3,32 @@
 namespace App\Http\Controllers;
 
 use App\Models\CandidateApplication;
+use App\Models\Vehicle;
 use App\Models\VehicleType;
+use App\Services\IfthenpayMultibancoService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 
 class CandidateApplicationController extends Controller
 {
     public function show(Request $request)
     {
-        $application = $this->resolveApplication($request);
+        $preselectedVehicle = $this->resolvePreselectedVehicle($request);
+        $application = $this->resolveApplication($request, $preselectedVehicle);
+        $paymentService = app(IfthenpayMultibancoService::class);
 
         return view('candidatura.wizard', [
             'application' => $application,
-            'uploadEndpoint' => route('candidatura.upload'),
-            'saveEndpoint' => route('candidatura.save'),
-            'submitEndpoint' => route('candidatura.submit'),
+            'uploadEndpoint' => route('reserva.upload'),
+            'saveEndpoint' => route('reserva.save'),
+            'submitEndpoint' => route('reserva.submit'),
+            'paymentEndpoint' => route('reserva.payment'),
             'vehicleTypes' => VehicleType::orderBy('brand')->orderBy('model')->get(),
+            'preselectedVehicle' => $preselectedVehicle,
+            'initialPayment' => $paymentService->getReferenceData($application),
         ]);
     }
 
@@ -71,16 +79,6 @@ class CandidateApplicationController extends Controller
         ];
 
         $validated = $request->validate($rules);
-
-        $documents = $application->documents ?? [];
-
-        foreach (['document_id', 'driver_license', 'tvde_certificate', 'criminal_record'] as $docKey) {
-            if (! $this->hasDocuments($documents[$docKey] ?? null)) {
-                return response()->json([
-                    'message' => 'Falta enviar todos os documentos obrigatorios.',
-                ], 422);
-            }
-        }
 
         $application->fill($validated);
         $application->status = 'submitted';
@@ -137,12 +135,35 @@ class CandidateApplicationController extends Controller
         ]);
     }
 
-    protected function resolveApplication(Request $request): CandidateApplication
+    public function payment(Request $request, IfthenpayMultibancoService $paymentService): JsonResponse
+    {
+        $application = $this->findByToken($request->input('token'));
+
+        $payment = $paymentService->ensureReference($application);
+
+        return response()->json([
+            'status' => 'ok',
+            'payment' => $payment,
+        ]);
+    }
+
+    public function paymentCallback(Request $request, IfthenpayMultibancoService $paymentService)
+    {
+        $application = $paymentService->handleCallback($request->all());
+
+        if (! $application) {
+            return response('invalid', 422);
+        }
+
+        return response('ok');
+    }
+
+    protected function resolveApplication(Request $request, ?Vehicle $preselectedVehicle = null): CandidateApplication
     {
         if ($token = $request->session()->get('candidate_token')) {
             $existing = CandidateApplication::where('token', $token)->first();
             if ($existing) {
-                return $existing;
+                return $this->applyPreselectedVehicle($existing, $preselectedVehicle);
             }
         }
 
@@ -151,7 +172,7 @@ class CandidateApplicationController extends Controller
             if ($existing) {
                 $request->session()->put('candidate_token', $token);
 
-                return $existing;
+                return $this->applyPreselectedVehicle($existing, $preselectedVehicle);
             }
         }
 
@@ -164,7 +185,7 @@ class CandidateApplicationController extends Controller
 
         $request->session()->put('candidate_token', $application->token);
 
-        return $application;
+        return $this->applyPreselectedVehicle($application, $preselectedVehicle);
     }
 
     protected function findByToken(?string $token): CandidateApplication
@@ -208,7 +229,7 @@ class CandidateApplicationController extends Controller
                 'nif' => ['required', 'string', 'max:30'],
                 'iban' => ['required', 'string', 'max:34'],
             ]),
-            'legal' => $request->validate([
+            'summary' => $request->validate([
                 'rgpd' => ['accepted'],
                 'truth_declaration' => ['accepted'],
                 'contact_authorization' => ['accepted'],
@@ -274,20 +295,92 @@ class CandidateApplicationController extends Controller
         return [];
     }
 
-    protected function hasDocuments(mixed $value): bool
+    protected function resolvePreselectedVehicle(Request $request): ?Vehicle
     {
-        if (is_string($value)) {
-            return trim($value) !== '';
+        $vehicleId = $request->integer('vehicle');
+
+        if (! $vehicleId) {
+            return null;
         }
 
-        if (is_array($value)) {
-            if (array_is_list($value)) {
-                return count($value) > 0;
+        return Vehicle::query()
+            ->where('source', 'tvde')
+            ->find($vehicleId);
+    }
+
+    protected function applyPreselectedVehicle(CandidateApplication $application, ?Vehicle $vehicle): CandidateApplication
+    {
+        if (! $vehicle || $application->submitted_at) {
+            return $application;
+        }
+
+        $vehicleTypeId = $this->resolveVehicleTypeIdFromVehicle($vehicle);
+
+        if (! $vehicleTypeId) {
+            return $application;
+        }
+
+        if ((int) $application->vehicle_type_id === (int) $vehicleTypeId) {
+            return $application;
+        }
+
+        $application->vehicle_type_id = $vehicleTypeId;
+        $application->save();
+
+        return $application->fresh();
+    }
+
+    protected function resolveVehicleTypeIdFromVehicle(Vehicle $vehicle): ?int
+    {
+        $brand = $this->normalizeVehicleText($vehicle->make);
+        $model = $this->normalizeVehicleText($vehicle->model);
+        $trim = $this->normalizeVehicleText($vehicle->trim);
+
+        $matchingBrandModel = VehicleType::query()
+            ->get()
+            ->filter(function (VehicleType $type) use ($brand, $model): bool {
+                return $this->normalizeVehicleText($type->brand) === $brand
+                    && $this->normalizeVehicleText($type->model) === $model;
+            })
+            ->values();
+
+        if ($matchingBrandModel->isEmpty()) {
+            return null;
+        }
+
+        if ($trim !== '') {
+            $exactVersion = $matchingBrandModel->first(
+                fn (VehicleType $type): bool => $this->normalizeVehicleText($type->version) === $trim
+            );
+
+            if ($exactVersion) {
+                return $exactVersion->getKey();
             }
 
-            return ! empty($value);
+            $partialVersion = $matchingBrandModel->first(function (VehicleType $type) use ($trim): bool {
+                $version = $this->normalizeVehicleText($type->version);
+
+                if ($version === '') {
+                    return false;
+                }
+
+                return str_contains($trim, $version) || str_contains($version, $trim);
+            });
+
+            if ($partialVersion) {
+                return $partialVersion->getKey();
+            }
         }
 
-        return false;
+        return $matchingBrandModel->first()?->getKey();
+    }
+
+    protected function normalizeVehicleText(?string $value): string
+    {
+        return Str::of((string) $value)
+            ->replace("\xc2\xa0", ' ')
+            ->squish()
+            ->lower()
+            ->value();
     }
 }

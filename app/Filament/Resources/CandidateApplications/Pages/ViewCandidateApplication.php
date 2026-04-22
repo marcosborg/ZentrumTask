@@ -5,8 +5,10 @@ namespace App\Filament\Resources\CandidateApplications\Pages;
 use App\Filament\Resources\CandidateApplications\CandidateApplicationResource;
 use App\Filament\Resources\Drivers\DriverResource;
 use App\Models\Driver;
+use App\Services\IfthenpayMultibancoService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Filament\Actions\Action;
+use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\Select;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ViewRecord;
@@ -16,6 +18,8 @@ use Illuminate\Support\Facades\Storage;
 class ViewCandidateApplication extends ViewRecord
 {
     protected static string $resource = CandidateApplicationResource::class;
+
+    protected ?string $heading = 'Detalhe da reserva';
 
     protected function getHeaderActions(): array
     {
@@ -36,8 +40,56 @@ class ViewCandidateApplication extends ViewRecord
 
                     return response()->streamDownload(
                         fn () => print ($pdf->output()),
-                        'candidatura-'.$record->id.'.pdf'
+                        'reserva-'.$record->id.'.pdf'
                     );
+                }),
+            Action::make('refreshPaymentReference')
+                ->label('Gerar / atualizar referência')
+                ->icon('heroicon-o-credit-card')
+                ->color('gray')
+                ->action(function (IfthenpayMultibancoService $paymentService): void {
+                    $paymentService->ensureReference($this->record);
+                    $this->record->refresh();
+
+                    Notification::make()
+                        ->success()
+                        ->title('Referência atualizada')
+                        ->body('Os dados de pagamento da reserva foram atualizados.')
+                        ->send();
+                }),
+            Action::make('markPaymentAsPaid')
+                ->label('Marcar pagamento manual')
+                ->icon('heroicon-o-check-circle')
+                ->color('success')
+                ->visible(fn (): bool => $this->record?->reservation_payment_status !== 'paid')
+                ->form([
+                    DateTimePicker::make('paid_at')
+                        ->label('Data de pagamento')
+                        ->seconds(false)
+                        ->default(now())
+                        ->required(),
+                    Select::make('status')
+                        ->label('Estado')
+                        ->options([
+                            'paid' => 'Pago',
+                        ])
+                        ->default('paid')
+                        ->required(),
+                ])
+                ->action(function (array $data): void {
+                    $this->record->update([
+                        'reservation_payment_status' => $data['status'],
+                        'reservation_payment_paid_at' => $data['paid_at'],
+                        'reservation_payment_last_checked_at' => now(),
+                    ]);
+
+                    $this->record->refresh();
+
+                    Notification::make()
+                        ->success()
+                        ->title('Pagamento atualizado')
+                        ->body('O pagamento ficou marcado manualmente no backoffice.')
+                        ->send();
                 }),
             Action::make('createDriver')
                 ->label('Criar Driver')
@@ -52,7 +104,7 @@ class ViewCandidateApplication extends ViewRecord
                             'nif' => $this->record->nif,
                             'iban' => $this->record->iban,
                             'candidate_application_id' => $this->record->id,
-                            'notes' => 'Criado a partir da candidatura '.$this->record->id,
+                            'notes' => 'Criado a partir da reserva '.$this->record->id,
                         ]);
 
                         $this->record->update([
@@ -65,7 +117,7 @@ class ViewCandidateApplication extends ViewRecord
                     Notification::make()
                         ->success()
                         ->title('Driver criado')
-                        ->body('Registo criado a partir da candidatura.')
+                        ->body('Registo criado a partir da reserva.')
                         ->send();
 
                     $this->redirect(DriverResource::getUrl('edit', ['record' => $driver]));

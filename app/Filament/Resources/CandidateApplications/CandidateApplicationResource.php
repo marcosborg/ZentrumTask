@@ -8,6 +8,7 @@ use App\Filament\Resources\CandidateApplications\Pages\ViewCandidateApplication;
 use App\Filament\Resources\CandidateApplications\Tables\CandidateApplicationsTable;
 use App\Models\CandidateApplication;
 use BackedEnum;
+use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TagsInput;
@@ -28,6 +29,12 @@ use UnitEnum;
 class CandidateApplicationResource extends Resource
 {
     protected static ?string $model = CandidateApplication::class;
+
+    protected static ?string $modelLabel = 'Reserva de viatura';
+
+    protected static ?string $pluralModelLabel = 'Reservas de viatura';
+
+    protected static ?string $navigationLabel = 'Reservas de viatura';
 
     protected static BackedEnum|string|null $navigationIcon = Heroicon::OutlinedDocumentText;
 
@@ -159,6 +166,51 @@ class CandidateApplicationResource extends Resource
                         Toggle::make('contact_authorization')
                             ->label('Autorizou contacto'),
                     ]),
+                Section::make('Pagamento da reserva')
+                    ->columns(3)
+                    ->components([
+                        Select::make('reservation_payment_status')
+                            ->label('Estado do pagamento')
+                            ->options(self::paymentStatusOptions()),
+                        TextInput::make('reservation_payment_entity')
+                            ->label('Entidade')
+                            ->disabled(),
+                        TextInput::make('reservation_payment_sub_entity')
+                            ->label('Subentidade')
+                            ->disabled(),
+                        TextInput::make('reservation_payment_reference')
+                            ->label('Referencia')
+                            ->disabled(),
+                        TextInput::make('reservation_payment_order_id')
+                            ->label('Order ID')
+                            ->disabled(),
+                        TextInput::make('reservation_payment_request_id')
+                            ->label('Request ID')
+                            ->disabled(),
+                        TextInput::make('reservation_payment_base_amount')
+                            ->label('Caucao base')
+                            ->prefix('EUR')
+                            ->numeric()
+                            ->disabled(),
+                        TextInput::make('reservation_payment_vat_rate')
+                            ->label('IVA %')
+                            ->suffix('%')
+                            ->numeric()
+                            ->disabled(),
+                        TextInput::make('reservation_payment_amount')
+                            ->label('Total a pagar')
+                            ->prefix('EUR')
+                            ->numeric(),
+                        DateTimePicker::make('reservation_payment_generated_at')
+                            ->label('Referencia gerada em')
+                            ->seconds(false),
+                        DateTimePicker::make('reservation_payment_expires_at')
+                            ->label('Valida ate')
+                            ->seconds(false),
+                        DateTimePicker::make('reservation_payment_paid_at')
+                            ->label('Pago em')
+                            ->seconds(false),
+                    ]),
             ]);
     }
 
@@ -227,6 +279,24 @@ class CandidateApplicationResource extends Resource
                             Html::make(fn (CandidateApplication $record): HtmlString => self::documentLink('Registo criminal', $record, 'criminal_record')),
                         ]),
                     ]),
+                Section::make('Pagamento da reserva')
+                    ->columns(3)
+                    ->components([
+                        Text::make(fn (CandidateApplication $record): string => 'Estado do pagamento: '.self::paymentStatusLabel($record->reservation_payment_status))
+                            ->color(fn (CandidateApplication $record): string => self::paymentStatusColor($record->reservation_payment_status))
+                            ->weight('semibold'),
+                        Text::make(fn (CandidateApplication $record): string => 'Entidade: '.((string) ($record->reservation_payment_entity ?? '-'))),
+                        Text::make(fn (CandidateApplication $record): string => 'Subentidade: '.((string) ($record->reservation_payment_sub_entity ?? '-'))),
+                        Text::make(fn (CandidateApplication $record): string => 'Referencia: '.((string) ($record->reservation_payment_reference ?? '-'))),
+                        Text::make(fn (CandidateApplication $record): string => 'Order ID: '.((string) ($record->reservation_payment_order_id ?? '-'))),
+                        Text::make(fn (CandidateApplication $record): string => 'Request ID: '.((string) ($record->reservation_payment_request_id ?? '-'))),
+                        Text::make(fn (CandidateApplication $record): string => 'Caucao base: '.self::moneyLabel($record->reservation_payment_base_amount)),
+                        Text::make(fn (CandidateApplication $record): string => 'IVA: '.(($record->reservation_payment_vat_rate !== null) ? number_format((float) $record->reservation_payment_vat_rate, 2, ',', '.').'%' : '-')),
+                        Text::make(fn (CandidateApplication $record): string => 'Total a pagar: '.self::moneyLabel($record->reservation_payment_amount)),
+                        Text::make(fn (CandidateApplication $record): string => 'Referencia gerada em: '.(optional($record->reservation_payment_generated_at)->format('Y-m-d H:i') ?? '-')),
+                        Text::make(fn (CandidateApplication $record): string => 'Valida ate: '.(optional($record->reservation_payment_expires_at)->format('Y-m-d H:i') ?? '-')),
+                        Text::make(fn (CandidateApplication $record): string => 'Pago em: '.(optional($record->reservation_payment_paid_at)->format('Y-m-d H:i') ?? '-')),
+                    ]),
             ]);
     }
 
@@ -242,6 +312,42 @@ class CandidateApplicationResource extends Resource
             'view' => ViewCandidateApplication::route('/{record}'),
             'edit' => EditCandidateApplication::route('/{record}/edit'),
         ];
+    }
+
+    public static function paymentStatusOptions(): array
+    {
+        return [
+            'pending_generation' => 'Por gerar',
+            'pending_configuration' => 'Aguardando configuracao',
+            'generated' => 'Referencia gerada',
+            'generation_failed' => 'Falha ao gerar',
+            'paid' => 'Pago',
+        ];
+    }
+
+    public static function paymentStatusLabel(?string $state): string
+    {
+        return self::paymentStatusOptions()[$state ?? ''] ?? 'Sem estado';
+    }
+
+    public static function paymentStatusColor(?string $state): string
+    {
+        return match ($state) {
+            'paid' => 'success',
+            'generated' => 'info',
+            'generation_failed' => 'danger',
+            'pending_configuration', 'pending_generation' => 'warning',
+            default => 'gray',
+        };
+    }
+
+    public static function moneyLabel(mixed $amount): string
+    {
+        if ($amount === null || $amount === '') {
+            return '-';
+        }
+
+        return number_format((float) $amount, 2, ',', '.').' EUR';
     }
 
     private static function documentName(CandidateApplication $record, string $key): string

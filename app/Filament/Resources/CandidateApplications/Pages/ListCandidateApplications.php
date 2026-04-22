@@ -11,6 +11,8 @@ class ListCandidateApplications extends ListRecords
 {
     protected static string $resource = CandidateApplicationResource::class;
 
+    protected ?string $heading = 'Reservas de viatura';
+
     protected function getHeaderActions(): array
     {
         return [];

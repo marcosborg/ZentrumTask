@@ -46,6 +46,12 @@ class CandidateApplicationsTable
                         'converted' => 'Convertida',
                         default => 'Rascunho',
                     }),
+                TextColumn::make('reservation_payment_status')
+                    ->label('Pagamento')
+                    ->badge()
+                    ->formatStateUsing(fn (?string $state): string => \App\Filament\Resources\CandidateApplications\CandidateApplicationResource::paymentStatusLabel($state))
+                    ->color(fn (?string $state): string => \App\Filament\Resources\CandidateApplications\CandidateApplicationResource::paymentStatusColor($state))
+                    ->toggleable(),
                 TextColumn::make('current_step')
                     ->label('Passo atual')
                     ->sortable(),
@@ -66,6 +72,9 @@ class CandidateApplicationsTable
                         'draft' => 'Rascunho',
                         'converted' => 'Convertida',
                     ]),
+                SelectFilter::make('reservation_payment_status')
+                    ->label('Pagamento')
+                    ->options(\App\Filament\Resources\CandidateApplications\CandidateApplicationResource::paymentStatusOptions()),
             ])
             ->recordActions([
                 ViewAction::make(),

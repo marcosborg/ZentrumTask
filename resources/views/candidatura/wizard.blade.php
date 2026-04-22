@@ -1,6 +1,6 @@
 @extends('website.layout')
 
-@section('title', 'Candidatura online | Zentrum TVDE')
+@section('title', 'Reserva de viatura | Zentrum TVDE')
 
 @push('styles')
 <style>
@@ -58,6 +58,219 @@
 .wizard-hero ::placeholder {
     color: #94a3b8;
 }
+.wizard-check-grid {
+    display: grid;
+    gap: 0.9rem;
+}
+.wizard-check-card {
+    position: relative;
+    display: flex;
+    align-items: flex-start;
+    gap: 0.9rem;
+    padding: 1rem 1.1rem;
+    border: 1px solid #d9e2ec;
+    border-radius: 18px;
+    background: #ffffff;
+    box-shadow: 0 6px 18px rgba(15, 23, 42, 0.04);
+    cursor: pointer;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease, background 0.2s ease;
+}
+.wizard-check-card:hover {
+    border-color: #93c5fd;
+    box-shadow: 0 10px 24px rgba(37, 99, 235, 0.10);
+    transform: translateY(-1px);
+}
+.wizard-check-card.is-active {
+    border-color: #2563eb;
+    background: linear-gradient(180deg, #eff6ff 0%, #f8fbff 100%);
+    box-shadow: 0 12px 28px rgba(37, 99, 235, 0.14);
+}
+.wizard-check-input {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+}
+.wizard-check-indicator {
+    width: 26px;
+    height: 26px;
+    border-radius: 999px;
+    border: 2px solid #cbd5e1;
+    background: #fff;
+    flex: 0 0 26px;
+    margin-top: 0.05rem;
+    position: relative;
+    transition: border-color 0.2s ease, background 0.2s ease, transform 0.2s ease;
+}
+.wizard-check-card.is-active .wizard-check-indicator {
+    border-color: #2563eb;
+    background: #2563eb;
+    transform: scale(1.03);
+}
+.wizard-check-card.is-active .wizard-check-indicator::after {
+    content: '';
+    position: absolute;
+    left: 7px;
+    top: 3px;
+    width: 7px;
+    height: 12px;
+    border: solid #fff;
+    border-width: 0 2px 2px 0;
+    transform: rotate(45deg);
+}
+.wizard-check-copy {
+    min-width: 0;
+}
+.wizard-check-title {
+    display: block;
+    color: #0f172a;
+    font-weight: 700;
+    line-height: 1.35;
+}
+.wizard-check-hint {
+    display: block;
+    margin-top: 0.25rem;
+    color: #64748b;
+    font-size: 0.92rem;
+    line-height: 1.5;
+}
+.wizard-check-grid--inline {
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+.wizard-info-banner {
+    background: linear-gradient(180deg, #eff6ff 0%, #f8fbff 100%);
+    border: 1px solid #bfdbfe;
+    border-radius: 18px;
+    padding: 1rem 1.1rem;
+}
+.wizard-info-banner strong {
+    color: #0f172a;
+}
+.wizard-tax-link {
+    display: inline-block;
+    margin: 0;
+    padding: 0;
+    border: none;
+    background: transparent;
+    color: #1d4ed8;
+    font-weight: 800;
+    text-decoration: none;
+    line-height: 1;
+    vertical-align: super;
+    font-size: 0.8em;
+    cursor: pointer;
+}
+.wizard-tax-popover {
+    position: relative;
+    display: inline-flex;
+    align-items: flex-start;
+}
+.wizard-tax-popover__bubble {
+    position: absolute;
+    left: 50%;
+    bottom: calc(100% + 0.65rem);
+    transform: translateX(-50%);
+    width: min(320px, 72vw);
+    padding: 0.8rem 0.9rem;
+    border-radius: 14px;
+    background: #0f172a;
+    color: #fff;
+    font-size: 0.88rem;
+    line-height: 1.55;
+    box-shadow: 0 18px 32px rgba(15, 23, 42, 0.22);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.18s ease, transform 0.18s ease;
+    z-index: 10;
+}
+.wizard-tax-popover__bubble::after {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 100%;
+    transform: translateX(-50%);
+    border-width: 7px 6px 0 6px;
+    border-style: solid;
+    border-color: #0f172a transparent transparent transparent;
+}
+.wizard-tax-popover:hover .wizard-tax-popover__bubble,
+.wizard-tax-popover:focus-within .wizard-tax-popover__bubble {
+    opacity: 1;
+    transform: translateX(-50%) translateY(-2px);
+}
+.wizard-payment-grid {
+    display: grid;
+    gap: 0.9rem;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+.wizard-payment-grid--secondary {
+    margin-top: 0.9rem;
+}
+.wizard-payment-summary {
+    padding: 1.15rem 1.2rem;
+    border-radius: 22px;
+    background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+    border: 1px solid #0f172a;
+    box-shadow: 0 16px 30px rgba(15, 23, 42, 0.18);
+    color: #fff;
+}
+.wizard-payment-summary__row + .wizard-payment-summary__row {
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.12);
+}
+.wizard-payment-summary__label {
+    display: block;
+    margin-bottom: 0.2rem;
+    color: rgba(255, 255, 255, 0.72);
+    font-size: 0.82rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+.wizard-payment-summary__value {
+    display: block;
+    color: #fff;
+    font-size: 1.8rem;
+    font-weight: 800;
+    line-height: 1.15;
+    letter-spacing: 0.02em;
+}
+.wizard-payment-summary__meta {
+    display: block;
+    margin-top: 0.35rem;
+    color: rgba(255, 255, 255, 0.74);
+    font-size: 0.92rem;
+    line-height: 1.45;
+}
+.wizard-payment-card {
+    padding: 1rem 1.1rem;
+    border-radius: 18px;
+    background: linear-gradient(180deg, #eff6ff 0%, #f8fbff 100%);
+    border: 1px solid #bfdbfe;
+    box-shadow: 0 8px 22px rgba(37, 99, 235, 0.08);
+}
+.wizard-payment-card span {
+    display: block;
+    margin-bottom: 0.25rem;
+    color: #64748b;
+    font-size: 0.82rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+.wizard-payment-card strong {
+    color: #0f172a;
+    font-size: 1.3rem;
+    font-weight: 800;
+    line-height: 1.2;
+}
+.wizard-payment-card__meta {
+    display: block;
+    margin-top: 0.45rem;
+    color: #64748b;
+    font-size: 0.9rem;
+    line-height: 1.45;
+}
 </style>
 @endpush
 
@@ -67,16 +280,17 @@
     function wizard(config) {
         return {
             steps: [
-                { name: 'welcome', title: 'Boas-vindas', subtitle: 'Modelo Zentrum TVDE' },
-                { name: 'vehicle', title: 'Escolha de viatura', subtitle: 'Selecione o tipo de viatura pretendido' },
-                { name: 'rental', title: 'Condições de aluguer', subtitle: 'Leia e aceite' },
-                { name: 'eligibility', title: 'Elegibilidade TVDE', subtitle: 'Requisitos' },
-                { name: 'personal', title: 'Dados pessoais', subtitle: 'Contacto e identificação' },
-                { name: 'documents', title: 'Documentos', subtitle: 'Uploads obrigatórios' },
-                { name: 'legal', title: 'Confirmações legais', subtitle: 'RGPD e autorizações' },
-                { name: 'summary', title: 'Conclusão', subtitle: 'Revisão final' },
+                { name: 'welcome', title: 'Como funciona a reserva', subtitle: 'Processo Zentrum TVDE' },
+                { name: 'vehicle', title: 'Viatura', subtitle: 'Selecione a viatura pretendida' },
+                { name: 'rental', title: 'Condições da reserva', subtitle: 'Caução, aluguer e levantamento' },
+                { name: 'eligibility', title: 'Perfil TVDE', subtitle: 'Validação inicial' },
+                { name: 'personal', title: 'Dados da reserva', subtitle: 'Contacto e identificação' },
+                { name: 'documents', title: 'Documentos opcionais', subtitle: 'Envio para acelerar a reserva' },
+                { name: 'summary', title: 'Confirmar reserva', subtitle: 'Revisão final' },
+                { name: 'payment', title: 'Pagamento da caução', subtitle: 'Referência Multibanco' },
             ],
             vehicleTypes: config.vehicleTypes || [],
+            preselectedVehicle: config.preselectedVehicle || null,
             documentFields: [
                 { field: 'document_id', label: 'Documento de identificação' },
                 { field: 'driver_license', label: 'Carta de condução' },
@@ -85,20 +299,23 @@
             ],
             form: {},
             documents: {},
+            payment: {},
             token: config.token,
             saveEndpoint: config.saveEndpoint,
             uploadEndpoint: config.uploadEndpoint,
             submitEndpoint: config.submitEndpoint,
+            paymentEndpoint: config.paymentEndpoint,
             stepIndex: 0,
             saveMessage: '',
             status: config.initial.status,
+            paymentLoading: false,
 
             get progress() {
                 return Math.round(((this.stepIndex + 1) / this.steps.length) * 100);
             },
 
             get statusLabel() {
-                return this.status === 'submitted' ? 'Submetida' : (this.status === 'incomplete' ? 'Incompleta' : 'Rascunho');
+                return this.status === 'submitted' ? 'Reserva enviada' : (this.status === 'incomplete' ? 'Em preenchimento' : 'Rascunho');
             },
 
             init() {
@@ -122,11 +339,19 @@
                     contact_authorization: Boolean(config.initial.contact_authorization),
                 };
                 this.documents = config.initial.documents ?? {};
+                this.payment = config.initialPayment ?? {};
                 this.documentFields.forEach((doc) => {
                     this.documents[doc.field] = this.normalizeDocumentList(this.documents[doc.field]);
                 });
-                const foundStep = this.steps.findIndex((s) => s.name === (config.initial.current_step || 'welcome'));
+                const initialStep = (config.initial.current_step || 'welcome') === 'legal'
+                    ? 'summary'
+                    : (config.initial.current_step || 'welcome');
+                const foundStep = this.steps.findIndex((s) => s.name === initialStep);
                 this.stepIndex = foundStep >= 0 ? foundStep : 0;
+
+                if (this.steps[this.stepIndex]?.name === 'payment') {
+                    this.loadPaymentReference();
+                }
             },
 
             normalizeDocumentList(value) {
@@ -196,10 +421,13 @@
                     );
                 }
                 if (step === 'documents') {
-                    return this.documentFields.every((doc) => Array.isArray(this.documents[doc.field]) && this.documents[doc.field].length > 0);
+                    return true;
                 }
-                if (step === 'legal') {
+                if (step === 'summary') {
                     return this.form.rgpd && this.form.truth_declaration && this.form.contact_authorization;
+                }
+                if (step === 'payment') {
+                    return true;
                 }
 
                 return true;
@@ -209,12 +437,12 @@
                 const step = this.steps[this.stepIndex].name;
 
                 if (!this.validateStep(step)) {
-                    this.saveMessage = 'Preencha todos os campos obrigatorios';
+                    this.saveMessage = 'Preencha todos os campos obrigatórios';
 
                     return false;
                 }
 
-                this.saveMessage = 'A guardar...';
+                this.saveMessage = 'A guardar reserva...';
                 const payload = { ...this.form, step, token: this.token };
                 try {
                     const res = await fetch(this.saveEndpoint, {
@@ -226,11 +454,11 @@
                         body: JSON.stringify(payload),
                     });
                     if (!res.ok) throw new Error('Erro ao guardar');
-                    this.saveMessage = 'Dados guardados';
+                    this.saveMessage = 'Dados da reserva guardados';
                     this.status = this.status === 'submitted' ? 'submitted' : 'incomplete';
                     return true;
                 } catch (e) {
-                    this.saveMessage = 'Erro a guardar';
+                    this.saveMessage = 'Erro ao guardar a reserva';
                     return false;
                 }
             },
@@ -241,6 +469,10 @@
 
                 if (this.stepIndex < this.steps.length - 1) {
                     this.stepIndex += 1;
+                }
+
+                if (this.steps[this.stepIndex]?.name === 'payment') {
+                    await this.loadPaymentReference();
                 }
             },
 
@@ -290,9 +522,9 @@
 
             async submit() {
                 // Validate all steps before submit
-                const allValid = this.steps.every((s) => this.validateStep(s.name === 'summary' ? 'legal' : s.name));
+                const allValid = this.steps.every((s) => this.validateStep(s.name));
                 if (!allValid) {
-                    this.saveMessage = 'Preencha todos os campos obrigatorios antes de submeter';
+                    this.saveMessage = 'Preencha todos os campos obrigatórios antes de enviar a reserva';
 
                     return;
                 }
@@ -300,7 +532,7 @@
                 const saved = await this.saveCurrentStep();
                 if (!saved) return;
 
-                this.saveMessage = 'A submeter...';
+                this.saveMessage = 'A enviar reserva...';
                 const payload = { ...this.form, token: this.token };
                 const res = await fetch(this.submitEndpoint, {
                     method: 'POST',
@@ -311,21 +543,57 @@
                     body: JSON.stringify(payload),
                 });
                 if (!res.ok) {
-                    this.saveMessage = 'Erro na submissão';
+                    this.saveMessage = 'Erro ao enviar a reserva';
                     return;
                 }
                 this.status = 'submitted';
-                this.saveMessage = 'Candidatura submetida com sucesso. Será redirecionado em 5 segundos...';
+                this.saveMessage = 'Reserva enviada com sucesso. Será redirecionado em 5 segundos...';
 
                 let seconds = 5;
                 const interval = setInterval(() => {
                     seconds -= 1;
-                    this.saveMessage = `Candidatura submetida com sucesso. Será redirecionado em ${seconds} segundos...`;
+                    this.saveMessage = `Reserva enviada com sucesso. Será redirecionado em ${seconds} segundos...`;
                     if (seconds <= 0) {
                         clearInterval(interval);
                         window.location.href = '/';
                     }
                 }, 1000);
+            },
+
+            async loadPaymentReference(force = false) {
+                if (this.paymentLoading) {
+                    return;
+                }
+
+                if (!force && this.payment?.reference) {
+                    return;
+                }
+
+                this.paymentLoading = true;
+                this.saveMessage = 'A preparar referência Multibanco...';
+
+                try {
+                    const res = await fetch(this.paymentEndpoint, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                        },
+                        body: JSON.stringify({ token: this.token }),
+                    });
+
+                    if (!res.ok) {
+                        throw new Error('Erro ao gerar referência');
+                    }
+
+                    const json = await res.json();
+                    this.payment = json.payment || {};
+                    this.saveMessage = this.payment?.message || 'Referência preparada.';
+                } catch (e) {
+                    this.saveMessage = 'Não foi possível preparar a referência Multibanco.';
+                } finally {
+                    this.paymentLoading = false;
+                }
             },
         };
     }
@@ -338,7 +606,7 @@
         <div class="w-100 mb-4">
             <img
                 src="{{ asset('website/assets/header-candidatura.png') }}"
-                alt="Candidatura Zentrum TVDE"
+                alt="Reserva de viatura Zentrum TVDE"
                 class="img-fluid w-100"
                 style="object-fit: cover; max-height: 380px;"
             >
@@ -351,16 +619,22 @@
                         token: '{{ $application->token }}',
                         initial: @js($application->toArray()),
                         vehicleTypes: @js($vehicleTypes),
+                        preselectedVehicle: @js($preselectedVehicle ? [
+                            'id' => $preselectedVehicle->id,
+                            'label' => $preselectedVehicle->displayName(),
+                        ] : null),
+                        initialPayment: @js($initialPayment),
                         uploadEndpoint: '{{ $uploadEndpoint }}',
                         saveEndpoint: '{{ $saveEndpoint }}',
-                        submitEndpoint: '{{ $submitEndpoint }}'
+                        submitEndpoint: '{{ $submitEndpoint }}',
+                        paymentEndpoint: '{{ $paymentEndpoint }}'
                     })"
                     x-init="init()"
                 >
                     <div class="d-flex align-items-center justify-content-between mb-3">
                         <div>
                             <p class="mb-1 text-muted">Zentrum TVDE</p>
-                            <h1 class="h3 mb-0">Candidatura online</h1>
+                            <h1 class="h3 mb-0">Reserva de viatura</h1>
                         </div>
                         <span class="badge bg-success badge-pill" x-text="statusLabel"></span>
                     </div>
@@ -389,17 +663,23 @@
                                 <div class="row g-3">
                                     <template x-if="s.name === 'welcome'">
                                         <div class="col-12">
-                                            <p class="text-muted">Conheça o modelo Zentrum TVDE antes de avançar.</p>
-                                            <div class="form-check">
-                                                <input class="form-check-input" type="checkbox" x-model="form.accepts_model" id="accepts_model">
-                                                <label class="form-check-label" for="accepts_model">
-                                                    Compreendo que a Zentrum TVDE não celebra contratos de trabalho
+                                            <p class="text-muted">Está a iniciar um pedido de reserva. Vamos recolher os dados essenciais para lhe apresentar os próximos passos e preparar a viatura.</p>
+                                            <div class="wizard-check-grid mt-3">
+                                                <label class="wizard-check-card" :class="{ 'is-active': form.accepts_model }" for="accepts_model">
+                                                    <input class="wizard-check-input" type="checkbox" x-model="form.accepts_model" id="accepts_model">
+                                                    <span class="wizard-check-indicator" aria-hidden="true"></span>
+                                                    <span class="wizard-check-copy">
+                                                        <span class="wizard-check-title">Compreendo como funciona a reserva</span>
+                                                        <span class="wizard-check-hint">A Zentrum TVDE disponibiliza a viatura em regime profissional e esta reserva serve para avançar para validação e preparação do processo.</span>
+                                                    </span>
                                                 </label>
-                                            </div>
-                                            <div class="form-check mt-2">
-                                                <input class="form-check-input" type="checkbox" x-model="form.independent_driver" id="independent_driver">
-                                                <label class="form-check-label" for="independent_driver">
-                                                    Pretendo avançar como motorista independente
+                                                <label class="wizard-check-card" :class="{ 'is-active': form.independent_driver }" for="independent_driver">
+                                                    <input class="wizard-check-input" type="checkbox" x-model="form.independent_driver" id="independent_driver">
+                                                    <span class="wizard-check-indicator" aria-hidden="true"></span>
+                                                    <span class="wizard-check-copy">
+                                                        <span class="wizard-check-title">Quero avançar com a minha reserva</span>
+                                                        <span class="wizard-check-hint">Confirma que pretende reservar uma viatura e seguir para a validação do processo.</span>
+                                                    </span>
                                                 </label>
                                             </div>
                                         </div>
@@ -407,7 +687,14 @@
 
                                     <template x-if="s.name === 'vehicle'">
                                         <div class="col-12">
-                                            <p class="text-muted mb-3">Escolha a viatura pretendida. A disponibilidade pode variar; se não existir stock no momento, será encomendada após validação do seu processo.</p>
+                                            <p class="text-muted mb-3">Escolha a viatura pretendida. Se a reserva vier da página de uma viatura específica, esse modelo já aparece pré-selecionado para si.</p>
+                                            <template x-if="preselectedVehicle">
+                                                <div class="wizard-info-banner mb-3">
+                                                    <strong>Reserva iniciada a partir desta viatura:</strong>
+                                                    <span x-text="preselectedVehicle.label"></span>
+                                                    <div class="small text-muted mt-1">A seleção já ficou pré-preenchida para si neste passo.</div>
+                                                </div>
+                                            </template>
                                             <div class="row g-3">
                                                 <template x-for="type in vehicleTypes" :key="type.id">
                                                     <div class="col-md-6">
@@ -430,7 +717,7 @@
                                             <div class="row g-3">
                                                 <div class="col-md-6">
                                                     <div class="p-3 rounded-3 wizard-panel h-100">
-                                                        <h6 class="text-success mb-2">Condições chave</h6>
+                                                        <h6 class="text-success mb-2">O que está incluído</h6>
                                                         <ul class="mb-0 small" style="color:#cbd5e1;">
                                                             <li>Aluguer com manutenção incluída</li>
                                                             <li>Seguro e assistência 24/7</li>
@@ -440,25 +727,38 @@
                                                 </div>
                                                 <div class="col-md-6">
                                                     <div class="p-3 rounded-3 wizard-panel h-100">
-                                                        <h6 class="text-success mb-2">O que esperamos</h6>
+                                                        <h6 class="text-success mb-2">Antes de confirmar a reserva</h6>
                                                         <ul class="mb-0 small" style="color:#cbd5e1;">
-                                                            <li>Profissionalismo e pontualidade</li>
-                                                            <li>Respeito pelas plataformas</li>
-                                                            <li>Comunicação clara com a equipa</li>
+                                                            <li>Leitura completa das condições</li>
+                                                            <li>Disponibilidade para pagamento da caução inicial de 250€
+                                                                <span class="wizard-tax-popover">
+                                                                    <button type="button" class="wizard-tax-link" aria-label="Informação sobre IVA">*</button>
+                                                                    <span class="wizard-tax-popover__bubble" role="tooltip">
+                                                                        IVA incluido à taxa em vigor.
+                                                                    </span>
+                                                                </span>
+                                                            </li>
+                                                            <li>Comunicação rápida com a equipa</li>
                                                         </ul>
                                                     </div>
                                                 </div>
                                             </div>
-                                            <div class="form-check mt-3">
-                                                <input class="form-check-input" type="checkbox" x-model="form.rental_terms_read" id="rental_terms_read">
-                                                <label class="form-check-label" for="rental_terms_read">
-                                                    Li e compreendi as condições
+                                            <div class="wizard-check-grid mt-3">
+                                                <label class="wizard-check-card" :class="{ 'is-active': form.rental_terms_read }" for="rental_terms_read">
+                                                    <input class="wizard-check-input" type="checkbox" x-model="form.rental_terms_read" id="rental_terms_read">
+                                                    <span class="wizard-check-indicator" aria-hidden="true"></span>
+                                                    <span class="wizard-check-copy">
+                                                        <span class="wizard-check-title">Li e compreendi as condições da reserva</span>
+                                                        <span class="wizard-check-hint">Confirme que já leu os pontos principais sobre aluguer, caução e levantamento da viatura.</span>
+                                                    </span>
                                                 </label>
-                                            </div>
-                                            <div class="form-check mt-2">
-                                                <input class="form-check-input" type="checkbox" x-model="form.rental_terms_accept" id="rental_terms_accept">
-                                                <label class="form-check-label" for="rental_terms_accept">
-                                                    Aceito avançar com base nestas condições
+                                                <label class="wizard-check-card" :class="{ 'is-active': form.rental_terms_accept }" for="rental_terms_accept">
+                                                    <input class="wizard-check-input" type="checkbox" x-model="form.rental_terms_accept" id="rental_terms_accept">
+                                                    <span class="wizard-check-indicator" aria-hidden="true"></span>
+                                                    <span class="wizard-check-copy">
+                                                        <span class="wizard-check-title">Aceito avançar com a reserva nestas condições</span>
+                                                        <span class="wizard-check-hint">Sem esta confirmação não conseguimos continuar com a preparação da sua reserva.</span>
+                                                    </span>
                                                 </label>
                                             </div>
                                         </div>
@@ -537,7 +837,10 @@
 
                                     <template x-if="s.name === 'documents'">
                                         <div class="col-12">
-                                            <p class="text-muted mb-3">Uploads obrigatórios. Limite 10MB por ficheiro. Pode arrastar e largar diretamente nas caixas.</p>
+                                            <div class="wizard-info-banner mb-3">
+                                                <strong>Estes ficheiros não são obrigatórios para avançar.</strong>
+                                                <p class="mb-0 mt-2 text-muted">Se os carregar já, conseguimos acelerar a validação e a preparação da reserva. Se preferir, pode enviar a reserva agora e partilhar os documentos mais tarde.</p>
+                                            </div>
                                             <div class="row g-3">
                                                 <template x-for="doc in documentFields" :key="doc.field">
                                                     <div class="col-md-6">
@@ -547,7 +850,7 @@
                                                             @drop="handleDrop($event, doc.field)"
                                                         >
                                                             <p class="fw-semibold mb-1" x-text="doc.label"></p>
-                                                            <p class="small text-muted mb-2">Arraste e largue ou clique para selecionar.</p>
+                                                            <p class="small text-muted mb-2">Opcional. Arraste e largue ou clique para selecionar. Limite de 10MB por ficheiro.</p>
                                                             <label class="w-100">
                                                                 <input type="file" class="d-none" multiple @change="uploadFile($event, doc.field)">
                                                                 <div class="d-flex align-items-center justify-content-between rounded-3 border border-secondary p-2 text-secondary bg-white">
@@ -565,26 +868,17 @@
                                         </div>
                                     </template>
 
-                                    <template x-if="s.name === 'legal'">
-                                        <div class="col-12">
-                                            <div class="form-check">
-                                                <input class="form-check-input" type="checkbox" x-model="form.rgpd" id="rgpd">
-                                                <label class="form-check-label wizard-label" for="rgpd">Li e aceito o tratamento de dados (RGPD)</label>
-                                            </div>
-                                            <div class="form-check mt-2">
-                                                <input class="form-check-input" type="checkbox" x-model="form.truth_declaration" id="truth_declaration">
-                                                <label class="form-check-label wizard-label" for="truth_declaration">Declaro que as informações são verdadeiras</label>
-                                            </div>
-                                            <div class="form-check mt-2">
-                                                <input class="form-check-input" type="checkbox" x-model="form.contact_authorization" id="contact_authorization">
-                                                <label class="form-check-label wizard-label" for="contact_authorization">Autorizo contacto pela equipa Zentrum</label>
-                                            </div>
-                                        </div>
-                                    </template>
-
                                     <template x-if="s.name === 'summary'">
                                         <div class="col-12">
-                                            <p class="text-muted">Revise os dados e confirme a submissão.</p>
+                                            <p class="text-muted">Revise os dados e confirme o envio da reserva. O pagamento da caução inicial de 250€
+                                                <span class="wizard-tax-popover">
+                                                    <button type="button" class="wizard-tax-link" aria-label="Informação sobre IVA">*</button>
+                                                    <span class="wizard-tax-popover__bubble" role="tooltip">
+                                                        IVA incluido à taxa em vigor.
+                                                    </span>
+                                                </span>
+                                                será o passo seguinte.
+                                            </p>
                                             <ul class="list-unstyled mb-0 text-dark">
                                                 <li class="mb-1"><span class="wizard-label">Nome:</span> <span x-text="form.full_name"></span></li>
                                                 <li class="mb-1"><span class="wizard-label">Email:</span> <span x-text="form.email"></span></li>
@@ -595,6 +889,100 @@
                                                     <span x-text="vehicleTypes.find((t) => Number(t.id) === Number(form.vehicle_type_id)) ? `${vehicleTypes.find((t) => Number(t.id) === Number(form.vehicle_type_id)).brand} ${vehicleTypes.find((t) => Number(t.id) === Number(form.vehicle_type_id)).model}` : '-'"></span>
                                                 </li>
                                             </ul>
+
+                                            <div class="wizard-panel rounded-4 p-3 p-md-4 mt-4 mb-3">
+                                                <h3 class="h6 mb-2 text-success">Faltam só estas 3 confirmações</h3>
+                                                <p class="mb-0 text-muted">Marque as três caixas abaixo para conseguir enviar a sua reserva.</p>
+                                            </div>
+                                            <div class="wizard-check-grid">
+                                                <label class="wizard-check-card" :class="{ 'is-active': form.rgpd }" for="rgpd">
+                                                    <input class="wizard-check-input" type="checkbox" x-model="form.rgpd" id="rgpd">
+                                                    <span class="wizard-check-indicator" aria-hidden="true"></span>
+                                                    <span class="wizard-check-copy">
+                                                        <span class="wizard-check-title">Aceito o tratamento de dados (RGPD)</span>
+                                                        <span class="wizard-check-hint">Autoriza a Zentrum a tratar os seus dados para análise, contacto e gestão da reserva.</span>
+                                                    </span>
+                                                </label>
+                                                <label class="wizard-check-card" :class="{ 'is-active': form.truth_declaration }" for="truth_declaration">
+                                                    <input class="wizard-check-input" type="checkbox" x-model="form.truth_declaration" id="truth_declaration">
+                                                    <span class="wizard-check-indicator" aria-hidden="true"></span>
+                                                    <span class="wizard-check-copy">
+                                                        <span class="wizard-check-title">Confirmo que as informações são verdadeiras</span>
+                                                        <span class="wizard-check-hint">Declara que os dados e documentos enviados correspondem à realidade.</span>
+                                                    </span>
+                                                </label>
+                                                <label class="wizard-check-card" :class="{ 'is-active': form.contact_authorization }" for="contact_authorization">
+                                                    <input class="wizard-check-input" type="checkbox" x-model="form.contact_authorization" id="contact_authorization">
+                                                    <span class="wizard-check-indicator" aria-hidden="true"></span>
+                                                    <span class="wizard-check-copy">
+                                                        <span class="wizard-check-title">Autorizo contacto pela equipa Zentrum</span>
+                                                        <span class="wizard-check-hint">Permite que a nossa equipa fale consigo sobre a viatura e os próximos passos.</span>
+                                                    </span>
+                                                </label>
+                                            </div>
+                                        </div>
+                                    </template>
+
+                                    <template x-if="s.name === 'payment'">
+                                        <div class="col-12">
+                                            <div class="wizard-info-banner mb-3">
+                                                <strong>Pagamento por referência Multibanco.</strong>
+                                                <p class="mb-0 mt-2 text-muted" x-text="payment?.message || 'Estamos a preparar a referência para esta reserva.'"></p>
+                                            </div>
+
+                                            <div class="wizard-payment-summary">
+                                                <div class="wizard-payment-summary__row">
+                                                    <span class="wizard-payment-summary__label">Entidade</span>
+                                                    <strong class="wizard-payment-summary__value" x-text="payment?.entity || '12133'"></strong>
+                                                    <small class="wizard-payment-summary__meta">
+                                                        Subentidade:
+                                                        <span x-text="payment?.sub_entity || '054'"></span>
+                                                    </small>
+                                                </div>
+                                                <div class="wizard-payment-summary__row">
+                                                    <span class="wizard-payment-summary__label">Referência</span>
+                                                    <strong class="wizard-payment-summary__value" x-text="paymentLoading ? 'A gerar referência…' : (payment?.reference || 'A gerar automaticamente')"></strong>
+                                                    <template x-if="payment?.expires_at">
+                                                        <small class="wizard-payment-summary__meta">
+                                                            Válida até
+                                                            <span x-text="new Date(payment.expires_at).toLocaleString('pt-PT', { dateStyle: 'short', timeStyle: 'short' })"></span>
+                                                        </small>
+                                                    </template>
+                                                </div>
+                                                <div class="wizard-payment-summary__row">
+                                                    <span class="wizard-payment-summary__label">Valor</span>
+                                                    <strong class="wizard-payment-summary__value">
+                                                        <span x-text="payment?.formatted_amount || '307,50€'"></span>
+                                                        <span class="wizard-tax-popover">
+                                                            <button type="button" class="wizard-tax-link" aria-label="Informação sobre IVA">*</button>
+                                                            <span class="wizard-tax-popover__bubble" role="tooltip">
+                                                                IVA incluido à taxa em vigor.
+                                                            </span>
+                                                        </span>
+                                                    </strong>
+                                                    <small class="wizard-payment-summary__meta">
+                                                        Caução base:
+                                                        <span x-text="payment?.formatted_base_amount || '250,00€'"></span>
+                                                        · IVA:
+                                                        <span x-text="payment?.formatted_vat_amount || '57,50€'"></span>
+                                                    </small>
+                                                </div>
+                                            </div>
+
+                                            <div class="wizard-panel rounded-4 p-3 p-md-4 mt-3">
+                                                <h3 class="h6 mb-2 text-success">Como usar esta referência</h3>
+                                                <ul class="mb-0 small">
+                                                    <li>Use a entidade, subentidade e referência apresentadas neste passo para liquidar a caução inicial.</li>
+                                                    <li>O valor total a pagar já inclui o IVA aplicável à fase inicial da reserva.</li>
+                                                    <li>Depois do pagamento, poderemos confirmar a reserva da viatura.</li>
+                                                </ul>
+                                            </div>
+
+                                            <div class="mt-3">
+                                                <button type="button" class="btn btn-outline-secondary" @click="loadPaymentReference(true)" :disabled="paymentLoading">
+                                                    <span x-text="paymentLoading ? 'A atualizar…' : 'Atualizar referência'"></span>
+                                                </button>
+                                            </div>
                                         </div>
                                     </template>
                                 </div>
@@ -609,7 +997,7 @@
                                             type="button"
                                             class="btn btn-success"
                                             @click="stepIndex === steps.length - 1 ? submit() : nextStep()"
-                                            x-text="stepIndex === steps.length - 1 ? 'Submeter candidatura' : 'Avançar'"
+                                            x-text="stepIndex === steps.length - 1 ? 'Enviar reserva' : (steps[stepIndex].name === 'documents' ? 'Saltar por agora' : (steps[stepIndex].name === 'summary' ? 'Continuar para pagamento' : 'Avançar'))"
                                         ></button>
                                     </div>
                                 </div>
@@ -622,4 +1010,3 @@
     </div>
 </section>
 @endsection
-

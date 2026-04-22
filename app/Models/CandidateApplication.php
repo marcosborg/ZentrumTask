@@ -40,6 +40,21 @@ class CandidateApplication extends Model
         'legal_ip',
         'legal_version',
         'vehicle_type_id',
+        'reservation_payment_provider',
+        'reservation_payment_status',
+        'reservation_payment_order_id',
+        'reservation_payment_entity',
+        'reservation_payment_sub_entity',
+        'reservation_payment_reference',
+        'reservation_payment_request_id',
+        'reservation_payment_base_amount',
+        'reservation_payment_vat_rate',
+        'reservation_payment_amount',
+        'reservation_payment_generated_at',
+        'reservation_payment_expires_at',
+        'reservation_payment_paid_at',
+        'reservation_payment_last_checked_at',
+        'reservation_payment_payload',
     ];
 
     /**
@@ -52,6 +67,10 @@ class CandidateApplication extends Model
             'last_saved_at' => 'datetime',
             'rental_terms_accepted_at' => 'datetime',
             'legal_confirmed_at' => 'datetime',
+            'reservation_payment_generated_at' => 'datetime',
+            'reservation_payment_expires_at' => 'datetime',
+            'reservation_payment_paid_at' => 'datetime',
+            'reservation_payment_last_checked_at' => 'datetime',
             'accepts_model' => 'boolean',
             'independent_driver' => 'boolean',
             'rental_terms_read' => 'boolean',
@@ -64,6 +83,10 @@ class CandidateApplication extends Model
             'platforms' => 'array',
             'documents' => 'array',
             'vehicle_type_id' => 'integer',
+            'reservation_payment_base_amount' => 'decimal:2',
+            'reservation_payment_vat_rate' => 'decimal:2',
+            'reservation_payment_amount' => 'decimal:2',
+            'reservation_payment_payload' => 'array',
         ];
     }
 
