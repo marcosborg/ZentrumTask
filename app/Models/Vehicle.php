@@ -8,8 +8,8 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
-use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Spatie\MediaLibrary\HasMedia;
 use Spatie\MediaLibrary\InteractsWithMedia;
 
@@ -172,6 +172,16 @@ class Vehicle extends Model implements HasMedia
             'inactive' => 'Inativa',
             default => (string) $this->status,
         };
+    }
+
+    public function hasWeeklyRentalPrice(): bool
+    {
+        return (float) ($this->weekly_rental_price ?? 0) > 0;
+    }
+
+    public function weeklyRentalPriceFormatted(): string
+    {
+        return number_format((float) ($this->weekly_rental_price ?? 0), 2, ',', ' ');
     }
 
     /**

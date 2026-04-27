@@ -10,7 +10,7 @@
   <meta name="twitter:image" content="{{ $vehicle->primaryImageUrl() }}" />
   <script type="application/ld+json">
     {!! json_encode([
-        '@context' => 'https://schema.org',
+        '@'.'context' => 'https://schema.org',
         '@type' => 'Product',
         'name' => $vehicle->displayName(),
         'description' => $vehicle->notes ?: 'Ficha publica da viatura TVDE.',
@@ -24,6 +24,8 @@
             '@type' => 'Offer',
             'availability' => $vehicle->status === 'available' ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock',
             'url' => $vehicle->publicUrl(),
+            'priceCurrency' => $vehicle->hasWeeklyRentalPrice() ? 'EUR' : null,
+            'price' => $vehicle->hasWeeklyRentalPrice() ? (float) $vehicle->weekly_rental_price : null,
         ],
     ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) !!}
   </script>
@@ -81,6 +83,13 @@
               <div class="fleet-detail-price">{{ $vehicle->websiteAvailabilityLabel() }}</div>
               <div class="fleet-detail-badge">{{ $vehicle->statusLabel() }}</div>
             </div>
+
+            @if ($vehicle->hasWeeklyRentalPrice())
+              <div class="fleet-detail-rental">
+                <span>Aluguer semanal</span>
+                <strong>{{ $vehicle->weeklyRentalPriceFormatted() }}&euro;</strong>
+              </div>
+            @endif
 
             <div class="fleet-detail-meta">
               <div class="fleet-detail-meta-item">
@@ -146,6 +155,12 @@
             </div>
 
             <div class="fleet-reservation-highlight">
+              @if ($vehicle->hasWeeklyRentalPrice())
+                <div class="fleet-reservation-highlight-item">
+                  <span>Aluguer semanal</span>
+                  <strong>{{ $vehicle->weeklyRentalPriceFormatted() }}&euro;</strong>
+                </div>
+              @endif
               <div class="fleet-reservation-highlight-item">
                 <span>Caução inicial</span>
                 <div class="fleet-highlight-value">
@@ -375,6 +390,32 @@
       color: #0f172a;
     }
 
+    .fleet-detail-rental {
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+      padding: 1rem 1.1rem;
+      border-radius: 18px;
+      background: #f3f8ff;
+      border: 1px solid #dbeafe;
+      margin-bottom: 1.25rem;
+    }
+
+    .fleet-detail-rental span {
+      color: #47637f;
+      font-size: 0.8rem;
+      font-weight: 900;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .fleet-detail-rental strong {
+      color: #0f172a;
+      font-size: 1.8rem;
+      line-height: 1;
+      font-weight: 900;
+    }
+
     .fleet-detail-badge,
     .fleet-trust-list span {
       background: #f8fbff;
@@ -573,7 +614,7 @@
 
     .fleet-reservation-highlight {
       display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
       gap: 0.85rem;
       margin: 1.35rem 0 1.5rem;
     }

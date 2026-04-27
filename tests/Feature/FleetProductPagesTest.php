@@ -39,6 +39,7 @@ it('shows tvde vehicles on the homepage and links to the product page', function
         'trim' => 'Long Range',
         'source' => 'tvde',
         'status' => 'available',
+        'weekly_rental_price' => 325.50,
         'notes' => 'Autonomia alargada e conforto para TVDE.',
     ]);
 
@@ -47,7 +48,7 @@ it('shows tvde vehicles on the homepage and links to the product page', function
         'vin' => '5YJ3E1EA7JF000011',
         'make' => 'BMW',
         'model' => 'i4',
-        'source' => 'tvde',
+        'source' => 'private',
         'status' => 'maintenance',
     ]);
 
@@ -56,13 +57,17 @@ it('shows tvde vehicles on the homepage and links to the product page', function
         ->assertSee('Tesla Model 3 Long Range')
         ->assertSee('Tesla')
         ->assertSee('Disponivel')
+        ->assertSee('Aluguer semanal')
+        ->assertSee('325,50&euro;', false)
         ->assertSee(route('vehicle.index'), false)
         ->assertDontSee('BMW i4')
         ->assertSee(route('vehicle.show', ['vehicle' => $vehicle, 'slug' => $vehicle->publicSlug()]), false);
 
     $this->get(route('vehicle.show', ['vehicle' => $vehicle, 'slug' => $vehicle->publicSlug()]))
         ->assertSuccessful()
-        ->assertSee('Pedir contacto sobre esta viatura')
+        ->assertSee('Pedir contacto')
+        ->assertSee('Aluguer semanal')
+        ->assertSee('325,50&euro;', false)
         ->assertSee('Autonomia alargada e conforto para TVDE.')
         ->assertSee('application/ld+json', false);
 });
@@ -89,6 +94,7 @@ it('shows all tvde vehicles on the full fleet page including unavailable ones', 
         'model' => 'Model Y',
         'source' => 'tvde',
         'status' => 'available',
+        'weekly_rental_price' => 410,
     ]);
 
     $unavailableVehicle = Vehicle::query()->create([
@@ -115,6 +121,7 @@ it('shows all tvde vehicles on the full fleet page including unavailable ones', 
         ->assertSee($unavailableVehicle->displayName())
         ->assertSee('Disponivel')
         ->assertSee('Indisponivel')
+        ->assertSee('410,00&euro;', false)
         ->assertDontSee('Audi Q4');
 });
 
