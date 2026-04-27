@@ -6,8 +6,10 @@ use App\Models\Stage;
 use App\Models\Task;
 use App\Models\TaskComment;
 use App\Models\User;
+use App\Services\KanbanStageTimeoutService;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Schema;
 
 uses(RefreshDatabase::class);
@@ -80,7 +82,8 @@ it('stores the first interaction timestamp when a task is moved for the first ti
     $task->refresh();
 
     expect($task->stage_id)->toBe($nextStage->id)
-        ->and($task->first_interaction_at)->not->toBeNull();
+        ->and($task->first_interaction_at)->not->toBeNull()
+        ->and($task->stage_entered_at)->not->toBeNull();
 });
 
 it('stores the first interaction timestamp when the first comment is added and keeps the original value afterwards', function () {
@@ -140,4 +143,57 @@ it('soft deletes a task from the edit modal action', function () {
         ->and(Task::withTrashed()->find($task->id)?->trashed())->toBeTrue()
         ->and($page->showTaskForm)->toBeFalse()
         ->and($page->showTaskDetail)->toBeFalse();
+});
+
+it('moves tasks to the configured target stage after the stage timeout expires', function () {
+    Carbon::setTestNow('2026-04-27 10:00:00');
+
+    try {
+        [$board, $initialStage, $nextStage, $task] = createKanbanFixture();
+
+        $initialStage->update([
+            'timeout_days' => 2,
+            'timeout_target_stage_id' => $nextStage->id,
+        ]);
+
+        $task->forceFill([
+            'stage_entered_at' => now()->subDays(3),
+        ])->saveQuietly();
+
+        $result = app(KanbanStageTimeoutService::class)->apply($board->id);
+
+        $task->refresh();
+
+        expect($result['moved'])->toBe(1)
+            ->and($task->stage_id)->toBe($nextStage->id)
+            ->and($task->stage_entered_at?->equalTo(now()))->toBeTrue();
+    } finally {
+        Carbon::setTestNow();
+    }
+});
+
+it('keeps tasks in place while the configured stage timeout has not expired', function () {
+    Carbon::setTestNow('2026-04-27 10:00:00');
+
+    try {
+        [$board, $initialStage, $nextStage, $task] = createKanbanFixture();
+
+        $initialStage->update([
+            'timeout_days' => 2,
+            'timeout_target_stage_id' => $nextStage->id,
+        ]);
+
+        $task->forceFill([
+            'stage_entered_at' => now()->subDay(),
+        ])->saveQuietly();
+
+        $result = app(KanbanStageTimeoutService::class)->apply($board->id);
+
+        $task->refresh();
+
+        expect($result['moved'])->toBe(0)
+            ->and($task->stage_id)->toBe($initialStage->id);
+    } finally {
+        Carbon::setTestNow();
+    }
 });
