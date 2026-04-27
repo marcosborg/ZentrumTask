@@ -591,3 +591,50 @@ it('treats imported weekly mileage as the week total even when a previous readin
         ->and($settlement->amount_payable)->toBe('940.00')
         ->and($settlement->amount_due)->toBe('940.00');
 });
+
+it('creates a settlement for a driver with vehicle usage and no platform balances', function () {
+    $driver = Driver::factory()->create();
+    $vehicle = Vehicle::query()->create([
+        'license_plate' => 'NO-99-PL',
+        'make' => 'Toyota',
+        'model' => 'Yaris',
+        'status' => 'available',
+    ]);
+
+    DriverBillingProfile::factory()->create([
+        'driver_id' => $driver->id,
+        'active' => true,
+        'valid_from' => '2026-04-01',
+        'valid_to' => null,
+        'percent_company' => 40,
+        'percent_driver' => 60,
+        'vat_percent' => 23,
+        'vat_refund_mode' => VatRefundMode::None,
+        'vehicle_rent_type' => \App\Enums\VehicleRentType::Weekly,
+        'vehicle_rent_value' => 700,
+    ]);
+
+    VehicleAllocation::query()->create([
+        'vehicle_id' => $vehicle->id,
+        'driver_id' => $driver->id,
+        'starts_at' => '2026-04-15 00:00:00',
+        'ends_at' => '2026-04-15 23:59:59',
+        'status' => 'ended',
+    ]);
+
+    $result = app(DriverSettlementCalculator::class)->calculate('2026-04-13', '2026-04-19');
+
+    $settlement = DriverSettlement::query()
+        ->where('driver_id', $driver->id)
+        ->whereDate('period_start', '2026-04-13')
+        ->whereDate('period_end', '2026-04-19')
+        ->firstOrFail();
+
+    expect($result['created'])->toBe(1)
+        ->and($settlement->net_total)->toBe('0.00')
+        ->and($settlement->tips_total)->toBe('0.00')
+        ->and(data_get($settlement->rules_snapshot, 'rental_days'))->toBe(1)
+        ->and((float) $settlement->rules_snapshot['rent_total'])->toBe(100.0)
+        ->and($settlement->amount_payable)->toBe('-100.00')
+        ->and($settlement->amount_due)->toBe('-100.00');
+});
