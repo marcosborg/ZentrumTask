@@ -42,10 +42,25 @@ class DriverSettlementCalculator
             ->get()
             ->groupBy('driver_id');
 
+        $balanceDriverIds = $grouped->keys()->map(fn ($id): int => (int) $id)->values();
+        $allocationDriverIds = VehicleAllocation::query()
+            ->whereNotNull('driver_id')
+            ->where('starts_at', '<=', $end)
+            ->where(function ($query) use ($start): void {
+                $query->whereNull('ends_at')
+                    ->orWhere('ends_at', '>=', $start);
+            })
+            ->when($driverId, fn ($query) => $query->where('driver_id', $driverId))
+            ->pluck('driver_id')
+            ->map(fn ($id): int => (int) $id);
+
         $created = 0;
         $skipped = 0;
         $missingProfiles = 0;
-        $driverIds = $grouped->keys()->map(fn ($id): int => (int) $id)->values();
+        $driverIds = $balanceDriverIds
+            ->merge($allocationDriverIds)
+            ->unique()
+            ->values();
         $driversById = Driver::query()->whereIn('id', $driverIds)->get()->keyBy('id');
         $allocationsByDriver = VehicleAllocation::query()
             ->whereIn('driver_id', $driverIds)
@@ -58,7 +73,9 @@ class DriverSettlementCalculator
             ->groupBy('driver_id');
         $billingResolver = app(SettlementBillingResolver::class);
 
-        foreach ($grouped as $driverId => $driverBalances) {
+        foreach ($driverIds as $driverId) {
+            $driverBalances = $grouped->get($driverId, collect());
+
             $exists = DriverSettlement::query()
                 ->where('driver_id', $driverId)
                 ->whereDate('period_start', $start->toDateString())

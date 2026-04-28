@@ -15,6 +15,7 @@ class Task extends Model
     protected $casts = [
         'due_at' => 'datetime',
         'first_interaction_at' => 'datetime',
+        'stage_entered_at' => 'datetime',
         'meta' => 'array',
     ];
 
@@ -28,6 +29,7 @@ class Task extends Model
         'due_at',
         'position',
         'first_interaction_at',
+        'stage_entered_at',
         'external_reference',
         'meta',
     ];
@@ -69,9 +71,17 @@ class Task extends Model
 
     protected static function booted()
     {
+        static::creating(function (Task $task) {
+            $task->stage_entered_at ??= now();
+        });
+
         static::updating(function (Task $task) {
-            if ($task->isDirty('stage_id') && $task->first_interaction_at === null) {
-                $task->first_interaction_at = now();
+            if ($task->isDirty('stage_id')) {
+                $task->stage_entered_at = now();
+
+                if ($task->first_interaction_at === null) {
+                    $task->first_interaction_at = now();
+                }
             }
         });
 

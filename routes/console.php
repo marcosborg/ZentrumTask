@@ -1,5 +1,6 @@
 <?php
 
+use App\Console\Commands\ApplyKanbanStageTimeouts;
 use App\Console\Commands\CheckVehicleDocumentsExpiry;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
@@ -11,3 +12,7 @@ Artisan::command('inspire', function () {
 
 Schedule::command(CheckVehicleDocumentsExpiry::class)
     ->dailyAt('08:00');
+
+Schedule::command(ApplyKanbanStageTimeouts::class)
+    ->hourly()
+    ->withoutOverlapping();

@@ -69,6 +69,8 @@ class KanbanBoard extends Page
         'color' => null,
         'is_initial' => false,
         'is_final' => false,
+        'timeout_days' => null,
+        'timeout_target_stage_id' => null,
     ];
 
     public bool $showTaskForm = false;
@@ -153,6 +155,7 @@ class KanbanBoard extends Page
 
         $this->stages = Stage::query()
             ->where('board_id', $this->boardId)
+            ->with('timeoutTargetStage')
             ->orderBy('position')
             ->get();
 
@@ -213,6 +216,8 @@ class KanbanBoard extends Page
             'color' => null,
             'is_initial' => false,
             'is_final' => false,
+            'timeout_days' => null,
+            'timeout_target_stage_id' => null,
         ];
     }
 
@@ -374,6 +379,8 @@ class KanbanBoard extends Page
                 'color' => $stage->color,
                 'is_initial' => (bool) $stage->is_initial,
                 'is_final' => (bool) $stage->is_final,
+                'timeout_days' => $stage->timeout_days,
+                'timeout_target_stage_id' => $stage->timeout_target_stage_id,
             ];
         }
     }
@@ -384,13 +391,38 @@ class KanbanBoard extends Page
             return;
         }
 
-        $data = validator($this->stageForm, [
+        $validator = validator($this->stageForm, [
             'board_id' => ['required', 'exists:boards,id'],
             'name' => ['required', 'string', 'max:255'],
             'color' => ['nullable', 'string', 'max:30'],
             'is_initial' => ['boolean'],
             'is_final' => ['boolean'],
-        ])->validate();
+            'timeout_days' => ['nullable', 'integer', 'min:1', 'max:3650'],
+            'timeout_target_stage_id' => ['nullable', 'integer', 'exists:stages,id'],
+        ]);
+
+        $validator->after(function ($validator): void {
+            $data = $validator->getData();
+            $targetStageId = $data['timeout_target_stage_id'] ?? null;
+
+            if (! $targetStageId) {
+                return;
+            }
+
+            if (! empty($data['id']) && (int) $targetStageId === (int) $data['id']) {
+                $validator->errors()->add('timeout_target_stage_id', 'O estagio destino tem de ser diferente do estagio atual.');
+
+                return;
+            }
+
+            $targetStage = Stage::query()->find($targetStageId);
+
+            if (! $targetStage || (int) $targetStage->board_id !== (int) $data['board_id']) {
+                $validator->errors()->add('timeout_target_stage_id', 'O estagio destino tem de pertencer ao mesmo board.');
+            }
+        });
+
+        $data = $validator->validate();
 
         $payload = [
             'board_id' => $data['board_id'],
@@ -399,6 +431,8 @@ class KanbanBoard extends Page
             'color' => $data['color'] ?: null,
             'is_initial' => $data['is_initial'] ?? false,
             'is_final' => $data['is_final'] ?? false,
+            'timeout_days' => $data['timeout_days'] ?: null,
+            'timeout_target_stage_id' => $data['timeout_target_stage_id'] ?: null,
         ];
 
         if ($this->stageForm['id']) {

@@ -48,6 +48,13 @@
 
                     <h2 class="fleet-product-title" itemprop="name">{{ $vehicle->displayName() }}</h2>
 
+                    @if ($vehicle->hasWeeklyRentalPrice())
+                      <div class="fleet-product-price">
+                        <span>Aluguer semanal</span>
+                        <strong>{{ $vehicle->weeklyRentalPriceFormatted() }}&euro;</strong>
+                      </div>
+                    @endif
+
                     @if ($vehicle->maskedVin())
                       <div class="fleet-product-subline">
                         <span>Chassis</span>
@@ -192,6 +199,31 @@
       color: #0f172a;
       font-weight: 800;
       letter-spacing: 0.04em;
+    }
+
+    .fleet-product-price {
+      display: flex;
+      flex-direction: column;
+      gap: 0.2rem;
+      padding: 0.8rem 0.9rem;
+      border-radius: 14px;
+      background: #f3f8ff;
+      border: 1px solid #dbeafe;
+    }
+
+    .fleet-product-price span {
+      color: #47637f;
+      font-size: 0.78rem;
+      font-weight: 800;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+
+    .fleet-product-price strong {
+      color: #0f172a;
+      font-size: 1.15rem;
+      line-height: 1;
+      font-weight: 900;
     }
 
     .fleet-cta-row {

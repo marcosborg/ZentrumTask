@@ -57,6 +57,21 @@
                     <label style="display:flex;gap:6px;align-items:center;font-size:12px;color:var(--kb-muted);">
                         <input type="checkbox" wire:model="stageForm.is_final"> Final
                     </label>
+                    <div>
+                        <span class="kb-muted">Timeout (dias)</span>
+                        <input type="number" min="1" class="kb-input" wire:model="stageForm.timeout_days">
+                    </div>
+                    <div>
+                        <span class="kb-muted">Mover para</span>
+                        <select class="kb-input" wire:model="stageForm.timeout_target_stage_id">
+                            <option value="">-- Sem automatismo --</option>
+                            @foreach ($stages as $stageOption)
+                                @if((int) ($stageForm['id'] ?? 0) !== (int) $stageOption->id)
+                                    <option value="{{ $stageOption->id }}">{{ $stageOption->name }}</option>
+                                @endif
+                            @endforeach
+                        </select>
+                    </div>
                     <div style="grid-column:span 3;display:flex;justify-content:flex-end;gap:8px;">
                         <button type="button" class="kb-btn" wire:click="closeForms">Cancelar</button>
                         <button type="submit" class="kb-btn kb-btn-primary">Guardar estagio</button>
@@ -164,6 +179,9 @@
                                 <div class="kb-row" style="gap:4px;">
                                     @if($stage->is_initial)<span class="kb-badge">Inicial</span>@endif
                                     @if($stage->is_final)<span class="kb-badge">Final</span>@endif
+                                    @if($stage->timeout_days && $stage->timeoutTargetStage)
+                                        <span class="kb-badge">{{ $stage->timeout_days }}d -> {{ $stage->timeoutTargetStage->name }}</span>
+                                    @endif
                                 </div>
                             </div>
                     <div class="kb-row" style="gap:6px;">
