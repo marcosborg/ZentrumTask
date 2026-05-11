@@ -41,6 +41,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 use Throwable;
 use UnitEnum;
@@ -1224,12 +1225,15 @@ class DriverSettlementsReport extends Page implements HasTable
                         'image/png',
                         'image/webp',
                     ])
+                    ->maxSize(51200)
+                    ->fetchFileInformation(false)
+                    ->previewable(false)
                     ->maxFiles(1)
                     ->preserveFilenames()
                     ->required(),
             ])
             ->action(function (DriverSettlement $record, array $data): void {
-                $path = $this->uploadedGreenReceiptPath($data['green_receipt_file'] ?? null);
+                $path = $this->uploadedGreenReceiptPath($data['green_receipt_file'] ?? null, $record);
 
                 if (! $path) {
                     Notification::make()
@@ -1260,14 +1264,25 @@ class DriverSettlementsReport extends Page implements HasTable
             ->action(fn (DriverSettlement $record): ?StreamedResponse => $this->downloadGreenReceipt($record));
     }
 
-    private function uploadedGreenReceiptPath(mixed $state): ?string
+    private function uploadedGreenReceiptPath(mixed $state, ?DriverSettlement $record = null): ?string
     {
         if (is_string($state) && $state !== '') {
             return $state;
         }
 
+        if ($state instanceof TemporaryUploadedFile) {
+            return $state->store(
+                'driver-settlement-receipts/'.($record?->getKey() ?? Str::uuid()->toString()),
+                ['disk' => 'local']
+            );
+        }
+
         if (is_array($state)) {
             $first = collect($state)->first();
+
+            if ($first instanceof TemporaryUploadedFile) {
+                return $this->uploadedGreenReceiptPath($first, $record);
+            }
 
             return is_string($first) && $first !== '' ? $first : null;
         }

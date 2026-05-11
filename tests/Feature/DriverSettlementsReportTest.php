@@ -10,8 +10,10 @@ use App\Models\Vehicle;
 use App\Models\VehicleWeeklyMileage;
 use App\Services\DriverSettlementCalculator;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
 
@@ -125,6 +127,24 @@ it('replaces the previous green receipt file on upload', function () {
 
     expect($settlement->refresh()->green_receipt_path)->toBe('driver-settlement-receipts/1/new.pdf')
         ->and($settlement->green_receipt_uploaded_at)->not->toBeNull();
+});
+
+it('uploads a green receipt through the table action', function () {
+    Storage::fake('local');
+
+    $settlement = createReportSettlement();
+
+    Livewire::test(DriverSettlementsReport::class)
+        ->callTableAction('manageGreenReceipt', $settlement, [
+            'green_receipt_file' => UploadedFile::fake()->create('recibo-verde.pdf', 64, 'application/pdf'),
+        ]);
+
+    $settlement->refresh();
+
+    expect($settlement->green_receipt_path)->not->toBeNull()
+        ->and($settlement->green_receipt_uploaded_at)->not->toBeNull();
+
+    Storage::disk('local')->assertExists($settlement->green_receipt_path);
 });
 
 it('derives the weekly workflow checklist from email receipt and payment state', function () {
