@@ -29,6 +29,9 @@ class DriverSettlement extends Model
         'last_emailed_at',
         'last_emailed_to',
         'paid_at',
+        'green_receipt_path',
+        'green_receipt_uploaded_at',
+        'green_receipt_uploaded_by_user_id',
         'rules_snapshot',
     ];
 
@@ -53,6 +56,8 @@ class DriverSettlement extends Model
             'email_sent_count' => 'integer',
             'last_emailed_at' => 'datetime',
             'paid_at' => 'datetime',
+            'green_receipt_uploaded_at' => 'datetime',
+            'green_receipt_uploaded_by_user_id' => 'integer',
             'rules_snapshot' => 'array',
         ];
     }
@@ -65,5 +70,10 @@ class DriverSettlement extends Model
     public function emailLogs(): HasMany
     {
         return $this->hasMany(SettlementEmailLog::class);
+    }
+
+    public function greenReceiptUploadedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'green_receipt_uploaded_by_user_id');
     }
 }

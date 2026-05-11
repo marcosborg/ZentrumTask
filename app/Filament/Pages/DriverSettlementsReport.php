@@ -19,6 +19,7 @@ use App\Services\SettlementBillingResolver;
 use BackedEnum;
 use Filament\Actions\Action;
 use Filament\Forms\Components\DatePicker;
+use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
@@ -38,7 +39,9 @@ use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 use Throwable;
 use UnitEnum;
 
@@ -218,6 +221,119 @@ class DriverSettlementsReport extends Page implements HasTable
             ->send();
     }
 
+    /**
+     * @return list<string>
+     */
+    public function settlementChecklist(DriverSettlement $record): array
+    {
+        $items = [];
+
+        if ((int) ($record->email_sent_count ?? 0) > 0) {
+            $items[] = 'Email';
+        }
+
+        if ($this->hasGreenReceipt($record)) {
+            $items[] = 'Recibo';
+        }
+
+        if ((bool) $record->is_paid) {
+            $items[] = 'Pago';
+        }
+
+        return $items === [] ? ['Pendente'] : $items;
+    }
+
+    public function hasGreenReceipt(DriverSettlement $record): bool
+    {
+        return filled($record->green_receipt_path);
+    }
+
+    public function hasGreenReceiptFile(DriverSettlement $record): bool
+    {
+        return $this->hasGreenReceipt($record)
+            && Storage::disk('local')->exists((string) $record->green_receipt_path);
+    }
+
+    public function saveGreenReceipt(DriverSettlement $record, string $path): void
+    {
+        $previousPath = $record->green_receipt_path;
+
+        if ($previousPath && $previousPath !== $path) {
+            Storage::disk('local')->delete($previousPath);
+        }
+
+        $record->forceFill([
+            'green_receipt_path' => $path,
+            'green_receipt_uploaded_at' => now(),
+            'green_receipt_uploaded_by_user_id' => auth()->id(),
+        ])->save();
+    }
+
+    public function downloadGreenReceipt(DriverSettlement $record): ?StreamedResponse
+    {
+        $record->refresh();
+        $path = $record->green_receipt_path;
+
+        if (! $path || ! Storage::disk('local')->exists($path)) {
+            Notification::make()
+                ->danger()
+                ->title('Recibo verde indisponivel')
+                ->body('O ficheiro nao foi encontrado no storage.')
+                ->send();
+
+            return null;
+        }
+
+        return Storage::disk('local')->download($path, basename($path));
+    }
+
+    public function markSettlementPaid(DriverSettlement $record): bool
+    {
+        $record->refresh();
+
+        if (! $this->hasGreenReceiptFile($record)) {
+            Notification::make()
+                ->danger()
+                ->title('Anexe o recibo verde antes de marcar como pago.')
+                ->send();
+
+            return false;
+        }
+
+        DB::transaction(function () use ($record): void {
+            $balance = $this->resolveBalance((int) $record->driver_id);
+            $current = round((float) $balance->current_balance, 2);
+            $transferredAmount = round((float) ($record->amount_due ?? 0), 2);
+
+            if ($current !== 0.0) {
+                DriverBalanceMovement::query()->create([
+                    'driver_id' => $record->driver_id,
+                    'driver_balance_id' => $balance->id,
+                    'driver_settlement_id' => $record->id,
+                    'amount' => -$current,
+                    'type' => 'payment',
+                    'description' => 'Pagamento settlement '.$record->period_start?->format('d/m/Y').' - '.$record->period_end?->format('d/m/Y'),
+                ]);
+            }
+
+            $balance->forceFill([
+                'current_balance' => 0,
+                'is_settled' => true,
+                'settled_at' => now(),
+                'last_settlement_id' => $record->id,
+            ])->save();
+
+            $record->forceFill([
+                'amount_due' => 0,
+                'amount_transferred' => $transferredAmount,
+                'is_paid' => true,
+                'paid_at' => now(),
+            ])->save();
+        });
+
+        return true;
+    }
+
     public function table(Table $table): Table
     {
         return $table
@@ -231,21 +347,6 @@ class DriverSettlementsReport extends Page implements HasTable
                     })
                     ->sortable(query: function (Builder $query, string $direction): Builder {
                         return $query->orderBy('drivers.name', $direction);
-                    }),
-                TextColumn::make('driver_email')
-                    ->label('Email')
-                    ->state(fn (DriverSettlement $record): string => $this->driverIdentity((int) $record->driver_id)['email'])
-                    ->copyable()
-                    ->copyableState(fn (DriverSettlement $record): string => $this->driverIdentity((int) $record->driver_id)['email'])
-                    ->copyMessage('Email copiado')
-                    ->copyMessageDuration(1500),
-                TextColumn::make('period_range')
-                    ->label('Periodo')
-                    ->state(function (DriverSettlement $record): string {
-                        $start = $record->period_start?->format('d/m/Y') ?? '-';
-                        $end = $record->period_end?->format('d/m/Y') ?? '-';
-
-                        return "{$start} - {$end}";
                     }),
                 TextColumn::make('uber_net')
                     ->label('Uber')
@@ -357,6 +458,16 @@ class DriverSettlementsReport extends Page implements HasTable
                     ->state(fn (DriverSettlement $record): string => $this->billingProfileLabel($record))
                     ->color(fn (DriverSettlement $record): string => $this->billingProfileColor($record))
                     ->toggleable(isToggledHiddenByDefault: true),
+                TextColumn::make('workflow_checklist')
+                    ->label('Checklist')
+                    ->badge()
+                    ->state(fn (DriverSettlement $record): array => $this->settlementChecklist($record))
+                    ->color(fn (string $state): string => match ($state) {
+                        'Email' => 'info',
+                        'Recibo' => 'success',
+                        'Pago' => 'success',
+                        default => 'gray',
+                    }),
                 TextColumn::make('amount_payable')
                     ->label('Valor a transferir')
                     ->alignRight()
@@ -393,6 +504,8 @@ class DriverSettlementsReport extends Page implements HasTable
             ])
             ->recordActions([
                 $this->sendSettlementEmailAction(),
+                $this->manageGreenReceiptAction(),
+                $this->downloadGreenReceiptAction(),
                 $this->manageAdjustmentsAction(),
                 $this->adjustBalanceAction(),
                 $this->markPaidAction(),
@@ -783,6 +896,8 @@ class DriverSettlementsReport extends Page implements HasTable
             ->modalSubmitAction(false)
             ->modalCancelActionLabel('Fechar')
             ->modalContent(function (DriverSettlement $record) {
+                $record->loadMissing('greenReceiptUploadedBy');
+
                 $balances = $this->balancesForSettlement($record);
                 $billing = $this->billingFor($record);
                 $driverIdentity = $this->driverIdentity((int) $record->driver_id);
@@ -808,6 +923,9 @@ class DriverSettlementsReport extends Page implements HasTable
                     'balance' => $balance,
                     'balanceMovements' => $balanceMovements,
                     'emailLogs' => $emailLogs,
+                    'greenReceiptDownloadUrl' => $this->hasGreenReceipt($record)
+                        ? route('driver-settlements.green-receipt.download', $record)
+                        : null,
                 ]);
             })
             ->action(function (): void {});
@@ -1085,6 +1203,78 @@ class DriverSettlementsReport extends Page implements HasTable
             });
     }
 
+    private function manageGreenReceiptAction(): Action
+    {
+        return Action::make('manageGreenReceipt')
+            ->label('Recibo verde')
+            ->icon(Heroicon::OutlinedDocumentArrowUp)
+            ->color(fn (DriverSettlement $record): string => $this->hasGreenReceipt($record) ? 'success' : 'warning')
+            ->modalHeading('Recibo verde')
+            ->modalDescription(fn (DriverSettlement $record): string => $this->hasGreenReceipt($record)
+                ? 'Substitua o recibo verde anexado a este settlement.'
+                : 'Anexe o recibo verde antes de marcar o settlement como pago.')
+            ->form([
+                FileUpload::make('green_receipt_file')
+                    ->label('Ficheiro')
+                    ->disk('local')
+                    ->directory(fn (DriverSettlement $record): string => "driver-settlement-receipts/{$record->id}")
+                    ->acceptedFileTypes([
+                        'application/pdf',
+                        'image/jpeg',
+                        'image/png',
+                        'image/webp',
+                    ])
+                    ->maxFiles(1)
+                    ->preserveFilenames()
+                    ->required(),
+            ])
+            ->action(function (DriverSettlement $record, array $data): void {
+                $path = $this->uploadedGreenReceiptPath($data['green_receipt_file'] ?? null);
+
+                if (! $path) {
+                    Notification::make()
+                        ->danger()
+                        ->title('Carregue um ficheiro valido')
+                        ->send();
+
+                    return;
+                }
+
+                $this->saveGreenReceipt($record, $path);
+                $this->resetTable();
+
+                Notification::make()
+                    ->success()
+                    ->title('Recibo verde anexado')
+                    ->send();
+            });
+    }
+
+    private function downloadGreenReceiptAction(): Action
+    {
+        return Action::make('downloadGreenReceipt')
+            ->label('Descarregar recibo')
+            ->icon(Heroicon::OutlinedDocumentArrowDown)
+            ->color('gray')
+            ->visible(fn (DriverSettlement $record): bool => $this->hasGreenReceipt($record))
+            ->action(fn (DriverSettlement $record): ?StreamedResponse => $this->downloadGreenReceipt($record));
+    }
+
+    private function uploadedGreenReceiptPath(mixed $state): ?string
+    {
+        if (is_string($state) && $state !== '') {
+            return $state;
+        }
+
+        if (is_array($state)) {
+            $first = collect($state)->first();
+
+            return is_string($first) && $first !== '' ? $first : null;
+        }
+
+        return null;
+    }
+
     private function manageAdjustmentsAction(): Action
     {
         return Action::make('manageAdjustments')
@@ -1350,36 +1540,9 @@ class DriverSettlementsReport extends Page implements HasTable
             ->visible(fn (DriverSettlement $record): bool => ! $record->is_paid)
             ->modalDescription('Define o settlement como pago e zera o saldo transitado.')
             ->action(function (DriverSettlement $record): void {
-                DB::transaction(function () use ($record): void {
-                    $balance = $this->resolveBalance((int) $record->driver_id);
-                    $current = round((float) $balance->current_balance, 2);
-                    $transferredAmount = round((float) ($record->amount_due ?? 0), 2);
-
-                    if ($current !== 0.0) {
-                        DriverBalanceMovement::query()->create([
-                            'driver_id' => $record->driver_id,
-                            'driver_balance_id' => $balance->id,
-                            'driver_settlement_id' => $record->id,
-                            'amount' => -$current,
-                            'type' => 'payment',
-                            'description' => 'Pagamento settlement '.$record->period_start?->format('d/m/Y').' - '.$record->period_end?->format('d/m/Y'),
-                        ]);
-                    }
-
-                    $balance->forceFill([
-                        'current_balance' => 0,
-                        'is_settled' => true,
-                        'settled_at' => now(),
-                        'last_settlement_id' => $record->id,
-                    ])->save();
-
-                    $record->forceFill([
-                        'amount_due' => 0,
-                        'amount_transferred' => $transferredAmount,
-                        'is_paid' => true,
-                        'paid_at' => now(),
-                    ])->save();
-                });
+                if (! $this->markSettlementPaid($record)) {
+                    return;
+                }
 
                 $this->resetTable();
 

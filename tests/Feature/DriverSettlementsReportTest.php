@@ -3,6 +3,7 @@
 use App\Filament\Pages\DriverSettlementsReport;
 use App\Models\Driver;
 use App\Models\DriverAdjustment;
+use App\Models\DriverBalance;
 use App\Models\DriverBillingProfile;
 use App\Models\DriverSettlement;
 use App\Models\Vehicle;
@@ -10,8 +11,33 @@ use App\Models\VehicleWeeklyMileage;
 use App\Services\DriverSettlementCalculator;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 
 uses(RefreshDatabase::class);
+
+function createReportSettlement(array $attributes = []): DriverSettlement
+{
+    $driver = $attributes['driver'] ?? Driver::factory()->create();
+
+    unset($attributes['driver']);
+
+    return DriverSettlement::query()->create(array_merge([
+        'driver_id' => $driver->id,
+        'period_start' => '2026-05-04',
+        'period_end' => '2026-05-10',
+        'net_total' => 1000,
+        'tips_total' => 0,
+        'expenses_total' => 0,
+        'carry_over_balance' => 0,
+        'company_share' => 400,
+        'driver_share' => 600,
+        'amount_payable' => 600,
+        'amount_due' => 600,
+        'amount_transferred' => 0,
+        'is_paid' => false,
+        'rules_snapshot' => [],
+    ], $attributes));
+}
 
 it('deletes a manual adjustment directly from the settlements report modal', function () {
     $driver = Driver::factory()->create();
@@ -33,6 +59,88 @@ it('deletes a manual adjustment directly from the settlements report modal', fun
     $page->deleteManualAdjustment($driver->id, $adjustment->id);
 
     expect(DriverAdjustment::query()->find($adjustment->id))->toBeNull();
+});
+
+it('does not mark a settlement as paid without a green receipt', function () {
+    $settlement = createReportSettlement();
+    DriverBalance::query()->create([
+        'driver_id' => $settlement->driver_id,
+        'current_balance' => 600,
+        'is_settled' => false,
+        'last_settlement_id' => $settlement->id,
+    ]);
+
+    $page = new DriverSettlementsReport;
+
+    expect($page->markSettlementPaid($settlement))->toBeFalse();
+
+    $settlement->refresh();
+
+    expect($settlement->is_paid)->toBeFalse()
+        ->and($settlement->amount_due)->toBe('600.00')
+        ->and($settlement->amount_transferred)->toBe('0.00');
+});
+
+it('marks a settlement as paid when a green receipt exists', function () {
+    Storage::fake('local');
+
+    $settlement = createReportSettlement();
+    DriverBalance::query()->create([
+        'driver_id' => $settlement->driver_id,
+        'current_balance' => 600,
+        'is_settled' => false,
+        'last_settlement_id' => $settlement->id,
+    ]);
+
+    Storage::disk('local')->put('driver-settlement-receipts/'.$settlement->id.'/recibo.pdf', 'receipt');
+
+    $page = new DriverSettlementsReport;
+    $page->saveGreenReceipt($settlement, 'driver-settlement-receipts/'.$settlement->id.'/recibo.pdf');
+
+    expect($page->markSettlementPaid($settlement))->toBeTrue();
+
+    $settlement->refresh();
+
+    expect($settlement->is_paid)->toBeTrue()
+        ->and($settlement->amount_due)->toBe('0.00')
+        ->and($settlement->amount_transferred)->toBe('600.00')
+        ->and($settlement->paid_at)->not->toBeNull();
+});
+
+it('replaces the previous green receipt file on upload', function () {
+    Storage::fake('local');
+
+    $settlement = createReportSettlement([
+        'green_receipt_path' => 'driver-settlement-receipts/1/old.pdf',
+    ]);
+
+    Storage::disk('local')->put('driver-settlement-receipts/1/old.pdf', 'old');
+    Storage::disk('local')->put('driver-settlement-receipts/1/new.pdf', 'new');
+
+    $page = new DriverSettlementsReport;
+    $page->saveGreenReceipt($settlement, 'driver-settlement-receipts/1/new.pdf');
+
+    Storage::disk('local')->assertMissing('driver-settlement-receipts/1/old.pdf');
+    Storage::disk('local')->assertExists('driver-settlement-receipts/1/new.pdf');
+
+    expect($settlement->refresh()->green_receipt_path)->toBe('driver-settlement-receipts/1/new.pdf')
+        ->and($settlement->green_receipt_uploaded_at)->not->toBeNull();
+});
+
+it('derives the weekly workflow checklist from email receipt and payment state', function () {
+    $settlement = createReportSettlement([
+        'email_sent_count' => 1,
+        'green_receipt_path' => 'driver-settlement-receipts/1/recibo.pdf',
+        'is_paid' => true,
+    ]);
+
+    $page = new DriverSettlementsReport;
+
+    expect($page->settlementChecklist($settlement))->toBe([
+        'Email',
+        'Recibo',
+        'Pago',
+    ]);
 });
 
 it('recalculates only one driver settlement without changing the others', function () {

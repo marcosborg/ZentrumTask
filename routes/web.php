@@ -13,8 +13,10 @@ use App\Http\Controllers\CandidateApplicationController;
 use App\Http\Controllers\MediaProxyController;
 use App\Http\Controllers\WebsiteChatController;
 use App\Http\Controllers\WebsiteController;
+use App\Models\DriverSettlement;
 use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\Storage;
 
 Route::get('/', [WebsiteController::class, 'index']);
 Route::options('/app/auth/login', fn () => response('', 204, [
@@ -190,6 +192,14 @@ Route::get('/media-proxy/{uuid}/{conversion?}', [MediaProxyController::class, 's
     ->whereUuid('uuid')
     ->where('conversion', '[A-Za-z0-9_-]+')
     ->name('media.proxy');
+
+Route::middleware(['auth'])->get('/admin/driver-settlements/{driverSettlement}/recibo-verde', function (DriverSettlement $driverSettlement) {
+    $path = $driverSettlement->green_receipt_path;
+
+    abort_if(! $path || ! Storage::disk('local')->exists($path), 404);
+
+    return Storage::disk('local')->download($path, basename($path));
+})->name('driver-settlements.green-receipt.download');
 
 Route::middleware(['auth'])->get('/admin/ajustes/exemplo.csv', function () {
     $content = implode("\n", [

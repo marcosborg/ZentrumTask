@@ -10,7 +10,7 @@
 
 <div class="space-y-4">
     <x-filament::section heading="Resumo">
-        <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <div>
                 <div class="text-xs uppercase text-gray-400">Motorista</div>
                 <div class="text-sm font-semibold text-gray-100">{{ $driverIdentity['name'] ?? '-' }}</div>
@@ -33,6 +33,25 @@
                         ({{ $settlement->last_emailed_to }})
                     @endif
                 </div>
+            </div>
+            <div>
+                <div class="text-xs uppercase text-gray-400">Recibo verde</div>
+                <div class="text-sm font-semibold text-gray-100">
+                    {{ filled($settlement->green_receipt_path) ? 'Anexado' : 'Em falta' }}
+                </div>
+                @if (filled($settlement->green_receipt_path))
+                    <div class="text-xs text-gray-400">
+                        {{ $settlement->green_receipt_uploaded_at?->format('d/m/Y H:i') ?? '-' }}
+                        @if ($settlement->greenReceiptUploadedBy)
+                            por {{ $settlement->greenReceiptUploadedBy->name }}
+                        @endif
+                    </div>
+                    @if (! empty($greenReceiptDownloadUrl))
+                        <a href="{{ $greenReceiptDownloadUrl }}" class="text-xs font-semibold text-primary-400 hover:text-primary-300">
+                            Descarregar recibo
+                        </a>
+                    @endif
+                @endif
             </div>
         </div>
     </x-filament::section>
