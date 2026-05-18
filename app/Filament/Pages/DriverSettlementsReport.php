@@ -292,15 +292,6 @@ class DriverSettlementsReport extends Page implements HasTable
     {
         $record->refresh();
 
-        if (! $this->hasGreenReceiptFile($record)) {
-            Notification::make()
-                ->danger()
-                ->title('Anexe o recibo verde antes de marcar como pago.')
-                ->send();
-
-            return false;
-        }
-
         DB::transaction(function () use ($record): void {
             $balance = $this->resolveBalance((int) $record->driver_id);
             $current = round((float) $balance->current_balance, 2);
@@ -1209,16 +1200,16 @@ class DriverSettlementsReport extends Page implements HasTable
         return Action::make('manageGreenReceipt')
             ->label('Recibo verde')
             ->icon(Heroicon::OutlinedDocumentArrowUp)
-            ->color(fn (DriverSettlement $record): string => $this->hasGreenReceipt($record) ? 'success' : 'warning')
+            ->color(fn (?DriverSettlement $record = null): string => ($record && $this->hasGreenReceipt($record)) ? 'success' : 'warning')
             ->modalHeading('Recibo verde')
-            ->modalDescription(fn (DriverSettlement $record): string => $this->hasGreenReceipt($record)
+            ->modalDescription(fn (?DriverSettlement $record = null): string => ($record && $this->hasGreenReceipt($record))
                 ? 'Substitua o recibo verde anexado a este settlement.'
-                : 'Anexe o recibo verde antes de marcar o settlement como pago.')
+                : 'Anexe ou substitua o recibo verde deste settlement.')
             ->form([
                 FileUpload::make('green_receipt_file')
                     ->label('Ficheiro')
                     ->disk('local')
-                    ->directory(fn (DriverSettlement $record): string => "driver-settlement-receipts/{$record->id}")
+                    ->directory(fn (?DriverSettlement $record = null): string => 'driver-settlement-receipts/'.($record?->getKey() ?? Str::uuid()->toString()))
                     ->acceptedFileTypes([
                         'application/pdf',
                         'image/jpeg',

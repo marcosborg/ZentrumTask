@@ -63,7 +63,7 @@ it('deletes a manual adjustment directly from the settlements report modal', fun
     expect(DriverAdjustment::query()->find($adjustment->id))->toBeNull();
 });
 
-it('does not mark a settlement as paid without a green receipt', function () {
+it('marks a settlement as paid without a green receipt', function () {
     $settlement = createReportSettlement();
     DriverBalance::query()->create([
         'driver_id' => $settlement->driver_id,
@@ -74,13 +74,14 @@ it('does not mark a settlement as paid without a green receipt', function () {
 
     $page = new DriverSettlementsReport;
 
-    expect($page->markSettlementPaid($settlement))->toBeFalse();
+    expect($page->markSettlementPaid($settlement))->toBeTrue();
 
     $settlement->refresh();
 
-    expect($settlement->is_paid)->toBeFalse()
-        ->and($settlement->amount_due)->toBe('600.00')
-        ->and($settlement->amount_transferred)->toBe('0.00');
+    expect($settlement->is_paid)->toBeTrue()
+        ->and($settlement->amount_due)->toBe('0.00')
+        ->and($settlement->amount_transferred)->toBe('600.00')
+        ->and($settlement->paid_at)->not->toBeNull();
 });
 
 it('marks a settlement as paid when a green receipt exists', function () {
