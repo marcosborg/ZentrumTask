@@ -28,15 +28,8 @@ PORT=3100
 LARAVEL_CHAT_BASE_URL=https://zentrum-tvde.com
 SESSION_STORE_PATH=./storage/sessions.json
 WHATSAPP_SESSION_PATH=./storage/whatsapp-session
-WHATSAPP_BROWSER_PATH=
 WHATSAPP_HEADLESS=true
 IGNORE_GROUPS=true
-```
-
-No Windows pode apontar para o Chrome instalado:
-
-```env
-WHATSAPP_BROWSER_PATH=C:\Program Files\Google\Chrome\Application\chrome.exe
 ```
 
 ## Producao

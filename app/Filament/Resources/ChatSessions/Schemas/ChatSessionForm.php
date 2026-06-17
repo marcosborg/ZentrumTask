@@ -21,6 +21,15 @@ class ChatSessionForm
                             ->disabled()
                             ->dehydrated(false)
                             ->columnSpanFull(),
+                        TextInput::make('source')
+                            ->label('Origem')
+                            ->formatStateUsing(fn ($record): string => match ((string) data_get($record?->meta, 'source', 'website')) {
+                                'whatsapp' => 'WhatsApp',
+                                'app' => 'App',
+                                default => 'Chat',
+                            })
+                            ->disabled()
+                            ->dehydrated(false),
                         TextInput::make('ip_address')
                             ->label('IP')
                             ->disabled()

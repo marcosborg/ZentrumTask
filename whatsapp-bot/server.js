@@ -1,8 +1,8 @@
 import 'dotenv/config';
 import axios from 'axios';
 import express from 'express';
+import QRCode from 'qrcode';
 import qrcode from 'qrcode-terminal';
-import { existsSync } from 'node:fs';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import whatsappWeb from 'whatsapp-web.js';
@@ -18,16 +18,12 @@ const laravelBaseUrl = (process.env.LARAVEL_CHAT_BASE_URL || 'https://zentrum-tv
 const sessionStorePath = resolve(process.env.SESSION_STORE_PATH || './storage/sessions.json');
 const whatsappSessionPath = resolve(process.env.WHATSAPP_SESSION_PATH || './storage/whatsapp-session');
 const ignoreGroups = process.env.IGNORE_GROUPS !== 'false';
-const browserPathCandidates = [
-  process.env.WHATSAPP_BROWSER_PATH,
-  'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
-  'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
-  'C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe',
-  'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe',
-].filter(Boolean);
-const browserPath = browserPathCandidates.find((path) => existsSync(path));
 
 let isWhatsappReady = false;
+let lastWhatsappState = 'starting';
+let lastQr = null;
+let lastQrAt = null;
+let lastError = null;
 const processingMessages = new Set();
 const chatQueues = new Map();
 
@@ -52,7 +48,7 @@ async function writeSessionStore(store) {
   await writeFile(sessionStorePath, JSON.stringify(store, null, 2));
 }
 
-async function resolveChatSession(from) {
+async function resolveChatSession(from, externalName = null) {
   const store = await readSessionStore();
 
   if (store[from]) {
@@ -61,6 +57,9 @@ async function resolveChatSession(from) {
 
   const { data } = await axios.post(`${laravelBaseUrl}/app/chat/session`, {
     session_token: null,
+    source: 'whatsapp',
+    external_id: from,
+    external_name: externalName,
   }, {
     headers: { Accept: 'application/json' },
     timeout: 30000,
@@ -78,11 +77,14 @@ async function resetChatSession(from) {
   await writeSessionStore(store);
 }
 
-async function askLaravelChat(from, message) {
-  const sessionToken = await resolveChatSession(from);
+async function askLaravelChat(from, message, externalName = null) {
+  const sessionToken = await resolveChatSession(from, externalName);
   const { data } = await axios.post(`${laravelBaseUrl}/app/chat/message`, {
     session_token: sessionToken,
     message,
+    source: 'whatsapp',
+    external_id: from,
+    external_name: externalName,
   }, {
     headers: { Accept: 'application/json' },
     timeout: 60000,
@@ -147,25 +149,39 @@ const client = new Client({
     clientId: 'zentrum-whatsapp',
     dataPath: whatsappSessionPath,
   }),
+  takeoverOnConflict: true,
+  takeoverTimeoutMs: 0,
   puppeteer: {
     headless: process.env.WHATSAPP_HEADLESS !== 'false',
-    executablePath: browserPath,
-    args: ['--no-sandbox', '--disable-setuid-sandbox'],
+    args: [
+      '--no-sandbox',
+      '--disable-setuid-sandbox',
+      '--disable-dev-shm-usage',
+      '--disable-gpu',
+    ],
   },
 });
 
 client.on('qr', (qr) => {
   isWhatsappReady = false;
+  lastWhatsappState = 'qr';
+  lastQr = qr;
+  lastQrAt = new Date().toISOString();
   console.log('Scan this QR code with WhatsApp Business: Settings > Linked devices > Link a device');
+  console.log('Or open http://127.0.0.1:3100/qr');
   qrcode.generate(qr, { small: true });
 });
 
 client.on('authenticated', () => {
+  lastWhatsappState = 'authenticated';
   console.log('WhatsApp authenticated.');
 });
 
 client.on('ready', () => {
   isWhatsappReady = true;
+  lastWhatsappState = 'ready';
+  lastQr = null;
+  lastError = null;
   console.log('WhatsApp bot is ready.');
 });
 
@@ -179,15 +195,24 @@ client.on('change_state', (state) => {
 
 client.on('auth_failure', (message) => {
   isWhatsappReady = false;
+  lastWhatsappState = 'auth_failure';
+  lastError = message;
   console.error('WhatsApp authentication failed:', message);
 });
 
 client.on('disconnected', (reason) => {
   isWhatsappReady = false;
+  lastWhatsappState = 'disconnected';
+  lastError = reason;
   console.warn('WhatsApp disconnected:', reason);
 });
 
 client.on('message', async (message) => {
+  if (!isWhatsappReady) {
+    isWhatsappReady = true;
+    lastWhatsappState = 'message_received';
+  }
+
   if (message.fromMe) {
     return;
   }
@@ -236,7 +261,9 @@ async function handleIncomingMessage(message, messageKey) {
     }
 
     await client.sendSeen(message.from).catch(() => undefined);
-    const reply = await askLaravelChat(message.from, text);
+    const contact = await message.getContact().catch(() => null);
+    const externalName = contact?.pushname || contact?.name || null;
+    const reply = await askLaravelChat(message.from, text, externalName);
     await replyInChunks(message, reply);
   } catch (error) {
     console.error('whatsapp_message_failed', {
@@ -253,7 +280,60 @@ app.get('/health', (_request, response) => {
   response.json({
     ok: true,
     whatsapp_ready: isWhatsappReady,
+    whatsapp_state: lastWhatsappState,
+    last_qr_at: lastQrAt,
+    last_error: lastError,
+    queued_chats: chatQueues.size,
+    processing_messages: processingMessages.size,
   });
+});
+
+app.get('/qr', async (_request, response) => {
+  if (isWhatsappReady) {
+    response.type('html').send('<!doctype html><meta charset="utf-8"><title>Zentrum WhatsApp</title><body style="font-family:Arial,sans-serif;text-align:center;padding:40px"><h1>WhatsApp ligado</h1><p>O bot ja esta pronto.</p></body>');
+    return;
+  }
+
+  if (!lastQr) {
+    response.type('html').send('<!doctype html><meta charset="utf-8"><title>Zentrum WhatsApp QR</title><meta http-equiv="refresh" content="2"><body style="font-family:Arial,sans-serif;text-align:center;padding:40px"><h1>A aguardar QR...</h1><p>Atualiza automaticamente.</p></body>');
+    return;
+  }
+
+  const qrDataUrl = await QRCode.toDataURL(lastQr, {
+    errorCorrectionLevel: 'M',
+    margin: 2,
+    width: 360,
+  });
+
+  response.type('html').send(`<!doctype html>
+<meta charset="utf-8">
+<title>Zentrum WhatsApp QR</title>
+<meta http-equiv="refresh" content="20">
+<body style="font-family:Arial,sans-serif;text-align:center;padding:32px;background:#f6f7f9;color:#111827">
+  <h1>Associar WhatsApp Business</h1>
+  <p>Abre o WhatsApp Business: Definicoes &gt; Dispositivos associados &gt; Associar dispositivo.</p>
+  <img src="${qrDataUrl}" alt="QR WhatsApp" style="width:360px;height:360px;background:white;padding:16px;border:1px solid #d1d5db">
+  <p style="color:#6b7280">QR gerado em ${lastQrAt || ''}. Esta pagina atualiza automaticamente.</p>
+</body>`);
+});
+
+app.post('/debug/send', async (request, response) => {
+  try {
+    const { to, message } = request.body || {};
+
+    if (!to || !message) {
+      response.status(422).json({ ok: false, error: 'Missing to or message.' });
+      return;
+    }
+
+    await client.sendMessage(to, message);
+    response.json({ ok: true });
+  } catch (error) {
+    response.status(500).json({
+      ok: false,
+      error: error?.message || String(error),
+    });
+  }
 });
 
 const server = app.listen(port, () => {

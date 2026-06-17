@@ -35,4 +35,9 @@ class ChatSession extends Model
     {
         return $this->hasMany(ChatMessage::class);
     }
+
+    public function getSourceAttribute(): string
+    {
+        return (string) data_get($this->meta, 'source', 'website');
+    }
 }

@@ -22,7 +22,10 @@ class WebsiteChatController extends Controller
         $session = $this->resolveSession(
             sessionToken: $data['session_token'] ?? null,
             requestIp: $request->ip(),
-            userAgent: $request->userAgent()
+            userAgent: $request->userAgent(),
+            source: $this->resolveSource($request, $data['source'] ?? null),
+            externalId: $data['external_id'] ?? null,
+            externalName: $data['external_name'] ?? null,
         );
 
         if ($setting->is_enabled && ($setting->welcome_message ?? null) && $session->messages()->count() === 0) {
@@ -58,7 +61,10 @@ class WebsiteChatController extends Controller
         $session = $this->resolveSession(
             sessionToken: $data['session_token'],
             requestIp: $request->ip(),
-            userAgent: $request->userAgent()
+            userAgent: $request->userAgent(),
+            source: $this->resolveSource($request, $data['source'] ?? null),
+            externalId: $data['external_id'] ?? null,
+            externalName: $data['external_name'] ?? null,
         );
 
         $userMessage = ChatMessage::query()->create([
@@ -115,9 +121,21 @@ class WebsiteChatController extends Controller
         ]);
     }
 
-    private function resolveSession(?string $sessionToken, ?string $requestIp, ?string $userAgent): ChatSession
+    private function resolveSession(
+        ?string $sessionToken,
+        ?string $requestIp,
+        ?string $userAgent,
+        string $source,
+        ?string $externalId,
+        ?string $externalName
+    ): ChatSession
     {
         $session = null;
+        $meta = array_filter([
+            'source' => $source,
+            'external_id' => $externalId,
+            'external_name' => $externalName,
+        ], fn ($value): bool => $value !== null && $value !== '');
 
         if ($sessionToken) {
             $session = ChatSession::query()
@@ -130,19 +148,36 @@ class WebsiteChatController extends Controller
                 'session_token' => (string) Str::uuid(),
                 'ip_address' => $requestIp,
                 'user_agent' => $userAgent,
+                'meta' => $meta,
                 'started_at' => now(),
                 'last_message_at' => now(),
             ]);
         }
 
-        if (($session->ip_address !== $requestIp) || ($session->user_agent !== $userAgent)) {
+        $mergedMeta = array_replace($session->meta ?? [], $meta);
+
+        if (
+            ($session->ip_address !== $requestIp)
+            || ($session->user_agent !== $userAgent)
+            || (($session->meta ?? []) !== $mergedMeta)
+        ) {
             $session->forceFill([
                 'ip_address' => $requestIp,
                 'user_agent' => $userAgent,
+                'meta' => $mergedMeta,
             ])->save();
         }
 
         return $session;
+    }
+
+    private function resolveSource(ChatSessionStartRequest|ChatMessageRequest $request, ?string $source): string
+    {
+        if ($source) {
+            return $source;
+        }
+
+        return str_starts_with((string) $request->path(), 'app/chat') ? 'app' : 'website';
     }
 
     /**

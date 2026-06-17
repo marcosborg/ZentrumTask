@@ -16,6 +16,9 @@ class ChatMessageRequest extends FormRequest
         return [
             'session_token' => ['required', 'uuid'],
             'message' => ['required', 'string', 'min:1', 'max:2000'],
+            'source' => ['nullable', 'string', 'in:website,app,whatsapp'],
+            'external_id' => ['nullable', 'string', 'max:120'],
+            'external_name' => ['nullable', 'string', 'max:120'],
         ];
     }
 }
