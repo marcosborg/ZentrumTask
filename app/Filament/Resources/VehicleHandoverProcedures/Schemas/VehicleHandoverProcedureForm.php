@@ -149,20 +149,26 @@ class VehicleHandoverProcedureForm
                             ->all()
                     ),
                 Section::make('Videos')
-                    ->description('Grava ou anexa, quando disponivel, um video do exterior e outro do interior. Maximo 100MB por video.')
+                    ->description('Grava ou anexa, quando disponivel, um video do exterior e outro do interior. Maximo 250MB por video.')
                     ->columns(2)
                     ->components([
                         FileUpload::make('video_items.exterior')
                             ->label('Video exterior')
                             ->acceptedFileTypes(['video/mp4', 'video/quicktime', 'video/webm', 'video/3gpp'])
-                            ->maxSize(102400)
+                            ->maxSize(256000)
+                            ->validationMessages([
+                                'max' => 'O video exterior pode ter no maximo 250MB.',
+                            ])
                             ->disk('public')
                             ->directory('vehicle-handovers/videos')
                             ->visibility('public'),
                         FileUpload::make('video_items.interior')
                             ->label('Video interior')
                             ->acceptedFileTypes(['video/mp4', 'video/quicktime', 'video/webm', 'video/3gpp'])
-                            ->maxSize(102400)
+                            ->maxSize(256000)
+                            ->validationMessages([
+                                'max' => 'O video interior pode ter no maximo 250MB.',
+                            ])
                             ->disk('public')
                             ->directory('vehicle-handovers/videos')
                             ->visibility('public'),

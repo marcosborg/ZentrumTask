@@ -25,7 +25,7 @@ use Illuminate\Validation\ValidationException;
 
 class VehicleHandoverProcedureService
 {
-    private const VIDEO_MAX_BYTES = 104857600;
+    private const VIDEO_MAX_BYTES = 262144000;
 
     /**
      * @return array<int, array{key: string, label: string, requires_value?: bool, value_label?: string, value_type?: string}>
@@ -326,7 +326,7 @@ class VehicleHandoverProcedureService
         if ($video instanceof UploadedFile) {
             if ($video->getSize() > self::VIDEO_MAX_BYTES) {
                 throw ValidationException::withMessages([
-                    'video_items' => 'Cada video pode ter no maximo 100MB.',
+                    'video_items' => 'Cada video pode ter no maximo 250MB.',
                 ]);
             }
 
