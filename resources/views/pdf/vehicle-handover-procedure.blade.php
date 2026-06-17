@@ -104,6 +104,16 @@
         </table>
 
         @php
+            $publicDisk = \Illuminate\Support\Facades\Storage::disk('public');
+            $publicDataUri = function (?string $path) use ($publicDisk): ?string {
+                if (empty($path) || ! $publicDisk->exists($path)) {
+                    return null;
+                }
+
+                $mime = $publicDisk->mimeType($path) ?: 'image/png';
+
+                return 'data:'.$mime.';base64,'.base64_encode($publicDisk->get($path));
+            };
             $generalPhotoUrls = collect($procedure->general_photo_paths ?? [])
                 ->map(fn ($path) => $path ? \Illuminate\Support\Facades\Storage::disk('public')->url($path) : null)
                 ->filter()
@@ -120,7 +130,7 @@
                 ->map(fn ($item) => [
                     'label' => $item['label'] ?? 'Video',
                     'url' => $item['url'] ?? (!empty($item['video_path']) ? \Illuminate\Support\Facades\Storage::disk('public')->url($item['video_path']) : null),
-                    'qr_url' => !empty($item['qr_path']) ? \Illuminate\Support\Facades\Storage::disk('public')->url($item['qr_path']) : null,
+                    'qr_url' => $publicDataUri($item['qr_path'] ?? null),
                 ])
                 ->filter(fn ($item) => !empty($item['url']))
                 ->values();
