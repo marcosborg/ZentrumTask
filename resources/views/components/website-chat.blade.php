@@ -1,3 +1,11 @@
+@php
+    $whatsappNumber = preg_replace('/\D+/', '', (string) config('services.whatsapp.public_number'));
+    $whatsappMessage = (string) config('services.whatsapp.public_message');
+    $whatsappHref = $whatsappNumber !== ''
+        ? 'https://wa.me/'.$whatsappNumber.'?text='.rawurlencode($whatsappMessage)
+        : null;
+@endphp
+
 <div
     id="zt-chat-widget"
     data-session-url="{{ route('website.chat.session') }}"
@@ -22,6 +30,32 @@
             color: #fff;
             box-shadow: 0 18px 30px rgba(255, 92, 0, 0.35);
             font-size: 24px;
+        }
+
+        #zt-chat-widget .zt-chat-actions {
+            display: flex;
+            gap: 0.7rem;
+            justify-content: flex-end;
+            align-items: center;
+        }
+
+        #zt-chat-widget .zt-whatsapp-toggle {
+            width: 62px;
+            height: 62px;
+            border-radius: 999px;
+            background: #25d366;
+            color: #fff;
+            box-shadow: 0 18px 30px rgba(37, 211, 102, 0.32);
+            font-size: 27px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            text-decoration: none;
+        }
+
+        #zt-chat-widget .zt-whatsapp-toggle:hover {
+            color: #fff;
+            background: #1ebe5d;
         }
 
         #zt-chat-widget .zt-chat-panel {
@@ -169,9 +203,22 @@
         </div>
     </div>
 
-    <button type="button" class="zt-chat-toggle" id="zt-chat-toggle" aria-label="Abrir chat">
-        <i class="fa-regular fa-comments"></i>
-    </button>
+    <div class="zt-chat-actions">
+        @if($whatsappHref)
+            <a
+                class="zt-whatsapp-toggle"
+                href="{{ $whatsappHref }}"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="Abrir WhatsApp"
+            >
+                <i class="fa-brands fa-whatsapp"></i>
+            </a>
+        @endif
+        <button type="button" class="zt-chat-toggle" id="zt-chat-toggle" aria-label="Abrir chat">
+            <i class="fa-regular fa-comments"></i>
+        </button>
+    </div>
 
     <script>
         (() => {

@@ -60,6 +60,11 @@ return [
         'model' => env('OPENAI_MODEL', 'gpt-4.1-mini'),
     ],
 
+    'whatsapp' => [
+        'public_number' => env('WHATSAPP_PUBLIC_NUMBER'),
+        'public_message' => env('WHATSAPP_PUBLIC_MESSAGE', 'Ola! Quero falar com a Zentrum TVDE.'),
+    ],
+
     'fcm' => [
         'service_account' => env('FCM_SERVICE_ACCOUNT', 'private/firebase-service-account.json'),
         'project_id' => env('FCM_PROJECT_ID'),
