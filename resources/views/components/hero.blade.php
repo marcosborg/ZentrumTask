@@ -1,6 +1,11 @@
 @php
     $collection = collect($heroes ?? []);
     $slides = $collection->isNotEmpty() ? $collection : collect([null]);
+    $whatsappNumber = preg_replace('/\D+/', '', (string) config('services.whatsapp.public_number'));
+    $whatsappMessage = (string) config('services.whatsapp.public_message');
+    $whatsappHref = $whatsappNumber !== ''
+        ? 'https://wa.me/'.$whatsappNumber.'?text='.rawurlencode($whatsappMessage)
+        : null;
 @endphp
 
 <section class="hero hero-slider">
@@ -26,6 +31,12 @@
                     {{ $subtitle }}
                   </p>
                   <div class="d-flex flex-wrap gap-3">
+                    @if ($whatsappHref)
+                      <a href="{{ $whatsappHref }}" target="_blank" rel="noopener noreferrer" class="cta-btn hero-whatsapp-btn text-decoration-none">
+                        <i class="fa-brands fa-whatsapp"></i>
+                        WhatsApp
+                      </a>
+                    @endif
                     <a href="{{ $ctaLink }}" class="cta-btn btn-primaria text-decoration-none">{{ $ctaText }}</a>
                     @if ($ctaSecondaryText && $ctaSecondaryLink)
                       <a href="{{ $ctaSecondaryLink }}" class="cta-btn btn-secundaria text-decoration-none">{{ $ctaSecondaryText }}</a>
@@ -103,6 +114,20 @@
     }
     .hero-pagination .swiper-pagination-bullet-active {
       background: #2dd4bf;
+    }
+    .hero-whatsapp-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: #25d366;
+      color: #fff;
+      border: 0;
+      box-shadow: 0 12px 24px rgba(37, 211, 102, 0.28);
+    }
+    .hero-whatsapp-btn:hover {
+      background: #1ebe5d;
+      color: #fff;
+      transform: translateY(-1px);
     }
     @media (max-width: 991px) {
       .hero-slider { padding-top: 2.5rem; }
