@@ -52,6 +52,11 @@
         </ul>
       </div>
       <div class="col-md-4 text-md-end">
+        <address class="text-light-subtle mb-3" style="font-style: normal;">
+          Rua 10, Zona Industrial de Rio Meao, n.o 356<br>
+          4520-475 Rio Meao<br>
+          Portugal
+        </address>
         <a
           href="https://www.livroreclamacoes.pt/Inicio/"
           target="_blank"
@@ -69,7 +74,6 @@
     </div>
   </div>
 </footer>
-
 
 
 
