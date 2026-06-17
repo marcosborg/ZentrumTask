@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\VehicleHandoverProcedures;
 
 use App\Filament\Resources\VehicleHandoverProcedures\Pages\CreateVehicleHandoverProcedure;
+use App\Filament\Resources\VehicleHandoverProcedures\Pages\EditVehicleHandoverProcedure;
 use App\Filament\Resources\VehicleHandoverProcedures\Pages\ListVehicleHandoverProcedures;
 use App\Filament\Resources\VehicleHandoverProcedures\Pages\ViewVehicleHandoverProcedure;
 use App\Filament\Resources\VehicleHandoverProcedures\Schemas\VehicleHandoverProcedureForm;
@@ -51,6 +52,7 @@ class VehicleHandoverProcedureResource extends Resource
             'index' => ListVehicleHandoverProcedures::route('/'),
             'create' => CreateVehicleHandoverProcedure::route('/create'),
             'view' => ViewVehicleHandoverProcedure::route('/{record}'),
+            'edit' => EditVehicleHandoverProcedure::route('/{record}/edit'),
         ];
     }
 }

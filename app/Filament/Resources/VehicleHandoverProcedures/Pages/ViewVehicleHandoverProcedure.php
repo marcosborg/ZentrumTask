@@ -5,6 +5,7 @@ namespace App\Filament\Resources\VehicleHandoverProcedures\Pages;
 use App\Filament\Resources\VehicleHandoverProcedures\VehicleHandoverProcedureResource;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Filament\Actions\Action;
+use Filament\Actions\EditAction;
 use Filament\Resources\Pages\ViewRecord;
 
 class ViewVehicleHandoverProcedure extends ViewRecord
@@ -14,6 +15,7 @@ class ViewVehicleHandoverProcedure extends ViewRecord
     protected function getHeaderActions(): array
     {
         return [
+            EditAction::make(),
             Action::make('downloadPdf')
                 ->label('Descarregar PDF')
                 ->icon('heroicon-o-document-arrow-down')

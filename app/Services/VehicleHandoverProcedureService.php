@@ -68,6 +68,58 @@ class VehicleHandoverProcedureService
         return $procedure->refresh();
     }
 
+    public function update(VehicleHandoverProcedure $procedure, array $data, User $operator): VehicleHandoverProcedure
+    {
+        $procedure = DB::transaction(function () use ($data, $operator, $procedure): VehicleHandoverProcedure {
+            $vehicle = Vehicle::query()->findOrFail($data['vehicle_id'] ?? $procedure->vehicle_id);
+            $driver = Driver::query()->findOrFail($data['driver_id'] ?? $procedure->driver_id);
+            $performedAt = isset($data['performed_at']) && $data['performed_at']
+                ? Carbon::parse((string) $data['performed_at'])
+                : ($procedure->performed_at ?? now());
+
+            $guidedPhotoItems = $this->normalizeGuidedPhotoItems((array) ($data['guided_photo_items'] ?? []));
+            $videoItems = $this->normalizeVideoItems((array) ($data['video_items'] ?? []));
+            $checklist = $this->normalizeChecklistPayload((array) ($data['checklist_payload'] ?? []), $guidedPhotoItems);
+            $damageItems = $this->normalizeDamageItems((array) ($data['damage_items'] ?? []));
+            $generalPhotoPaths = $this->storeGeneralPhotos((array) ($data['general_photos'] ?? []));
+
+            $procedure->update([
+                'type' => $data['type'] ?? $procedure->type,
+                'vehicle_id' => $vehicle->id,
+                'driver_id' => $driver->id,
+                'operator_user_id' => $procedure->operator_user_id ?: $operator->id,
+                'performed_at' => $performedAt,
+                'vehicle_snapshot' => $this->vehicleSnapshot($vehicle),
+                'driver_snapshot' => $this->driverSnapshot($driver),
+                'checklist_payload' => $checklist,
+                'damage_items' => $damageItems,
+                'general_photo_paths' => $generalPhotoPaths,
+                'guided_photo_items' => $guidedPhotoItems,
+                'video_items' => $videoItems,
+                'battery_minimum_confirmed' => (bool) Arr::get($checklist, 'battery_minimum_agreed.checked', false),
+                'battery_minimum_percent' => $this->nullableInt(Arr::get($checklist, 'battery_minimum_agreed.value')),
+                'deposit_paid_confirmed' => (bool) Arr::get($checklist, 'deposit_paid.checked', false),
+                'deposit_paid_amount' => $this->nullableDecimal(Arr::get($checklist, 'deposit_paid.value')),
+                'notes' => trim((string) ($data['notes'] ?? '')) ?: null,
+                'operator_signature_data_url' => (string) ($data['operator_signature_data_url'] ?? $procedure->operator_signature_data_url),
+                'driver_signature_data_url' => (string) ($data['driver_signature_data_url'] ?? $procedure->driver_signature_data_url),
+            ]);
+
+            return $procedure->refresh();
+        });
+
+        try {
+            $this->generateArtifacts($procedure);
+        } catch (\Throwable $exception) {
+            Log::warning('vehicle_handover_artifacts_failed', [
+                'procedure_id' => $procedure->id,
+                'error' => $exception->getMessage(),
+            ]);
+        }
+
+        return $procedure->refresh();
+    }
+
     /**
      * @return array{return: VehicleHandoverProcedure, delivery: VehicleHandoverProcedure}
      */
