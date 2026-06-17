@@ -18,6 +18,7 @@ class ChatSessionStartRequest extends FormRequest
             'source' => ['nullable', 'string', 'in:website,app,whatsapp'],
             'external_id' => ['nullable', 'string', 'max:120'],
             'external_name' => ['nullable', 'string', 'max:120'],
+            'external_phone' => ['nullable', 'string', 'max:40'],
         ];
     }
 }

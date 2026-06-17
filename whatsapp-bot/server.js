@@ -48,7 +48,7 @@ async function writeSessionStore(store) {
   await writeFile(sessionStorePath, JSON.stringify(store, null, 2));
 }
 
-async function resolveChatSession(from, externalName = null) {
+async function resolveChatSession(from, externalName = null, externalPhone = null) {
   const store = await readSessionStore();
 
   if (store[from]) {
@@ -60,6 +60,7 @@ async function resolveChatSession(from, externalName = null) {
     source: 'whatsapp',
     external_id: from,
     external_name: externalName,
+    external_phone: externalPhone,
   }, {
     headers: { Accept: 'application/json' },
     timeout: 30000,
@@ -77,14 +78,15 @@ async function resetChatSession(from) {
   await writeSessionStore(store);
 }
 
-async function askLaravelChat(from, message, externalName = null) {
-  const sessionToken = await resolveChatSession(from, externalName);
+async function askLaravelChat(from, message, externalName = null, externalPhone = null) {
+  const sessionToken = await resolveChatSession(from, externalName, externalPhone);
   const { data } = await axios.post(`${laravelBaseUrl}/app/chat/message`, {
     session_token: sessionToken,
     message,
     source: 'whatsapp',
     external_id: from,
     external_name: externalName,
+    external_phone: externalPhone,
   }, {
     headers: { Accept: 'application/json' },
     timeout: 60000,
@@ -263,7 +265,8 @@ async function handleIncomingMessage(message, messageKey) {
     await client.sendSeen(message.from).catch(() => undefined);
     const contact = await message.getContact().catch(() => null);
     const externalName = contact?.pushname || contact?.name || null;
-    const reply = await askLaravelChat(message.from, text, externalName);
+    const externalPhone = contact?.number || contact?.id?.user || null;
+    const reply = await askLaravelChat(message.from, text, externalName, externalPhone);
     await replyInChunks(message, reply);
   } catch (error) {
     console.error('whatsapp_message_failed', {

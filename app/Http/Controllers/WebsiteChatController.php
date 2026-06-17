@@ -7,6 +7,7 @@ use App\Http\Requests\ChatSessionStartRequest;
 use App\Models\ChatBotSetting;
 use App\Models\ChatMessage;
 use App\Models\ChatSession;
+use App\Services\ChatTaskCreationService;
 use App\Services\WebsiteChatService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Carbon;
@@ -26,6 +27,7 @@ class WebsiteChatController extends Controller
             source: $this->resolveSource($request, $data['source'] ?? null),
             externalId: $data['external_id'] ?? null,
             externalName: $data['external_name'] ?? null,
+            externalPhone: $data['external_phone'] ?? null,
         );
 
         if ($setting->is_enabled && ($setting->welcome_message ?? null) && $session->messages()->count() === 0) {
@@ -47,7 +49,11 @@ class WebsiteChatController extends Controller
         ]);
     }
 
-    public function message(ChatMessageRequest $request, WebsiteChatService $chatService): JsonResponse
+    public function message(
+        ChatMessageRequest $request,
+        WebsiteChatService $chatService,
+        ChatTaskCreationService $taskCreationService
+    ): JsonResponse
     {
         $data = $request->validated();
         $setting = ChatBotSetting::current();
@@ -65,6 +71,7 @@ class WebsiteChatController extends Controller
             source: $this->resolveSource($request, $data['source'] ?? null),
             externalId: $data['external_id'] ?? null,
             externalName: $data['external_name'] ?? null,
+            externalPhone: $data['external_phone'] ?? null,
         );
 
         $userMessage = ChatMessage::query()->create([
@@ -105,6 +112,12 @@ class WebsiteChatController extends Controller
             'last_message_at' => now(),
         ])->save();
 
+        try {
+            $taskCreationService->createFromSessionIfReady($session);
+        } catch (Throwable $exception) {
+            report($exception);
+        }
+
         return $this->jsonResponse([
             'session_token' => $session->session_token,
             'user_message' => $this->formatMessage($userMessage),
@@ -127,7 +140,8 @@ class WebsiteChatController extends Controller
         ?string $userAgent,
         string $source,
         ?string $externalId,
-        ?string $externalName
+        ?string $externalName,
+        ?string $externalPhone
     ): ChatSession
     {
         $session = null;
@@ -135,6 +149,8 @@ class WebsiteChatController extends Controller
             'source' => $source,
             'external_id' => $externalId,
             'external_name' => $externalName,
+            'external_phone' => $externalPhone,
+            'phone' => $externalPhone,
         ], fn ($value): bool => $value !== null && $value !== '');
 
         if ($sessionToken) {
