@@ -19,6 +19,8 @@ class VehicleHandoverProcedure extends Model
         'operator_user_id',
         'closed_allocation_id',
         'created_allocation_id',
+        'exchange_group_uuid',
+        'exchange_related_procedure_id',
         'performed_at',
         'allocation_effective_start_date',
         'allocation_effective_end_date',
@@ -28,6 +30,7 @@ class VehicleHandoverProcedure extends Model
         'damage_items',
         'general_photo_paths',
         'guided_photo_items',
+        'video_items',
         'battery_minimum_confirmed',
         'battery_minimum_percent',
         'deposit_paid_confirmed',
@@ -37,6 +40,8 @@ class VehicleHandoverProcedure extends Model
         'driver_signature_data_url',
         'html_snapshot',
         'pdf_path',
+        'email_sent_at',
+        'email_recipients',
     ];
 
     public function vehicle(): BelongsTo
@@ -64,6 +69,11 @@ class VehicleHandoverProcedure extends Model
         return $this->belongsTo(VehicleAllocation::class, 'created_allocation_id');
     }
 
+    public function exchangeRelatedProcedure(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'exchange_related_procedure_id');
+    }
+
     /**
      * @return array<string, string>
      */
@@ -79,10 +89,13 @@ class VehicleHandoverProcedure extends Model
             'damage_items' => 'array',
             'general_photo_paths' => 'array',
             'guided_photo_items' => 'array',
+            'video_items' => 'array',
             'battery_minimum_confirmed' => 'boolean',
             'battery_minimum_percent' => 'integer',
             'deposit_paid_confirmed' => 'boolean',
             'deposit_paid_amount' => 'decimal:2',
+            'email_sent_at' => 'datetime',
+            'email_recipients' => 'array',
         ];
     }
 }

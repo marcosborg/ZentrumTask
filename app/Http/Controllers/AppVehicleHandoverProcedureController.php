@@ -118,6 +118,39 @@ class AppVehicleHandoverProcedureController extends AppApiController
         ], 201);
     }
 
+    public function exchange(Request $request): JsonResponse
+    {
+        $user = $this->resolveAppUser($request);
+
+        if (! $user) {
+            return $this->corsJson([
+                'message' => 'Sessao invalida.',
+            ], 401);
+        }
+
+        try {
+            $payload = $request->all();
+            $procedures = $this->service->createExchange(
+                (array) ($payload['return_procedure'] ?? []),
+                (array) ($payload['delivery_procedure'] ?? []),
+                $user,
+            );
+        } catch (ValidationException $exception) {
+            return $this->corsJson([
+                'message' => 'Nao foi possivel guardar a troca.',
+                'errors' => $exception->errors(),
+            ], 422);
+        }
+
+        return $this->corsJson([
+            'message' => 'Troca registada com sucesso.',
+            'procedures' => [
+                'return' => $this->serializeProcedureDetail($procedures['return']),
+                'delivery' => $this->serializeProcedureDetail($procedures['delivery']),
+            ],
+        ], 201);
+    }
+
     public function show(Request $request, VehicleHandoverProcedure $vehicleHandoverProcedure): JsonResponse
     {
         $user = $this->resolveAppUser($request);
@@ -161,6 +194,8 @@ class AppVehicleHandoverProcedureController extends AppApiController
             'operator_name' => $procedure->operator?->name,
             'notes' => $procedure->notes,
             'pdf_url' => $procedure->pdf_path ? Storage::disk('public')->url($procedure->pdf_path) : null,
+            'exchange_group_uuid' => $procedure->exchange_group_uuid,
+            'exchange_related_procedure_id' => $procedure->exchange_related_procedure_id,
         ];
     }
 
@@ -209,6 +244,16 @@ class AppVehicleHandoverProcedureController extends AppApiController
                 ])
                 ->values()
                 ->all(),
+            'video_items' => collect($procedure->video_items ?? [])
+                ->map(fn (array $item, string $key): array => [
+                    'key' => $key,
+                    'label' => $item['label'] ?? $key,
+                    'required' => (bool) ($item['required'] ?? false),
+                    'video_url' => ! empty($item['video_path']) ? Storage::disk('public')->url($item['video_path']) : ($item['url'] ?? null),
+                    'qr_url' => ! empty($item['qr_path']) ? Storage::disk('public')->url($item['qr_path']) : null,
+                ])
+                ->values()
+                ->all(),
             'battery_minimum_confirmed' => $procedure->battery_minimum_confirmed,
             'battery_minimum_percent' => $procedure->battery_minimum_percent,
             'deposit_paid_confirmed' => $procedure->deposit_paid_confirmed,
@@ -218,6 +263,8 @@ class AppVehicleHandoverProcedureController extends AppApiController
             'html_snapshot' => $procedure->html_snapshot,
             'created_allocation_id' => $procedure->created_allocation_id,
             'closed_allocation_id' => $procedure->closed_allocation_id,
+            'email_sent_at' => optional($procedure->email_sent_at)?->toIso8601String(),
+            'email_recipients' => $procedure->email_recipients,
         ]);
     }
 }

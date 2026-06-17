@@ -72,6 +72,10 @@ Route::post('/app/ops/vehicle-handovers', [AppVehicleHandoverProcedureController
     ->withoutMiddleware([VerifyCsrfToken::class])
     ->middleware('throttle:30,1')
     ->name('app.ops.vehicle-handovers.store');
+Route::post('/app/ops/vehicle-handovers/exchange', [AppVehicleHandoverProcedureController::class, 'exchange'])
+    ->withoutMiddleware([VerifyCsrfToken::class])
+    ->middleware('throttle:30,1')
+    ->name('app.ops.vehicle-handovers.exchange');
 Route::get('/app/ops/vehicle-handovers/{vehicleHandoverProcedure}', [AppVehicleHandoverProcedureController::class, 'show'])
     ->withoutMiddleware([VerifyCsrfToken::class])
     ->middleware('throttle:60,1')

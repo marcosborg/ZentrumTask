@@ -115,15 +115,15 @@ class VehicleHandoverProcedureForm
                             ->map(function (array $item): Section {
                                 $components = [
                                     Checkbox::make("checklist_payload.{$item['key']}.checked")
-                                        ->label($item['label'])
-                                        ->required()
-                                        ->accepted(),
+                                        ->label($item['label']),
                                 ];
 
                                 if ($item['requires_value'] ?? false) {
+                                    $checkedPath = "checklist_payload.{$item['key']}.checked";
+
                                     $components[] = TextInput::make("checklist_payload.{$item['key']}.value")
                                         ->label($item['value_label'] ?? 'Valor')
-                                        ->required();
+                                        ->required(fn (Get $get): bool => (bool) $get($checkedPath));
                                 } else {
                                     $components[] = Hidden::make("checklist_payload.{$item['key']}.value");
                                 }
@@ -145,10 +145,28 @@ class VehicleHandoverProcedureForm
                                 ->image()
                                 ->disk('public')
                                 ->directory('vehicle-handovers/guided-photos')
-                                ->visibility('public')
-                                ->required($zone['required']))
+                                ->visibility('public'))
                             ->all()
                     ),
+                Section::make('Videos')
+                    ->description('Grava ou anexa, quando disponivel, um video do exterior e outro do interior. Maximo 100MB por video.')
+                    ->columns(2)
+                    ->components([
+                        FileUpload::make('video_items.exterior')
+                            ->label('Video exterior')
+                            ->acceptedFileTypes(['video/mp4', 'video/quicktime', 'video/webm', 'video/3gpp'])
+                            ->maxSize(102400)
+                            ->disk('public')
+                            ->directory('vehicle-handovers/videos')
+                            ->visibility('public'),
+                        FileUpload::make('video_items.interior')
+                            ->label('Video interior')
+                            ->acceptedFileTypes(['video/mp4', 'video/quicktime', 'video/webm', 'video/3gpp'])
+                            ->maxSize(102400)
+                            ->disk('public')
+                            ->directory('vehicle-handovers/videos')
+                            ->visibility('public'),
+                    ]),
                 Section::make('Danos')
                     ->components([
                         Repeater::make('damage_items')

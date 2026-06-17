@@ -19,6 +19,8 @@
         .checklist th, .checklist td, .damage-table th, .damage-table td { border: 1px solid #cbd5e1; padding: 7px; vertical-align: top; }
         .photo-grid { margin-top: 10px; }
         .photo-grid img { width: 170px; height: auto; margin: 0 10px 10px 0; border: 1px solid #cbd5e1; border-radius: 6px; }
+        .video-box { display: inline-block; width: 220px; min-height: 150px; margin: 0 10px 12px 0; padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px; vertical-align: top; word-break: break-all; }
+        .video-box img { width: 96px; height: 96px; display: block; margin-top: 8px; }
         .signatures { width: 100%; margin-top: 24px; }
         .signatures td { width: 50%; vertical-align: top; padding-right: 12px; }
         .signature-box { border: 1px dashed #94a3b8; height: 120px; padding: 8px; }
@@ -62,7 +64,7 @@
                 @foreach(($procedure->checklist_payload ?? []) as $item)
                     <tr>
                         <td>{{ $item['label'] ?? '-' }}</td>
-                        <td>{{ !empty($item['checked']) ? 'OK' : 'Nao' }}</td>
+                        <td>{{ !empty($item['checked']) ? 'OK' : 'Nao validado' }}</td>
                         <td>
                             @if(!empty($item['value']))
                                 {{ $item['value'] }}
@@ -114,6 +116,14 @@
                     'photo_url' => !empty($item['photo_path']) ? \Illuminate\Support\Facades\Storage::disk('public')->url($item['photo_path']) : null,
                 ])
                 ->groupBy('view');
+            $videoItems = collect($procedure->video_items ?? [])
+                ->map(fn ($item) => [
+                    'label' => $item['label'] ?? 'Video',
+                    'url' => $item['url'] ?? (!empty($item['video_path']) ? \Illuminate\Support\Facades\Storage::disk('public')->url($item['video_path']) : null),
+                    'qr_url' => !empty($item['qr_path']) ? \Illuminate\Support\Facades\Storage::disk('public')->url($item['qr_path']) : null,
+                ])
+                ->filter(fn ($item) => !empty($item['url']))
+                ->values();
         @endphp
 
         @if($guidedPhotoItems->isNotEmpty())
@@ -122,24 +132,43 @@
                 <div style="font-weight: bold; margin: 8px 0 6px;">{{ ucfirst((string) $view) }}</div>
                 <div class="photo-grid">
                     @foreach($items as $item)
-                        @if(!empty($item['photo_url']))
-                            <div style="display:inline-block; margin-right:10px; margin-bottom:10px;">
-                                <div style="font-size:11px; margin-bottom:4px;">{{ $item['label'] }}</div>
+                        <div style="display:inline-block; margin-right:10px; margin-bottom:10px;">
+                            <div style="font-size:11px; margin-bottom:4px;">{{ $item['label'] }}</div>
+                            @if(!empty($item['photo_url']))
                                 <img src="{{ $item['photo_url'] }}" alt="{{ $item['label'] }}">
-                            </div>
-                        @endif
+                            @else
+                                <div style="width:145px; min-height:80px; border:1px solid #cbd5e1; padding:12px; font-size:11px;">Nao registado</div>
+                            @endif
+                        </div>
                     @endforeach
                 </div>
             @endforeach
         @endif
 
+        <div class="section-title">Fotos gerais</div>
         @if($generalPhotoUrls->isNotEmpty())
-            <div class="section-title">Fotos gerais</div>
             <div class="photo-grid">
                 @foreach($generalPhotoUrls as $photoUrl)
                     <img src="{{ $photoUrl }}" alt="Foto">
                 @endforeach
             </div>
+        @else
+            <div>Fotos gerais nao registadas.</div>
+        @endif
+
+        <div class="section-title">Videos</div>
+        @if($videoItems->isNotEmpty())
+            @foreach($videoItems as $video)
+                <div class="video-box">
+                    <strong>{{ $video['label'] }}</strong><br>
+                    <a href="{{ $video['url'] }}">{{ $video['url'] }}</a>
+                    @if(!empty($video['qr_url']))
+                        <img src="{{ $video['qr_url'] }}" alt="QR {{ $video['label'] }}">
+                    @endif
+                </div>
+            @endforeach
+        @else
+            <div>Videos nao registados.</div>
         @endif
 
         <div class="section-title">Observacoes</div>

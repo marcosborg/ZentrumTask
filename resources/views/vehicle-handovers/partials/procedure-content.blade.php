@@ -15,6 +15,14 @@
             'photo_url' => !empty($item['photo_path']) ? Storage::disk('public')->url($item['photo_path']) : null,
         ])
         ->groupBy('view');
+    $videoItems = collect($procedure->video_items ?? [])
+        ->map(fn ($item) => [
+            'label' => $item['label'] ?? 'Video',
+            'url' => $item['url'] ?? (!empty($item['video_path']) ? Storage::disk('public')->url($item['video_path']) : null),
+            'qr_url' => !empty($item['qr_path']) ? Storage::disk('public')->url($item['qr_path']) : null,
+        ])
+        ->filter(fn ($item) => !empty($item['url']))
+        ->values();
 @endphp
 
 <div class="handover-doc">
@@ -45,7 +53,7 @@
                     @foreach(($procedure->checklist_payload ?? []) as $item)
                         <tr>
                             <td>{{ $item['label'] ?? '-' }}</td>
-                            <td>{{ !empty($item['checked']) ? 'OK' : 'Nao' }}</td>
+                            <td>{{ !empty($item['checked']) ? 'OK' : 'Nao validado' }}</td>
                             <td>
                                 @if(!empty($item['value']))
                                     {{ $item['value'] }}
@@ -104,7 +112,7 @@
                                     @if(!empty($item['photo_url']))
                                         <img src="{{ $item['photo_url'] }}" alt="{{ $item['label'] }}" class="handover-doc__photo">
                                     @else
-                                        <div class="handover-doc__photo" style="display:flex;align-items:center;justify-content:center;min-height:140px;background:#f8fafc;">Sem foto</div>
+                                        <div class="handover-doc__photo" style="display:flex;align-items:center;justify-content:center;min-height:140px;background:#f8fafc;">Nao registado</div>
                                     @endif
                                 </div>
                             @endforeach
@@ -127,6 +135,27 @@
             </div>
         @else
             <p class="handover-doc__muted">Sem fotos gerais anexadas.</p>
+        @endif
+    </section>
+
+    <section>
+        <h2>Videos</h2>
+        @if($videoItems->isNotEmpty())
+            <div class="handover-doc__photos">
+                @foreach($videoItems as $video)
+                    <div class="handover-doc__damage">
+                        <div class="handover-doc__damage-head">
+                            <strong>{{ $video['label'] }}</strong>
+                            <a href="{{ $video['url'] }}" target="_blank" rel="noopener">Abrir video</a>
+                        </div>
+                        @if(!empty($video['qr_url']))
+                            <img src="{{ $video['qr_url'] }}" alt="QR {{ $video['label'] }}" class="handover-doc__photo" style="max-width:140px;">
+                        @endif
+                    </div>
+                @endforeach
+            </div>
+        @else
+            <p class="handover-doc__muted">Videos nao registados.</p>
         @endif
     </section>
 

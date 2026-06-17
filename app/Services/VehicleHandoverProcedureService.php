@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Mail\VehicleHandoverProceduresMail;
 use App\Models\Driver;
 use App\Models\User;
 use App\Models\Vehicle;
@@ -9,15 +10,23 @@ use App\Models\VehicleAllocation;
 use App\Models\VehicleHandoverProcedure;
 use App\Support\VehicleHandoverDefinition;
 use Barryvdh\DomPDF\Facade\Pdf;
+use chillerlan\QRCode\QRCode;
+use chillerlan\QRCode\QROptions;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Validation\ValidationException;
 
 class VehicleHandoverProcedureService
 {
+    private const VIDEO_MAX_BYTES = 104857600;
+
     /**
      * @return array<int, array{key: string, label: string, requires_value?: bool, value_label?: string, value_type?: string}>
      */
@@ -52,6 +61,44 @@ class VehicleHandoverProcedureService
 
     public function create(array $data, User $operator): VehicleHandoverProcedure
     {
+        $procedure = DB::transaction(fn (): VehicleHandoverProcedure => $this->createProcedure($data, $operator));
+
+        $this->sendProceduresMail(collect([$procedure]));
+
+        return $procedure->refresh();
+    }
+
+    /**
+     * @return array{return: VehicleHandoverProcedure, delivery: VehicleHandoverProcedure}
+     */
+    public function createExchange(array $returnData, array $deliveryData, User $operator): array
+    {
+        $exchangeUuid = (string) Str::uuid();
+        $returnData['type'] = 'return';
+        $deliveryData['type'] = 'delivery';
+        $returnData['exchange_group_uuid'] = $exchangeUuid;
+        $deliveryData['exchange_group_uuid'] = $exchangeUuid;
+
+        $procedures = DB::transaction(function () use ($deliveryData, $operator, $returnData): array {
+            $returnProcedure = $this->createProcedure($returnData, $operator);
+            $deliveryData['exchange_related_procedure_id'] = $returnProcedure->id;
+            $deliveryProcedure = $this->createProcedure($deliveryData, $operator);
+
+            $returnProcedure->updateQuietly(['exchange_related_procedure_id' => $deliveryProcedure->id]);
+
+            return [
+                'return' => $returnProcedure->refresh(),
+                'delivery' => $deliveryProcedure->refresh(),
+            ];
+        });
+
+        $this->sendProceduresMail(collect([$procedures['return'], $procedures['delivery']]));
+
+        return $procedures;
+    }
+
+    private function createProcedure(array $data, User $operator): VehicleHandoverProcedure
+    {
         $vehicle = Vehicle::query()->with('currentAllocation.driver')->findOrFail($data['vehicle_id']);
         $driver = Driver::query()->with('currentAllocation.vehicle')->findOrFail($data['driver_id']);
         $performedAt = isset($data['performed_at']) && $data['performed_at']
@@ -60,8 +107,8 @@ class VehicleHandoverProcedureService
 
         $this->guardBusinessRules($data['type'], $vehicle, $driver);
 
-        return DB::transaction(function () use ($data, $driver, $operator, $performedAt, $vehicle): VehicleHandoverProcedure {
             $guidedPhotoItems = $this->normalizeGuidedPhotoItems((array) ($data['guided_photo_items'] ?? []));
+            $videoItems = $this->normalizeVideoItems((array) ($data['video_items'] ?? []));
             $checklist = $this->normalizeChecklistPayload((array) ($data['checklist_payload'] ?? []), $guidedPhotoItems);
             $damageItems = $this->normalizeDamageItems((array) ($data['damage_items'] ?? []));
             $generalPhotoPaths = $this->storeGeneralPhotos((array) ($data['general_photos'] ?? []));
@@ -72,6 +119,8 @@ class VehicleHandoverProcedureService
                 'vehicle_id' => $vehicle->id,
                 'driver_id' => $driver->id,
                 'operator_user_id' => $operator->id,
+                'exchange_group_uuid' => $data['exchange_group_uuid'] ?? null,
+                'exchange_related_procedure_id' => $data['exchange_related_procedure_id'] ?? null,
                 'performed_at' => $performedAt,
                 'vehicle_snapshot' => $this->vehicleSnapshot($vehicle),
                 'driver_snapshot' => $this->driverSnapshot($driver),
@@ -79,6 +128,7 @@ class VehicleHandoverProcedureService
                 'damage_items' => $damageItems,
                 'general_photo_paths' => $generalPhotoPaths,
                 'guided_photo_items' => $guidedPhotoItems,
+                'video_items' => $videoItems,
                 'battery_minimum_confirmed' => (bool) Arr::get($checklist, 'battery_minimum_agreed.checked', false),
                 'battery_minimum_percent' => $this->nullableInt(Arr::get($checklist, 'battery_minimum_agreed.value')),
                 'deposit_paid_confirmed' => (bool) Arr::get($checklist, 'deposit_paid.checked', false),
@@ -110,30 +160,46 @@ class VehicleHandoverProcedureService
             }
 
             if ($data['type'] === 'delivery') {
-                $startDate = $performedAt->copy()->startOfDay()->addDay();
+                $allocation = VehicleAllocation::query()
+                    ->active()
+                    ->where('vehicle_id', $vehicle->id)
+                    ->where('driver_id', $driver->id)
+                    ->latest('starts_at')
+                    ->first();
 
-                $allocation = VehicleAllocation::query()->create([
-                    'vehicle_id' => $vehicle->id,
-                    'driver_id' => $driver->id,
-                    'starts_at' => $startDate,
-                    'status' => 'active',
-                    'handover_location' => 'Entrega de viatura',
-                    'notes' => trim((string) ($data['notes'] ?? '')) ?: null,
-                ]);
+                if (! $allocation) {
+                    $startDate = $performedAt->copy()->startOfDay()->addDay();
+
+                    $allocation = VehicleAllocation::query()->create([
+                        'vehicle_id' => $vehicle->id,
+                        'driver_id' => $driver->id,
+                        'starts_at' => $startDate,
+                        'status' => 'active',
+                        'handover_location' => 'Entrega de viatura',
+                        'notes' => trim((string) ($data['notes'] ?? '')) ?: null,
+                    ]);
+                }
 
                 $vehicle->update(['status' => 'allocated']);
 
                 $procedure->update([
                     'created_allocation_id' => $allocation->id,
-                    'allocation_effective_start_date' => $startDate->toDateString(),
+                    'allocation_effective_start_date' => Carbon::parse($allocation->starts_at)->toDateString(),
                 ]);
             }
 
             $procedure->refresh()->load(['vehicle.currentAllocation.driver', 'driver.currentAllocation.vehicle', 'operator', 'closedAllocation', 'createdAllocation']);
-            $this->generateArtifacts($procedure);
+
+            try {
+                $this->generateArtifacts($procedure);
+            } catch (\Throwable $exception) {
+                Log::warning('vehicle_handover_artifacts_failed', [
+                    'procedure_id' => $procedure->id,
+                    'error' => $exception->getMessage(),
+                ]);
+            }
 
             return $procedure->refresh();
-        });
     }
 
     /**
@@ -174,6 +240,123 @@ class VehicleHandoverProcedureService
         ]);
     }
 
+    /**
+     * @return array<string, array{label: string, required: bool, video_path: string|null, qr_path: string|null, url: string|null}>
+     */
+    protected function normalizeVideoItems(array $items): array
+    {
+        $definitions = [
+            'exterior' => 'Video exterior',
+            'interior' => 'Video interior',
+        ];
+
+        $normalized = [];
+
+        foreach ($definitions as $key => $label) {
+            $payload = Arr::get($items, $key);
+            $video = is_array($payload) ? ($payload['video'] ?? null) : $payload;
+            $path = $this->storeSingleVideo($video);
+            $url = $path ? Storage::disk('public')->url($path) : null;
+            $normalized[$key] = [
+                'label' => $label,
+                'required' => false,
+                'video_path' => $path,
+                'qr_path' => $url ? $this->storeQrCode($url, $key) : null,
+                'url' => $url,
+            ];
+        }
+
+        return $normalized;
+    }
+
+    protected function storeSingleVideo(mixed $video): ?string
+    {
+        if ($video instanceof UploadedFile) {
+            if ($video->getSize() > self::VIDEO_MAX_BYTES) {
+                throw ValidationException::withMessages([
+                    'video_items' => 'Cada video pode ter no maximo 100MB.',
+                ]);
+            }
+
+            if (! str_starts_with((string) $video->getMimeType(), 'video/')) {
+                throw ValidationException::withMessages([
+                    'video_items' => 'O ficheiro enviado tem de ser video.',
+                ]);
+            }
+
+            return $video->store('vehicle-handovers/videos', 'public');
+        }
+
+        if (is_string($video) && trim($video) !== '') {
+            return trim($video);
+        }
+
+        return null;
+    }
+
+    protected function storeQrCode(string $url, string $key): ?string
+    {
+        try {
+            $options = new QROptions([
+                'outputType' => QRCode::OUTPUT_IMAGE_PNG,
+                'imageBase64' => false,
+                'scale' => 4,
+            ]);
+
+            $contents = (new QRCode($options))->render($url);
+            $path = 'vehicle-handovers/qrcodes/'.uniqid("{$key}_", true).'.png';
+            Storage::disk('public')->put($path, $contents);
+
+            return $path;
+        } catch (\Throwable $exception) {
+            Log::warning('vehicle_handover_qr_failed', [
+                'url' => $url,
+                'error' => $exception->getMessage(),
+            ]);
+
+            return null;
+        }
+    }
+
+    /**
+     * @param  Collection<int, VehicleHandoverProcedure>  $procedures
+     */
+    protected function sendProceduresMail(Collection $procedures): void
+    {
+        $procedures = $procedures->map->refresh()->values();
+        $first = $procedures->first();
+
+        if (! $first instanceof VehicleHandoverProcedure) {
+            return;
+        }
+
+        $driverEmail = trim((string) ($first->driver?->email ?? data_get($first->driver_snapshot, 'email', '')));
+        $recipients = ['info@zentrum-tvde.com'];
+
+        if ($driverEmail !== '' && filter_var($driverEmail, FILTER_VALIDATE_EMAIL)) {
+            array_unshift($recipients, $driverEmail);
+        }
+
+        $recipients = array_values(array_unique($recipients));
+
+        try {
+            Mail::to(array_shift($recipients))
+                ->cc($recipients)
+                ->send(new VehicleHandoverProceduresMail($procedures));
+
+            $sentTo = array_values(array_unique(array_merge([$driverEmail], $recipients, ['info@zentrum-tvde.com'])));
+            $procedures->each(fn (VehicleHandoverProcedure $procedure) => $procedure->updateQuietly([
+                'email_sent_at' => now(),
+                'email_recipients' => array_values(array_filter($sentTo)),
+            ]));
+        } catch (\Throwable $exception) {
+            Log::warning('vehicle_handover_mail_failed', [
+                'procedure_ids' => $procedures->pluck('id')->all(),
+                'error' => $exception->getMessage(),
+            ]);
+        }
+    }
+
     protected function guardBusinessRules(string $type, Vehicle $vehicle, Driver $driver): void
     {
         if (! in_array($type, ['delivery', 'return'], true)) {
@@ -183,15 +366,29 @@ class VehicleHandoverProcedureService
         }
 
         if ($type === 'delivery') {
-            if ($vehicle->status !== 'available' || $vehicle->currentAllocation()->exists()) {
+            $vehicleAllocation = $vehicle->currentAllocation;
+            $driverAllocation = $driver->currentAllocation;
+            $alreadyAllocatedToThisDriver = VehicleAllocation::query()
+                ->active()
+                ->where('vehicle_id', $vehicle->id)
+                ->where('driver_id', $driver->id)
+                ->exists();
+
+            if ($vehicleAllocation && (int) $vehicleAllocation->driver_id !== (int) $driver->id) {
                 throw ValidationException::withMessages([
-                    'vehicle_id' => 'A entrega so pode ser feita com uma viatura disponivel.',
+                    'vehicle_id' => 'Esta viatura ja esta alocada a outro motorista.',
                 ]);
             }
 
-            if ($driver->currentAllocation()->exists()) {
+            if ($driverAllocation && (int) $driverAllocation->vehicle_id !== (int) $vehicle->id) {
                 throw ValidationException::withMessages([
-                    'driver_id' => 'O motorista ja tem uma viatura alocada.',
+                    'driver_id' => 'O motorista ja tem outra viatura alocada.',
+                ]);
+            }
+
+            if (! $alreadyAllocatedToThisDriver && $vehicle->status !== 'available') {
+                throw ValidationException::withMessages([
+                    'vehicle_id' => 'A entrega exige uma viatura disponivel ou ja alocada a este motorista.',
                 ]);
             }
         }
@@ -233,13 +430,7 @@ class VehicleHandoverProcedureService
                 $checked = $hasRequiredGuidedPhotos;
             }
 
-            if (! $checked) {
-                throw ValidationException::withMessages([
-                    'checklist_payload.'.$item['key'].'.checked' => 'Todos os itens do checklist sao obrigatorios.',
-                ]);
-            }
-
-            if (($item['requires_value'] ?? false) && ($value === null || $value === '')) {
+            if ($checked && ($item['requires_value'] ?? false) && ($value === null || $value === '')) {
                 throw ValidationException::withMessages([
                     'checklist_payload.'.$item['key'].'.value' => 'Este item exige um valor.',
                 ]);
@@ -268,12 +459,6 @@ class VehicleHandoverProcedureService
         foreach ($this->guidedPhotoZones() as $zone) {
             $payload = Arr::get($items, $zone['key'], []);
             $photoPath = $this->storeSinglePhoto(Arr::get($payload, 'photo'), 'vehicle-handovers/guided-photos');
-
-            if ($zone['required'] && ! $photoPath) {
-                throw ValidationException::withMessages([
-                    'guided_photo_items.'.$zone['key'].'.photo' => 'Esta fotografia da viatura e obrigatoria.',
-                ]);
-            }
 
             $normalized[$zone['key']] = [
                 'label' => $zone['label'],
