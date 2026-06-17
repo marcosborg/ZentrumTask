@@ -350,13 +350,14 @@ class VehicleHandoverProcedureService
     {
         try {
             $options = new QROptions([
-                'outputType' => QRCode::OUTPUT_IMAGE_PNG,
+                'outputType' => QRCode::OUTPUT_MARKUP_SVG,
                 'imageBase64' => false,
+                'svgUseFillAttributes' => true,
                 'scale' => 4,
             ]);
 
             $contents = (new QRCode($options))->render($url);
-            $path = 'vehicle-handovers/qrcodes/'.uniqid("{$key}_", true).'.png';
+            $path = 'vehicle-handovers/qrcodes/'.uniqid("{$key}_", true).'.svg';
             Storage::disk('public')->put($path, $contents);
 
             return $path;

@@ -114,6 +114,27 @@
 
                 return 'data:'.$mime.';base64,'.base64_encode($publicDisk->get($path));
             };
+            $qrDataUri = function (?string $url, ?string $path = null) use ($publicDataUri): ?string {
+                $storedQr = $publicDataUri($path);
+
+                if ($storedQr) {
+                    return $storedQr;
+                }
+
+                if (empty($url)) {
+                    return null;
+                }
+
+                try {
+                    return (new \chillerlan\QRCode\QRCode(new \chillerlan\QRCode\QROptions([
+                        'outputType' => \chillerlan\QRCode\QRCode::OUTPUT_MARKUP_SVG,
+                        'imageBase64' => true,
+                        'svgUseFillAttributes' => true,
+                    ])))->render($url);
+                } catch (\Throwable $exception) {
+                    return null;
+                }
+            };
             $generalPhotoUrls = collect($procedure->general_photo_paths ?? [])
                 ->map(fn ($path) => $path ? \Illuminate\Support\Facades\Storage::disk('public')->url($path) : null)
                 ->filter()
@@ -127,11 +148,15 @@
                 ])
                 ->groupBy('view');
             $videoItems = collect($procedure->video_items ?? [])
-                ->map(fn ($item) => [
-                    'label' => $item['label'] ?? 'Video',
-                    'url' => $item['url'] ?? (!empty($item['video_path']) ? \Illuminate\Support\Facades\Storage::disk('public')->url($item['video_path']) : null),
-                    'qr_url' => $publicDataUri($item['qr_path'] ?? null),
-                ])
+                ->map(function ($item) use ($qrDataUri) {
+                    $url = $item['url'] ?? (!empty($item['video_path']) ? \Illuminate\Support\Facades\Storage::disk('public')->url($item['video_path']) : null);
+
+                    return [
+                        'label' => $item['label'] ?? 'Video',
+                        'url' => $url,
+                        'qr_url' => $qrDataUri($url, $item['qr_path'] ?? null),
+                    ];
+                })
                 ->filter(fn ($item) => !empty($item['url']))
                 ->values();
         @endphp
