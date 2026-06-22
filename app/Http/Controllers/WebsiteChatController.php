@@ -53,8 +53,7 @@ class WebsiteChatController extends Controller
         ChatMessageRequest $request,
         WebsiteChatService $chatService,
         ChatTaskCreationService $taskCreationService
-    ): JsonResponse
-    {
+    ): JsonResponse {
         $data = $request->validated();
         $setting = ChatBotSetting::current();
 
@@ -96,6 +95,12 @@ class WebsiteChatController extends Controller
                 'completion_tokens' => null,
                 'total_tokens' => null,
             ];
+        }
+
+        $missingContactPrompt = $taskCreationService->missingContactPromptForSession($session);
+
+        if ($missingContactPrompt !== null && ! str_contains((string) $reply['content'], $missingContactPrompt)) {
+            $reply['content'] = rtrim((string) $reply['content'])."\n\n".$missingContactPrompt;
         }
 
         $assistantMessage = ChatMessage::query()->create([
@@ -142,8 +147,7 @@ class WebsiteChatController extends Controller
         ?string $externalId,
         ?string $externalName,
         ?string $externalPhone
-    ): ChatSession
-    {
+    ): ChatSession {
         $session = null;
         $meta = array_filter([
             'source' => $source,
