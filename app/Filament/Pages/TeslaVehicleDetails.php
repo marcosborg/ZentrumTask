@@ -6,10 +6,15 @@ use App\Models\TeslaChargingEvent;
 use App\Models\TeslaVehicle;
 use App\Models\TeslaVehicleError;
 use App\Models\TeslaVehicleSnapshot;
+use App\Services\TeslaService;
 use BackedEnum;
+use Filament\Actions\Action;
+use Filament\Forms\Components\TextInput;
+use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Database\Eloquent\Collection;
+use Throwable;
 
 class TeslaVehicleDetails extends Page
 {
@@ -38,6 +43,67 @@ class TeslaVehicleDetails extends Page
         return $this->vehicle->display_name
             ? "Tesla {$this->vehicle->display_name}"
             : "Tesla {$this->vehicle->vin}";
+    }
+
+    /**
+     * @return array<int, Action>
+     */
+    protected function getHeaderActions(): array
+    {
+        return [
+            Action::make('setChargeLimit')
+                ->label('Definir limite SOC')
+                ->icon('heroicon-m-bolt')
+                ->color('warning')
+                ->modalHeading('Definir limite de carga')
+                ->modalDescription('Envia um comando para a Tesla para alterar o limite de carga desta viatura.')
+                ->form([
+                    TextInput::make('percent')
+                        ->label('Limite SOC')
+                        ->suffix('%')
+                        ->numeric()
+                        ->integer()
+                        ->minValue(50)
+                        ->maxValue(100)
+                        ->default($this->latestSnapshot()?->charge_limit_soc ?? 80)
+                        ->required(),
+                ])
+                ->action(function (array $data, TeslaService $teslaService): void {
+                    $percent = (int) ($data['percent'] ?? 0);
+
+                    try {
+                        $response = $teslaService->setChargeLimit($this->vehicle->loadMissing('account'), $percent);
+                    } catch (Throwable $exception) {
+                        Notification::make()
+                            ->danger()
+                            ->title('Falha ao definir limite SOC')
+                            ->body($exception->getMessage())
+                            ->send();
+
+                        return;
+                    }
+
+                    $result = data_get($response, 'response.result');
+                    $reason = (string) (data_get($response, 'response.reason') ?? data_get($response, 'error') ?? '');
+                    $alreadySet = $reason === 'already_set';
+
+                    if ($result === true || $alreadySet) {
+                        Notification::make()
+                            ->success()
+                            ->title($alreadySet ? 'Limite SOC ja estava definido' : 'Limite SOC enviado')
+                            ->body("Limite solicitado: {$percent}%.")
+                            ->send();
+
+                        return;
+                    }
+
+                    Notification::make()
+                        ->danger()
+                        ->title('Tesla recusou o comando')
+                        ->body($reason !== '' ? $reason : 'Resposta inesperada da Tesla.')
+                        ->send();
+                }),
+        ];
     }
 
     public function latestSnapshot(): ?TeslaVehicleSnapshot

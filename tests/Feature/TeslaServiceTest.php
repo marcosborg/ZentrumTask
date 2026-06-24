@@ -90,6 +90,39 @@ it('refreshes an expired token before fetching vehicle data', function (): void 
         && $request->hasHeader('Authorization', 'Bearer new-access-token'));
 });
 
+it('sets the tesla charge limit', function (): void {
+    Http::fake([
+        'tesla.test/api/1/vehicles/5YJ3E1EA7JF000001/command/set_charge_limit' => Http::response([
+            'response' => [
+                'result' => true,
+                'reason' => '',
+            ],
+        ]),
+    ]);
+
+    $account = TeslaAccount::factory()->create([
+        'access_token' => encrypt('valid-token'),
+        'refresh_token' => encrypt('refresh-token'),
+        'expires_at' => now()->addHour(),
+    ]);
+
+    $vehicle = TeslaVehicle::factory()->create([
+        'tesla_account_id' => $account->id,
+        'vin' => '5YJ3E1EA7JF000001',
+    ]);
+
+    $response = app(TeslaService::class)->setChargeLimit($vehicle, 80);
+
+    expect($response['response']['result'])->toBeTrue();
+
+    Http::assertSent(function ($request): bool {
+        return $request->url() === 'https://tesla.test/api/1/vehicles/5YJ3E1EA7JF000001/command/set_charge_limit'
+            && $request->method() === 'POST'
+            && $request->hasHeader('Authorization', 'Bearer valid-token')
+            && $request['percent'] === 80;
+    });
+});
+
 it('shows a configuration warning when tesla credentials are missing', function (): void {
     config()->set('services.tesla.client_id', null);
 

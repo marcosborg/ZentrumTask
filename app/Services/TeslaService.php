@@ -290,6 +290,23 @@ class TeslaService
             ->json();
     }
 
+    /**
+     * @return array<string, mixed>
+     */
+    public function setChargeLimit(TeslaVehicle $vehicle, int $percent): array
+    {
+        if ($percent < 50 || $percent > 100) {
+            throw new RuntimeException('O limite SOC deve estar entre 50% e 100%.');
+        }
+
+        return $this->client($vehicle->account)
+            ->post($this->url("/api/1/vehicles/{$vehicle->vin}/command/set_charge_limit"), [
+                'percent' => $percent,
+            ])
+            ->throw()
+            ->json();
+    }
+
     public function createManualOdometerSnapshot(TeslaVehicle $vehicle, ?string $periodStart = null, ?string $periodEnd = null): TeslaVehicleSnapshot
     {
         $snapshot = $this->hydrateVehicleData($vehicle, true);
