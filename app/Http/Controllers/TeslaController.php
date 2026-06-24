@@ -2,8 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Filament\Pages\TeslaIntegration;
 use App\Models\TeslaAccount;
-use App\Models\TeslaVehicle;
 use App\Services\TeslaService;
 use Illuminate\Http\Client\RequestException;
 use Illuminate\Http\Request;
@@ -16,27 +16,11 @@ class TeslaController extends Controller
 {
     public function __construct(private readonly TeslaService $teslaService) {}
 
-    public function index(): \Illuminate\Contracts\View\View
-    {
-        return view('admin.tesla.index', [
-            'isConfigured' => $this->isConfigured(),
-            'accounts' => TeslaAccount::query()
-                ->withCount('vehicles')
-                ->latest()
-                ->get(),
-            'vehicles' => TeslaVehicle::query()
-                ->with('account')
-                ->latest('last_seen_at')
-                ->latest()
-                ->get(),
-        ]);
-    }
-
     public function redirectToTesla(Request $request): \Illuminate\Http\RedirectResponse
     {
         if (! $this->isConfigured()) {
             return redirect()
-                ->route('admin.tesla.index')
+                ->to(TeslaIntegration::getUrl())
                 ->with('error', 'Configura as credenciais Tesla antes de ligar uma conta.');
         }
 
@@ -59,7 +43,7 @@ class TeslaController extends Controller
 
         if (! $this->isValidState($state, $expectedState, $cachedState)) {
             return redirect()
-                ->route('admin.tesla.index')
+                ->to(TeslaIntegration::getUrl())
                 ->with('error', 'O estado OAuth da Tesla e invalido. Tenta ligar a conta novamente.');
         }
 
@@ -70,7 +54,7 @@ class TeslaController extends Controller
 
         if (! is_string($code) || $code === '') {
             return redirect()
-                ->route('admin.tesla.index')
+                ->to(TeslaIntegration::getUrl())
                 ->with('error', 'A Tesla nao devolveu um codigo de autorizacao.');
         }
 
@@ -78,7 +62,7 @@ class TeslaController extends Controller
             $token = $this->teslaService->exchangeCodeForToken($code);
         } catch (RequestException $exception) {
             return redirect()
-                ->route('admin.tesla.index')
+                ->to(TeslaIntegration::getUrl())
                 ->with('error', $this->messageFromTeslaException($exception, 'Nao foi possivel trocar o codigo OAuth por tokens.'));
         }
 
@@ -113,7 +97,7 @@ class TeslaController extends Controller
         }
 
         return redirect()
-            ->route('admin.tesla.index')
+            ->to(TeslaIntegration::getUrl())
             ->with('success', 'Conta Tesla ligada com sucesso.');
     }
 
@@ -123,7 +107,7 @@ class TeslaController extends Controller
 
         if ($accounts->isEmpty()) {
             return redirect()
-                ->route('admin.tesla.index')
+                ->to(TeslaIntegration::getUrl())
                 ->with('error', 'Liga uma conta Tesla antes de sincronizar veiculos.');
         }
 
@@ -135,12 +119,12 @@ class TeslaController extends Controller
             }
         } catch (RequestException $exception) {
             return redirect()
-                ->route('admin.tesla.index')
+                ->to(TeslaIntegration::getUrl())
                 ->with('error', $this->messageFromTeslaException($exception, 'Nao foi possivel sincronizar os veiculos Tesla.'));
         }
 
         return redirect()
-            ->route('admin.tesla.index')
+            ->to(TeslaIntegration::getUrl())
             ->with('success', "{$synced} veiculo(s) Tesla sincronizado(s).");
     }
 

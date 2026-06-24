@@ -2,9 +2,12 @@
 
 namespace App\Filament\Pages;
 
+use App\Models\TeslaAccount;
+use App\Models\TeslaVehicle;
 use BackedEnum;
 use Filament\Pages\Page;
 use Filament\Support\Icons\Heroicon;
+use Illuminate\Database\Eloquent\Collection;
 use UnitEnum;
 
 class TeslaIntegration extends Page
@@ -19,12 +22,31 @@ class TeslaIntegration extends Page
 
     protected static ?int $navigationSort = 90;
 
-    protected static ?string $slug = 'tesla-integration';
+    protected static ?string $slug = 'tesla';
 
     protected string $view = 'filament.pages.tesla-integration';
 
-    public static function getNavigationUrl(): string
+    public bool $isConfigured = false;
+
+    public Collection $accounts;
+
+    public Collection $vehicles;
+
+    public function mount(): void
     {
-        return route('admin.tesla.index');
+        $this->isConfigured = filled(config('services.tesla.client_id'))
+            && filled(config('services.tesla.client_secret'))
+            && filled(config('services.tesla.redirect_uri'));
+
+        $this->accounts = TeslaAccount::query()
+            ->withCount('vehicles')
+            ->latest()
+            ->get();
+
+        $this->vehicles = TeslaVehicle::query()
+            ->with('account')
+            ->latest('last_seen_at')
+            ->latest()
+            ->get();
     }
 }

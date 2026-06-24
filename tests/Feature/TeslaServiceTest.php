@@ -20,6 +20,11 @@ beforeEach(function (): void {
     config()->set('services.tesla.scopes', 'openid offline_access vehicle_device_data vehicle_location vehicle_charging_cmds');
 });
 
+function teslaPageUrl(): string
+{
+    return \App\Filament\Pages\TeslaIntegration::getUrl();
+}
+
 it('lists vehicles for a tesla account', function (): void {
     Http::fake([
         'tesla.test/api/1/vehicles' => Http::response([
@@ -89,7 +94,7 @@ it('shows a configuration warning when tesla credentials are missing', function 
     config()->set('services.tesla.client_id', null);
 
     $this->actingAs(User::factory()->create())
-        ->get(route('admin.tesla.index'))
+        ->get(teslaPageUrl())
         ->assertOk()
         ->assertSee('Configuracao Tesla incompleta');
 });
@@ -101,7 +106,7 @@ it('blocks callbacks with an invalid oauth state', function (): void {
             'state' => 'wrong-state',
             'code' => 'valid-code',
         ]))
-        ->assertRedirect(route('admin.tesla.index'))
+        ->assertRedirect(teslaPageUrl())
         ->assertSessionHas('error');
 });
 
@@ -111,7 +116,7 @@ it('rejects callbacks without an authorization code', function (): void {
         ->get(route('tesla.callback', [
             'state' => 'expected-state',
         ]))
-        ->assertRedirect(route('admin.tesla.index'))
+        ->assertRedirect(teslaPageUrl())
         ->assertSessionHas('error');
 });
 
@@ -128,7 +133,7 @@ it('shows a readable error when tesla token exchange fails', function (): void {
             'state' => 'expected-state',
             'code' => 'bad-code',
         ]))
-        ->assertRedirect(route('admin.tesla.index'))
+        ->assertRedirect(teslaPageUrl())
         ->assertSessionHas('error', 'Invalid authorization code');
 });
 
@@ -163,7 +168,7 @@ it('stores a tesla account after a successful oauth callback', function (): void
             'state' => 'expected-state',
             'code' => 'valid-code',
         ]))
-        ->assertRedirect(route('admin.tesla.index'))
+        ->assertRedirect(teslaPageUrl())
         ->assertSessionHas('success');
 
     $account = TeslaAccount::query()->firstOrFail();
@@ -199,7 +204,7 @@ it('stores a tesla account when the oauth state is validated from cache', functi
         'state' => 'cached-state',
         'code' => 'valid-code',
     ]))
-        ->assertRedirect(route('admin.tesla.index'))
+        ->assertRedirect(teslaPageUrl())
         ->assertSessionHas('success');
 
     $account = TeslaAccount::query()->firstOrFail();
@@ -243,7 +248,7 @@ it('syncs tesla vehicles into the database', function (): void {
 
     $this->actingAs(User::factory()->create())
         ->post(route('admin.tesla.syncVehicles'))
-        ->assertRedirect(route('admin.tesla.index'))
+        ->assertRedirect(teslaPageUrl())
         ->assertSessionHas('success');
 
     $vehicle = TeslaVehicle::query()->firstOrFail();
