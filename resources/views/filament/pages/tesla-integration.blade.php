@@ -207,6 +207,82 @@
             @endif
         </x-filament::section>
 
+        <x-filament::section heading="Custos Supercharger por semana">
+            @php
+                $weeklyChargingCosts = $this->weeklyChargingCosts();
+            @endphp
+
+            @if ($weeklyChargingCosts === [])
+                <p class="tesla-admin__muted">Ainda nao existem custos de Supercharger normalizados para apresentar.</p>
+            @else
+                <div style="overflow-x: auto;">
+                    <table class="tesla-admin__account-table">
+                        <thead>
+                            <tr>
+                                <th>Semana</th>
+                                <th>Carregamentos</th>
+                                <th>Viaturas</th>
+                                <th>kWh</th>
+                                <th>Custo</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach ($weeklyChargingCosts as $week)
+                                <tr>
+                                    <td>
+                                        <strong>{{ \Illuminate\Support\Carbon::parse($week['week_start'])->format('d/m/Y') }}</strong>
+                                        <br>
+                                        <span class="tesla-admin__muted">ate {{ \Illuminate\Support\Carbon::parse($week['week_end'])->format('d/m/Y') }}</span>
+                                    </td>
+                                    <td>{{ $week['charges_count'] }}</td>
+                                    <td>{{ $week['vehicles_count'] }}</td>
+                                    <td>{{ number_format($week['energy_kwh'], 1, ',', ' ') }} kWh</td>
+                                    <td><strong>{{ number_format($week['cost'], 2, ',', ' ') }} {{ $week['currency'] }}</strong></td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            @endif
+        </x-filament::section>
+
+        <x-filament::section heading="Carregamentos Supercharger">
+            @php
+                $superchargerCharges = $this->superchargerCharges();
+            @endphp
+
+            @if ($superchargerCharges === [])
+                <p class="tesla-admin__muted">Ainda nao existem carregamentos Supercharger com custo para apresentar.</p>
+            @else
+                <div style="overflow-x: auto;">
+                    <table class="tesla-admin__account-table">
+                        <thead>
+                            <tr>
+                                <th>Data</th>
+                                <th>Viatura</th>
+                                <th>VIN</th>
+                                <th>Local</th>
+                                <th>kWh</th>
+                                <th>Custo</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach ($superchargerCharges as $charge)
+                                <tr>
+                                    <td>{{ $charge['started_at']->format('d/m/Y H:i') }}</td>
+                                    <td><strong>{{ $charge['vehicle_name'] }}</strong></td>
+                                    <td>{{ $charge['vin'] }}</td>
+                                    <td>{{ $charge['location'] }}</td>
+                                    <td>{{ is_numeric($charge['energy_kwh']) ? number_format((float) $charge['energy_kwh'], 1, ',', ' ') . ' kWh' : '-' }}</td>
+                                    <td><strong>{{ number_format((float) $charge['cost'], 2, ',', ' ') }} {{ $charge['currency'] }}</strong></td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            @endif
+        </x-filament::section>
+
         <x-filament::section heading="Veiculos Tesla">
             {{ $this->table }}
         </x-filament::section>

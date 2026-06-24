@@ -220,6 +220,7 @@ class TeslaService
                 ],
             );
 
+            $this->resolveInternalVehicle($vehicle);
             $this->hydrateVehicleData($vehicle);
             $this->syncVehicleExtras($vehicle->refresh());
             $synced++;
@@ -289,7 +290,7 @@ class TeslaService
             ->json();
     }
 
-    public function createManualOdometerSnapshot(TeslaVehicle $vehicle): TeslaVehicleSnapshot
+    public function createManualOdometerSnapshot(TeslaVehicle $vehicle, ?string $periodStart = null, ?string $periodEnd = null): TeslaVehicleSnapshot
     {
         $snapshot = $this->hydrateVehicleData($vehicle, true);
 
@@ -297,7 +298,8 @@ class TeslaService
             throw new RuntimeException('Nao foi possivel obter dados atuais da Tesla para esta viatura.');
         }
 
-        $this->createWeeklyMileageFromManualSnapshot($snapshot);
+        $this->createWeeklyMileageFromManualSnapshot($snapshot, $periodStart, $periodEnd);
+        $this->syncChargingData($vehicle->refresh(), $periodStart, $periodEnd);
 
         return $snapshot->refresh();
     }
@@ -413,7 +415,7 @@ class TeslaService
         ]);
     }
 
-    protected function createWeeklyMileageFromManualSnapshot(TeslaVehicleSnapshot $snapshot): void
+    protected function createWeeklyMileageFromManualSnapshot(TeslaVehicleSnapshot $snapshot, ?string $periodStart = null, ?string $periodEnd = null): void
     {
         if (! is_numeric($snapshot->odometer)) {
             return;
@@ -444,22 +446,24 @@ class TeslaService
         }
 
         $weeklyKm = round(max(0, (float) $snapshot->odometer - (float) $previous->odometer), 2);
-        $periodStart = $previous->recorded_at->copy()->startOfDay();
-        $periodEnd = $snapshot->recorded_at->isMonday()
-            ? $snapshot->recorded_at->copy()->subDay()->endOfDay()
+        $periodStartDate = $periodStart
+            ? Carbon::parse($periodStart)->startOfDay()
+            : $previous->recorded_at->copy()->startOfDay();
+        $periodEndDate = $periodEnd
+            ? Carbon::parse($periodEnd)->endOfDay()
             : $snapshot->recorded_at->copy()->endOfDay();
 
-        if ($periodEnd->lt($periodStart)) {
-            $periodEnd = $snapshot->recorded_at->copy()->endOfDay();
+        if ($periodEndDate->lt($periodStartDate)) {
+            throw new RuntimeException('Periodo invalido: fim anterior ao inicio.');
         }
 
-        $driverMatch = $this->resolveDriverForVehiclePeriod($internalVehicle, $periodStart, $periodEnd);
+        $driverMatch = $this->resolveDriverForVehiclePeriod($internalVehicle, $periodStartDate, $periodEndDate);
 
         $weeklyMileage = VehicleWeeklyMileage::query()->updateOrCreate(
             [
                 'vehicle_id' => $internalVehicle->getKey(),
-                'period_start' => $periodStart->toDateString(),
-                'period_end' => $periodEnd->toDateString(),
+                'period_start' => $periodStartDate->toDateString(),
+                'period_end' => $periodEndDate->toDateString(),
             ],
             [
                 'driver_id' => $driverMatch['driver_id'],
@@ -633,13 +637,17 @@ class TeslaService
         $this->syncTelemetryErrors($vehicle);
     }
 
-    protected function syncChargingData(TeslaVehicle $vehicle): void
+    protected function syncChargingData(TeslaVehicle $vehicle, ?string $periodStart = null, ?string $periodEnd = null): void
     {
-        $start = now()->subDays(90)->toIso8601String();
-        $end = now()->toIso8601String();
+        $start = $periodStart
+            ? Carbon::parse($periodStart)->startOfDay()
+            : now()->subDays(90);
+        $end = $periodEnd
+            ? Carbon::parse($periodEnd)->endOfDay()
+            : now();
 
         try {
-            $history = $this->getChargingHistory($vehicle, $start, $end);
+            $history = $this->getChargingHistory($vehicle, $start->toIso8601String(), $end->toIso8601String());
             $this->storeChargingRows($vehicle, 'history', $this->rowsFromTeslaResponse($history));
         } catch (Throwable $exception) {
             Log::info('Tesla charging history unavailable.', [
@@ -649,7 +657,7 @@ class TeslaService
         }
 
         try {
-            $sessions = $this->getChargingSessions($vehicle, now()->subDays(90)->toDateString(), now()->toDateString());
+            $sessions = $this->getChargingSessions($vehicle, $start->toDateString(), $end->toDateString());
             $this->storeChargingRows($vehicle, 'session', $this->rowsFromTeslaResponse($sessions));
         } catch (Throwable $exception) {
             Log::info('Tesla charging sessions unavailable.', [
@@ -690,27 +698,80 @@ class TeslaService
     protected function storeChargingRows(TeslaVehicle $vehicle, string $source, array $rows): void
     {
         foreach ($rows as $row) {
-            $externalId = $this->stringValue($row['id'] ?? $row['session_id'] ?? $row['charging_session_id'] ?? null)
+            $chargingFee = $this->chargingFeeFromRow($row);
+            $externalId = $this->stringValue($row['id'] ?? $row['session_id'] ?? $row['sessionId'] ?? $row['charging_session_id'] ?? null)
                 ?? md5(json_encode($row, JSON_THROW_ON_ERROR));
+            $payloadSessionId = $this->stringValue($row['sessionId'] ?? null);
+            $eventQuery = TeslaChargingEvent::query()
+                ->where('tesla_vehicle_id', $vehicle->getKey())
+                ->where('source', $source);
 
-            TeslaChargingEvent::query()->updateOrCreate(
-                [
-                    'tesla_vehicle_id' => $vehicle->getKey(),
-                    'source' => $source,
-                    'external_id' => $externalId,
-                ],
-                [
-                    'started_at' => $this->dateValue($row['started_at'] ?? $row['start_time'] ?? $row['startTime'] ?? $row['date_from'] ?? null),
-                    'ended_at' => $this->dateValue($row['ended_at'] ?? $row['end_time'] ?? $row['endTime'] ?? $row['date_to'] ?? null),
-                    'energy_kwh' => $this->floatValue($row['energy_kwh'] ?? $row['energy_used'] ?? $row['kwh'] ?? $row['charge_energy_added'] ?? null),
-                    'cost' => $this->floatValue($row['cost'] ?? $row['fee'] ?? $row['billed_amount'] ?? $row['total_cost'] ?? null),
-                    'currency' => $this->stringValue($row['currency'] ?? $row['billing_currency'] ?? null),
-                    'location_name' => $this->stringValue($row['location'] ?? $row['site_location_name'] ?? $row['charging_location'] ?? null),
-                    'country' => $this->stringValue($row['country'] ?? null),
-                    'raw_payload' => $row,
-                ],
-            );
+            $event = (clone $eventQuery)
+                ->where('external_id', $externalId)
+                ->first();
+
+            if (! $event && $payloadSessionId) {
+                $event = (clone $eventQuery)
+                    ->where('raw_payload->sessionId', $payloadSessionId)
+                    ->first();
+            }
+
+            $event ??= new TeslaChargingEvent([
+                'tesla_vehicle_id' => $vehicle->getKey(),
+                'source' => $source,
+            ]);
+
+            $event->fill([
+                'external_id' => $externalId,
+                'started_at' => $this->dateValue($row['started_at'] ?? $row['start_time'] ?? $row['startTime'] ?? $row['chargeStartDateTime'] ?? $row['date_from'] ?? null),
+                'ended_at' => $this->dateValue($row['ended_at'] ?? $row['end_time'] ?? $row['endTime'] ?? $row['chargeStopDateTime'] ?? $row['unlatchDateTime'] ?? $row['date_to'] ?? null),
+                'energy_kwh' => $this->floatValue($row['energy_kwh'] ?? $row['energy_used'] ?? $row['kwh'] ?? $row['charge_energy_added'] ?? $chargingFee['energy_kwh']),
+                'cost' => $this->floatValue($row['cost'] ?? $row['fee'] ?? $row['billed_amount'] ?? $row['total_cost'] ?? $chargingFee['cost']),
+                'currency' => $this->stringValue($row['currency'] ?? $row['billing_currency'] ?? $chargingFee['currency']),
+                'location_name' => $this->stringValue($row['location'] ?? $row['site_location_name'] ?? $row['siteLocationName'] ?? $row['charging_location'] ?? null),
+                'country' => $this->stringValue($row['country'] ?? $row['countryCode'] ?? null),
+                'raw_payload' => $row,
+            ])->save();
         }
+    }
+
+    /**
+     * @param  array<string, mixed>  $row
+     * @return array{energy_kwh: float|null, cost: float|null, currency: string|null}
+     */
+    protected function chargingFeeFromRow(array $row): array
+    {
+        $fees = $row['fees'] ?? [];
+
+        if (! is_array($fees)) {
+            return [
+                'energy_kwh' => null,
+                'cost' => null,
+                'currency' => null,
+            ];
+        }
+
+        foreach ($fees as $fee) {
+            if (! is_array($fee)) {
+                continue;
+            }
+
+            if (($fee['feeType'] ?? null) !== 'CHARGING') {
+                continue;
+            }
+
+            return [
+                'energy_kwh' => $this->floatValue($fee['usageBase'] ?? null),
+                'cost' => $this->floatValue($fee['totalDue'] ?? $fee['totalBase'] ?? null),
+                'currency' => $this->stringValue($fee['currencyCode'] ?? null),
+            ];
+        }
+
+        return [
+            'energy_kwh' => null,
+            'cost' => null,
+            'currency' => null,
+        ];
     }
 
     /**
