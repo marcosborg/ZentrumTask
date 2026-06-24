@@ -1,9 +1,129 @@
 <x-filament-panels::page>
-    <div class="space-y-6">
-        <div class="flex flex-wrap items-start justify-between gap-3">
-            <p class="text-sm text-gray-500 dark:text-gray-400">Gestao da ligacao OAuth e sincronizacao da frota Tesla.</p>
+    <style>
+        .tesla-admin {
+            display: grid;
+            gap: 1.25rem;
+        }
 
-            <div class="flex flex-wrap gap-2">
+        .tesla-admin__header {
+            align-items: flex-start;
+            display: flex;
+            gap: 1rem;
+            justify-content: space-between;
+        }
+
+        .tesla-admin__subtitle {
+            color: rgb(156 163 175);
+            font-size: .925rem;
+            margin-top: .25rem;
+        }
+
+        .tesla-admin__actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: .5rem;
+            justify-content: flex-end;
+        }
+
+        .tesla-admin__alert {
+            border-radius: .75rem;
+            border: 1px solid color-mix(in srgb, var(--alert-color) 35%, transparent);
+            background: color-mix(in srgb, var(--alert-color) 12%, transparent);
+            color: var(--alert-color);
+            font-size: .925rem;
+            padding: .875rem 1rem;
+        }
+
+        .tesla-admin__alert--success {
+            --alert-color: rgb(34 197 94);
+        }
+
+        .tesla-admin__alert--danger {
+            --alert-color: rgb(248 113 113);
+        }
+
+        .tesla-admin__stats {
+            display: grid;
+            gap: .75rem;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+
+        .tesla-admin__stat {
+            background: color-mix(in srgb, currentColor 4%, transparent);
+            border: 1px solid rgba(148, 163, 184, .22);
+            border-radius: .875rem;
+            padding: 1rem;
+        }
+
+        .tesla-admin__stat-label {
+            color: rgb(156 163 175);
+            font-size: .78rem;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+
+        .tesla-admin__stat-value {
+            font-size: 1.65rem;
+            font-weight: 800;
+            line-height: 1.1;
+            margin-top: .6rem;
+        }
+
+        .tesla-admin__account-table {
+            border-collapse: separate;
+            border-spacing: 0;
+            font-size: .875rem;
+            overflow: hidden;
+            width: 100%;
+        }
+
+        .tesla-admin__account-table th {
+            color: rgb(156 163 175);
+            font-size: .75rem;
+            font-weight: 700;
+            padding: .75rem;
+            text-align: left;
+            text-transform: uppercase;
+        }
+
+        .tesla-admin__account-table td {
+            border-top: 1px solid rgba(148, 163, 184, .18);
+            padding: .85rem .75rem;
+            vertical-align: top;
+        }
+
+        .tesla-admin__muted {
+            color: rgb(156 163 175);
+        }
+
+        .tesla-admin__scopes {
+            color: rgb(209 213 219);
+            max-width: 42rem;
+            white-space: normal;
+        }
+
+        @media (max-width: 900px) {
+            .tesla-admin__header {
+                display: grid;
+            }
+
+            .tesla-admin__actions {
+                justify-content: flex-start;
+            }
+
+            .tesla-admin__stats {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+
+    <div class="tesla-admin">
+        <div class="tesla-admin__header">
+            <div>
+                <p class="tesla-admin__subtitle">Gestao da ligacao OAuth e sincronizacao da frota Tesla.</p>
+            </div>
+
+            <div class="tesla-admin__actions">
                 <x-filament::button tag="a" href="{{ route('admin.tesla.connect') }}" icon="heroicon-m-link">
                     Ligar conta Tesla
                 </x-filament::button>
@@ -18,110 +138,77 @@
         </div>
 
         @if (session('success'))
-            <div class="rounded-lg border border-success-200 bg-success-50 px-4 py-3 text-sm text-success-700 dark:border-success-500/30 dark:bg-success-500/10 dark:text-success-300">
+            <div class="tesla-admin__alert tesla-admin__alert--success">
                 {{ session('success') }}
             </div>
         @endif
 
         @if (session('error'))
-            <div class="rounded-lg border border-danger-200 bg-danger-50 px-4 py-3 text-sm text-danger-700 dark:border-danger-500/30 dark:bg-danger-500/10 dark:text-danger-300">
+            <div class="tesla-admin__alert tesla-admin__alert--danger">
                 {{ session('error') }}
             </div>
         @endif
 
         @unless ($isConfigured)
-            <div class="rounded-lg border border-danger-200 bg-danger-50 px-4 py-3 text-sm text-danger-700 dark:border-danger-500/30 dark:bg-danger-500/10 dark:text-danger-300">
+            <div class="tesla-admin__alert tesla-admin__alert--danger">
                 Configuracao Tesla incompleta. Define TESLA_CLIENT_ID, TESLA_CLIENT_SECRET e TESLA_REDIRECT_URI no .env.
             </div>
         @endunless
 
-        <div class="grid gap-4 md:grid-cols-3">
-            <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-gray-900">
-                <p class="text-sm text-gray-500 dark:text-gray-400">Configuracao</p>
-                <p class="mt-4 text-2xl font-semibold text-gray-950 dark:text-white">{{ $isConfigured ? 'Pronta' : 'Incompleta' }}</p>
+        <x-filament::section>
+            <div class="tesla-admin__stats">
+                <div class="tesla-admin__stat">
+                    <div class="tesla-admin__stat-label">Configuracao</div>
+                    <div class="tesla-admin__stat-value">{{ $isConfigured ? 'Pronta' : 'Incompleta' }}</div>
+                </div>
+
+                <div class="tesla-admin__stat">
+                    <div class="tesla-admin__stat-label">Contas ligadas</div>
+                    <div class="tesla-admin__stat-value">{{ $accounts->count() }}</div>
+                </div>
+
+                <div class="tesla-admin__stat">
+                    <div class="tesla-admin__stat-label">Veiculos sincronizados</div>
+                    <div class="tesla-admin__stat-value">{{ $vehicles->count() }}</div>
+                </div>
             </div>
+        </x-filament::section>
 
-            <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-gray-900">
-                <p class="text-sm text-gray-500 dark:text-gray-400">Contas ligadas</p>
-                <p class="mt-4 text-2xl font-semibold text-gray-950 dark:text-white">{{ $accounts->count() }}</p>
-            </div>
-
-            <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-gray-900">
-                <p class="text-sm text-gray-500 dark:text-gray-400">Veiculos sincronizados</p>
-                <p class="mt-4 text-2xl font-semibold text-gray-950 dark:text-white">{{ $vehicles->count() }}</p>
-            </div>
-        </div>
-
-        <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-gray-900">
-            <h2 class="text-base font-semibold text-gray-950 dark:text-white">Contas Tesla</h2>
-
+        <x-filament::section heading="Conta Tesla">
             @if ($accounts->isEmpty())
-                <p class="mt-4 text-sm text-gray-500 dark:text-gray-400">Ainda nao existe nenhuma conta Tesla ligada.</p>
+                <p class="tesla-admin__muted">Ainda nao existe nenhuma conta Tesla ligada.</p>
             @else
-                <div class="mt-4 overflow-x-auto">
-                    <table class="w-full text-left text-sm">
-                        <thead class="text-xs uppercase text-gray-500 dark:text-gray-400">
-                            <tr class="border-b border-gray-200 dark:border-white/10">
-                                <th class="px-3 py-2 font-semibold">ID</th>
-                                <th class="px-3 py-2 font-semibold">Email</th>
-                                <th class="px-3 py-2 font-semibold">Scopes</th>
-                                <th class="px-3 py-2 font-semibold">Expira em</th>
-                                <th class="px-3 py-2 font-semibold">Ultima sincronizacao</th>
-                                <th class="px-3 py-2 font-semibold">Veiculos</th>
+                <div style="overflow-x: auto;">
+                    <table class="tesla-admin__account-table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Email</th>
+                                <th>Scopes</th>
+                                <th>Expira em</th>
+                                <th>Ultima sincronizacao</th>
+                                <th>Veiculos</th>
                             </tr>
                         </thead>
-                        <tbody class="divide-y divide-gray-100 dark:divide-white/10">
+                        <tbody>
                             @foreach ($accounts as $account)
                                 <tr>
-                                    <td class="px-3 py-2">{{ $account->id }}</td>
-                                    <td class="px-3 py-2">{{ $account->owner_email ?: $account->email ?: 'unknown' }}</td>
-                                    <td class="px-3 py-2">{{ implode(', ', $account->scopes ?? []) }}</td>
-                                    <td class="px-3 py-2">{{ $account->expires_at?->format('Y-m-d H:i') ?: '-' }}</td>
-                                    <td class="px-3 py-2">{{ $account->last_synced_at?->format('Y-m-d H:i') ?: '-' }}</td>
-                                    <td class="px-3 py-2">{{ $account->vehicles_count }}</td>
+                                    <td>{{ $account->id }}</td>
+                                    <td>{{ $account->owner_email ?: $account->email ?: 'unknown' }}</td>
+                                    <td class="tesla-admin__scopes">{{ implode(', ', $account->scopes ?? []) }}</td>
+                                    <td>{{ $account->expires_at?->format('Y-m-d H:i') ?: '-' }}</td>
+                                    <td>{{ $account->last_synced_at?->format('Y-m-d H:i') ?: '-' }}</td>
+                                    <td>{{ $account->vehicles_count }}</td>
                                 </tr>
                             @endforeach
                         </tbody>
                     </table>
                 </div>
             @endif
-        </div>
+        </x-filament::section>
 
-        <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-gray-900">
-            <h2 class="text-base font-semibold text-gray-950 dark:text-white">Veiculos Tesla</h2>
-
-            @if ($vehicles->isEmpty())
-                <p class="mt-4 text-sm text-gray-500 dark:text-gray-400">Ainda nao existem veiculos Tesla sincronizados.</p>
-            @else
-                <div class="mt-4 overflow-x-auto">
-                    <table class="w-full text-left text-sm">
-                        <thead class="text-xs uppercase text-gray-500 dark:text-gray-400">
-                            <tr class="border-b border-gray-200 dark:border-white/10">
-                                <th class="px-3 py-2 font-semibold">VIN</th>
-                                <th class="px-3 py-2 font-semibold">Nome</th>
-                                <th class="px-3 py-2 font-semibold">Estado</th>
-                                <th class="px-3 py-2 font-semibold">Modelo</th>
-                                <th class="px-3 py-2 font-semibold">Odometro</th>
-                                <th class="px-3 py-2 font-semibold">Bateria</th>
-                                <th class="px-3 py-2 font-semibold">Ultima atualizacao</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-gray-100 dark:divide-white/10">
-                            @foreach ($vehicles as $vehicle)
-                                <tr>
-                                    <td class="px-3 py-2">{{ $vehicle->vin }}</td>
-                                    <td class="px-3 py-2">{{ $vehicle->display_name ?: '-' }}</td>
-                                    <td class="px-3 py-2">{{ $vehicle->state ?: '-' }}</td>
-                                    <td class="px-3 py-2">{{ $vehicle->model ?: '-' }}</td>
-                                    <td class="px-3 py-2">{{ $vehicle->odometer !== null ? number_format((float) $vehicle->odometer, 1, ',', ' ') : '-' }}</td>
-                                    <td class="px-3 py-2">{{ $vehicle->battery_level !== null ? $vehicle->battery_level.'%' : '-' }}</td>
-                                    <td class="px-3 py-2">{{ $vehicle->last_seen_at?->format('Y-m-d H:i') ?: '-' }}</td>
-                                </tr>
-                            @endforeach
-                        </tbody>
-                    </table>
-                </div>
-            @endif
-        </div>
+        <x-filament::section heading="Veiculos Tesla">
+            {{ $this->table }}
+        </x-filament::section>
     </div>
 </x-filament-panels::page>

@@ -229,9 +229,17 @@ it('syncs tesla vehicles into the database', function (): void {
             'response' => [
                 'vehicle_state' => [
                     'odometer' => 43210.5,
+                    'tpms_pressure_fl' => 3.01,
+                    'tpms_pressure_fr' => 3.02,
                 ],
                 'charge_state' => [
                     'battery_level' => 78,
+                    'usable_battery_level' => 76,
+                    'est_battery_range' => 180.5,
+                ],
+                'climate_state' => [
+                    'inside_temp' => 21,
+                    'outside_temp' => 26,
                 ],
                 'vehicle_config' => [
                     'car_type' => 'model3',
@@ -258,4 +266,10 @@ it('syncs tesla vehicles into the database', function (): void {
         ->and((float) $vehicle->odometer)->toBe(43210.5)
         ->and($vehicle->battery_level)->toBe(78)
         ->and($vehicle->model)->toBe('model3');
+
+    $snapshot = $vehicle->snapshots()->firstOrFail();
+
+    expect($snapshot->battery_level)->toBe(78)
+        ->and((float) $snapshot->tpms_pressure_fl)->toBe(3.01)
+        ->and((float) $snapshot->inside_temp)->toBe(21.0);
 });

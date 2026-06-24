@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class TeslaVehicle extends Model
 {
@@ -33,6 +34,21 @@ class TeslaVehicle extends Model
     public function vehicle(): BelongsTo
     {
         return $this->belongsTo(Vehicle::class);
+    }
+
+    public function snapshots(): HasMany
+    {
+        return $this->hasMany(TeslaVehicleSnapshot::class);
+    }
+
+    public function chargingEvents(): HasMany
+    {
+        return $this->hasMany(TeslaChargingEvent::class);
+    }
+
+    public function errors(): HasMany
+    {
+        return $this->hasMany(TeslaVehicleError::class);
     }
 
     /**

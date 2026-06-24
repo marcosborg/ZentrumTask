@@ -3,7 +3,10 @@
 namespace App\Services;
 
 use App\Models\TeslaAccount;
+use App\Models\TeslaChargingEvent;
 use App\Models\TeslaVehicle;
+use App\Models\TeslaVehicleError;
+use App\Models\TeslaVehicleSnapshot;
 use Carbon\CarbonInterface;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Http\Client\RequestException;
@@ -11,9 +14,23 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
+use Throwable;
 
 class TeslaService
 {
+    /**
+     * @var list<string>
+     */
+    private const VEHICLE_DATA_MODULES = [
+        'vehicle_state',
+        'charge_state',
+        'drive_state',
+        'location_data',
+        'climate_state',
+        'vehicle_config',
+        'gui_settings',
+    ];
+
     public function getAuthorizationUrl(string $state): string
     {
         return (string) Str::of((string) config('services.tesla.auth_url'))
@@ -154,7 +171,7 @@ class TeslaService
      */
     public function getVehicleData(
         TeslaVehicle $vehicle,
-        array $modules = ['vehicle_state', 'charge_state', 'drive_state', 'location_data']
+        array $modules = self::VEHICLE_DATA_MODULES
     ): array {
         try {
             $response = $this->client($vehicle->account)
@@ -200,6 +217,7 @@ class TeslaService
             );
 
             $this->hydrateVehicleData($vehicle);
+            $this->syncVehicleExtras($vehicle->refresh());
             $synced++;
         }
 
@@ -252,6 +270,17 @@ class TeslaService
                 'limit' => $limit,
                 'offset' => $offset,
             ])
+            ->throw()
+            ->json();
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function getFleetTelemetryErrors(TeslaVehicle $vehicle): array
+    {
+        return $this->client($vehicle->account)
+            ->get($this->url("/api/1/vehicles/{$vehicle->vin}/fleet_telemetry_errors"))
             ->throw()
             ->json();
     }
@@ -315,6 +344,8 @@ class TeslaService
 
         $vehicleState = $data['vehicle_state'] ?? [];
         $chargeState = $data['charge_state'] ?? [];
+        $driveState = $data['drive_state'] ?? [];
+        $climateState = $data['climate_state'] ?? [];
         $vehicleConfig = $data['vehicle_config'] ?? [];
 
         $vehicle->forceFill([
@@ -324,5 +355,184 @@ class TeslaService
             'raw_payload' => array_merge($vehicle->raw_payload ?? [], ['vehicle_data' => $data]),
             'last_seen_at' => now(),
         ])->save();
+
+        TeslaVehicleSnapshot::query()->create([
+            'tesla_vehicle_id' => $vehicle->getKey(),
+            'recorded_at' => now(),
+            'vehicle_state' => $vehicle->state,
+            'charging_state' => $this->stringValue($chargeState['charging_state'] ?? null),
+            'battery_level' => $this->integerValue($chargeState['battery_level'] ?? null),
+            'usable_battery_level' => $this->integerValue($chargeState['usable_battery_level'] ?? null),
+            'battery_range' => $this->floatValue($chargeState['battery_range'] ?? null),
+            'est_battery_range' => $this->floatValue($chargeState['est_battery_range'] ?? null),
+            'rated_battery_range' => $this->floatValue($chargeState['rated_battery_range'] ?? null),
+            'odometer' => $this->floatValue($vehicleState['odometer'] ?? null),
+            'speed' => $this->floatValue($driveState['speed'] ?? null),
+            'latitude' => $this->floatValue($driveState['latitude'] ?? $driveState['native_latitude'] ?? null),
+            'longitude' => $this->floatValue($driveState['longitude'] ?? $driveState['native_longitude'] ?? null),
+            'heading' => $this->integerValue($driveState['heading'] ?? null),
+            'shift_state' => $this->stringValue($driveState['shift_state'] ?? null),
+            'charge_energy_added' => $this->floatValue($chargeState['charge_energy_added'] ?? null),
+            'charger_power' => $this->floatValue($chargeState['charger_power'] ?? null),
+            'charge_limit_soc' => $this->integerValue($chargeState['charge_limit_soc'] ?? null),
+            'inside_temp' => $this->floatValue($climateState['inside_temp'] ?? null),
+            'outside_temp' => $this->floatValue($climateState['outside_temp'] ?? null),
+            'driver_temp_setting' => $this->floatValue($climateState['driver_temp_setting'] ?? null),
+            'passenger_temp_setting' => $this->floatValue($climateState['passenger_temp_setting'] ?? null),
+            'tpms_pressure_fl' => $this->floatValue($vehicleState['tpms_pressure_fl'] ?? null),
+            'tpms_pressure_fr' => $this->floatValue($vehicleState['tpms_pressure_fr'] ?? null),
+            'tpms_pressure_rl' => $this->floatValue($vehicleState['tpms_pressure_rl'] ?? null),
+            'tpms_pressure_rr' => $this->floatValue($vehicleState['tpms_pressure_rr'] ?? null),
+            'raw_payload' => $data,
+        ]);
+    }
+
+    protected function syncVehicleExtras(TeslaVehicle $vehicle): void
+    {
+        $this->syncChargingData($vehicle);
+        $this->syncTelemetryErrors($vehicle);
+    }
+
+    protected function syncChargingData(TeslaVehicle $vehicle): void
+    {
+        $start = now()->subDays(90)->toIso8601String();
+        $end = now()->toIso8601String();
+
+        try {
+            $history = $this->getChargingHistory($vehicle, $start, $end);
+            $this->storeChargingRows($vehicle, 'history', $this->rowsFromTeslaResponse($history));
+        } catch (Throwable $exception) {
+            Log::info('Tesla charging history unavailable.', [
+                'tesla_vehicle_id' => $vehicle->getKey(),
+                'message' => $exception->getMessage(),
+            ]);
+        }
+
+        try {
+            $sessions = $this->getChargingSessions($vehicle, now()->subDays(90)->toDateString(), now()->toDateString());
+            $this->storeChargingRows($vehicle, 'session', $this->rowsFromTeslaResponse($sessions));
+        } catch (Throwable $exception) {
+            Log::info('Tesla charging sessions unavailable.', [
+                'tesla_vehicle_id' => $vehicle->getKey(),
+                'message' => $exception->getMessage(),
+            ]);
+        }
+    }
+
+    protected function syncTelemetryErrors(TeslaVehicle $vehicle): void
+    {
+        try {
+            $response = $this->getFleetTelemetryErrors($vehicle);
+        } catch (Throwable $exception) {
+            Log::info('Tesla fleet telemetry errors unavailable.', [
+                'tesla_vehicle_id' => $vehicle->getKey(),
+                'message' => $exception->getMessage(),
+            ]);
+
+            return;
+        }
+
+        foreach ($this->rowsFromTeslaResponse($response) as $row) {
+            TeslaVehicleError::query()->create([
+                'tesla_vehicle_id' => $vehicle->getKey(),
+                'source' => 'fleet_telemetry',
+                'code' => $this->stringValue($row['code'] ?? $row['error_code'] ?? $row['name'] ?? null),
+                'message' => $this->stringValue($row['message'] ?? $row['error'] ?? $row['description'] ?? null),
+                'occurred_at' => $this->dateValue($row['created_at'] ?? $row['timestamp'] ?? $row['time'] ?? null),
+                'raw_payload' => $row,
+            ]);
+        }
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $rows
+     */
+    protected function storeChargingRows(TeslaVehicle $vehicle, string $source, array $rows): void
+    {
+        foreach ($rows as $row) {
+            $externalId = $this->stringValue($row['id'] ?? $row['session_id'] ?? $row['charging_session_id'] ?? null)
+                ?? md5(json_encode($row, JSON_THROW_ON_ERROR));
+
+            TeslaChargingEvent::query()->updateOrCreate(
+                [
+                    'tesla_vehicle_id' => $vehicle->getKey(),
+                    'source' => $source,
+                    'external_id' => $externalId,
+                ],
+                [
+                    'started_at' => $this->dateValue($row['started_at'] ?? $row['start_time'] ?? $row['startTime'] ?? $row['date_from'] ?? null),
+                    'ended_at' => $this->dateValue($row['ended_at'] ?? $row['end_time'] ?? $row['endTime'] ?? $row['date_to'] ?? null),
+                    'energy_kwh' => $this->floatValue($row['energy_kwh'] ?? $row['energy_used'] ?? $row['kwh'] ?? $row['charge_energy_added'] ?? null),
+                    'cost' => $this->floatValue($row['cost'] ?? $row['fee'] ?? $row['billed_amount'] ?? $row['total_cost'] ?? null),
+                    'currency' => $this->stringValue($row['currency'] ?? $row['billing_currency'] ?? null),
+                    'location_name' => $this->stringValue($row['location'] ?? $row['site_location_name'] ?? $row['charging_location'] ?? null),
+                    'country' => $this->stringValue($row['country'] ?? null),
+                    'raw_payload' => $row,
+                ],
+            );
+        }
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    protected function rowsFromTeslaResponse(array $response): array
+    {
+        $candidates = [
+            $response['response'] ?? null,
+            $response['data'] ?? null,
+            $response['results'] ?? null,
+            $response,
+        ];
+
+        foreach ($candidates as $candidate) {
+            if (! is_array($candidate)) {
+                continue;
+            }
+
+            if (array_is_list($candidate)) {
+                return array_values(array_filter($candidate, fn (mixed $row): bool => is_array($row)));
+            }
+
+            foreach (['sessions', 'history', 'records', 'errors'] as $key) {
+                if (isset($candidate[$key]) && is_array($candidate[$key]) && array_is_list($candidate[$key])) {
+                    return array_values(array_filter($candidate[$key], fn (mixed $row): bool => is_array($row)));
+                }
+            }
+        }
+
+        return [];
+    }
+
+    protected function floatValue(mixed $value): ?float
+    {
+        return is_numeric($value) ? (float) $value : null;
+    }
+
+    protected function integerValue(mixed $value): ?int
+    {
+        return is_numeric($value) ? (int) $value : null;
+    }
+
+    protected function stringValue(mixed $value): ?string
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        return is_scalar($value) ? (string) $value : null;
+    }
+
+    protected function dateValue(mixed $value): ?Carbon
+    {
+        if (! $value) {
+            return null;
+        }
+
+        try {
+            return Carbon::parse($value);
+        } catch (Throwable) {
+            return null;
+        }
     }
 }
