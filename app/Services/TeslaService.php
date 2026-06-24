@@ -7,6 +7,9 @@ use App\Models\TeslaChargingEvent;
 use App\Models\TeslaVehicle;
 use App\Models\TeslaVehicleError;
 use App\Models\TeslaVehicleSnapshot;
+use App\Models\Vehicle;
+use App\Models\VehicleAllocation;
+use App\Models\VehicleWeeklyMileage;
 use Carbon\CarbonInterface;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Http\Client\RequestException;
@@ -14,6 +17,7 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
+use RuntimeException;
 use Throwable;
 
 class TeslaService
@@ -285,6 +289,19 @@ class TeslaService
             ->json();
     }
 
+    public function createManualOdometerSnapshot(TeslaVehicle $vehicle): TeslaVehicleSnapshot
+    {
+        $snapshot = $this->hydrateVehicleData($vehicle, true);
+
+        if (! $snapshot) {
+            throw new RuntimeException('Nao foi possivel obter dados atuais da Tesla para esta viatura.');
+        }
+
+        $this->createWeeklyMileageFromManualSnapshot($snapshot);
+
+        return $snapshot->refresh();
+    }
+
     protected function client(?TeslaAccount $account = null): PendingRequest
     {
         $request = Http::acceptJson()->timeout(20);
@@ -334,12 +351,12 @@ class TeslaService
             ->all();
     }
 
-    protected function hydrateVehicleData(TeslaVehicle $vehicle): void
+    protected function hydrateVehicleData(TeslaVehicle $vehicle, bool $isManual = false): ?TeslaVehicleSnapshot
     {
         try {
             $data = $this->getVehicleData($vehicle);
         } catch (RequestException) {
-            return;
+            return null;
         }
 
         $vehicleState = $data['vehicle_state'] ?? [];
@@ -356,9 +373,15 @@ class TeslaService
             'last_seen_at' => now(),
         ])->save();
 
-        TeslaVehicleSnapshot::query()->create([
+        $location = $this->resolveGoogleLocation(
+            $this->floatValue($driveState['latitude'] ?? $driveState['native_latitude'] ?? null),
+            $this->floatValue($driveState['longitude'] ?? $driveState['native_longitude'] ?? null),
+        );
+
+        return TeslaVehicleSnapshot::query()->create([
             'tesla_vehicle_id' => $vehicle->getKey(),
             'recorded_at' => now(),
+            'is_manual' => $isManual,
             'vehicle_state' => $vehicle->state,
             'charging_state' => $this->stringValue($chargeState['charging_state'] ?? null),
             'battery_level' => $this->integerValue($chargeState['battery_level'] ?? null),
@@ -370,6 +393,9 @@ class TeslaService
             'speed' => $this->floatValue($driveState['speed'] ?? null),
             'latitude' => $this->floatValue($driveState['latitude'] ?? $driveState['native_latitude'] ?? null),
             'longitude' => $this->floatValue($driveState['longitude'] ?? $driveState['native_longitude'] ?? null),
+            'locality' => $location['locality'],
+            'formatted_address' => $location['formatted_address'],
+            'google_place_id' => $location['google_place_id'],
             'heading' => $this->integerValue($driveState['heading'] ?? null),
             'shift_state' => $this->stringValue($driveState['shift_state'] ?? null),
             'charge_energy_added' => $this->floatValue($chargeState['charge_energy_added'] ?? null),
@@ -385,6 +411,220 @@ class TeslaService
             'tpms_pressure_rr' => $this->floatValue($vehicleState['tpms_pressure_rr'] ?? null),
             'raw_payload' => $data,
         ]);
+    }
+
+    protected function createWeeklyMileageFromManualSnapshot(TeslaVehicleSnapshot $snapshot): void
+    {
+        if (! is_numeric($snapshot->odometer)) {
+            return;
+        }
+
+        $vehicle = $snapshot->teslaVehicle()->first();
+
+        if (! $vehicle) {
+            return;
+        }
+
+        $internalVehicle = $this->resolveInternalVehicle($vehicle);
+
+        if (! $internalVehicle) {
+            return;
+        }
+
+        $previous = $vehicle->snapshots()
+            ->where('is_manual', true)
+            ->whereNotNull('odometer')
+            ->whereKeyNot($snapshot->getKey())
+            ->where('recorded_at', '<', $snapshot->recorded_at)
+            ->latest('recorded_at')
+            ->first();
+
+        if (! $previous || ! is_numeric($previous->odometer)) {
+            return;
+        }
+
+        $weeklyKm = round(max(0, (float) $snapshot->odometer - (float) $previous->odometer), 2);
+        $periodStart = $previous->recorded_at->copy()->startOfDay();
+        $periodEnd = $snapshot->recorded_at->isMonday()
+            ? $snapshot->recorded_at->copy()->subDay()->endOfDay()
+            : $snapshot->recorded_at->copy()->endOfDay();
+
+        if ($periodEnd->lt($periodStart)) {
+            $periodEnd = $snapshot->recorded_at->copy()->endOfDay();
+        }
+
+        $driverMatch = $this->resolveDriverForVehiclePeriod($internalVehicle, $periodStart, $periodEnd);
+
+        $weeklyMileage = VehicleWeeklyMileage::query()->updateOrCreate(
+            [
+                'vehicle_id' => $internalVehicle->getKey(),
+                'period_start' => $periodStart->toDateString(),
+                'period_end' => $periodEnd->toDateString(),
+            ],
+            [
+                'driver_id' => $driverMatch['driver_id'],
+                'weekly_km' => $weeklyKm,
+                'assignment_status' => $driverMatch['status'],
+                'raw_row' => [
+                    'source' => 'tesla_manual_snapshot',
+                    'tesla_vehicle_id' => $vehicle->getKey(),
+                    'previous_snapshot_id' => $previous->getKey(),
+                    'current_snapshot_id' => $snapshot->getKey(),
+                    'previous_odometer' => (float) $previous->odometer,
+                    'current_odometer' => (float) $snapshot->odometer,
+                ],
+                'imported_at' => now(),
+                'source_file' => 'tesla_manual_snapshot',
+            ],
+        );
+
+        $snapshot->forceFill([
+            'vehicle_weekly_mileage_id' => $weeklyMileage->getKey(),
+        ])->save();
+    }
+
+    protected function resolveInternalVehicle(TeslaVehicle $vehicle): ?Vehicle
+    {
+        if ($vehicle->vehicle_id) {
+            return $vehicle->vehicle;
+        }
+
+        $internalVehicle = Vehicle::query()
+            ->where('vin', $vehicle->vin)
+            ->first();
+
+        if (! $internalVehicle && $vehicle->display_name) {
+            $normalizedPlate = $this->normalizePlate($vehicle->display_name);
+
+            if ($normalizedPlate !== '') {
+                $internalVehicle = Vehicle::query()
+                    ->whereRaw("UPPER(REPLACE(REPLACE(REPLACE(license_plate, '-', ''), ' ', ''), '.', '')) = ?", [$normalizedPlate])
+                    ->first();
+            }
+        }
+
+        if ($internalVehicle) {
+            $vehicle->forceFill(['vehicle_id' => $internalVehicle->getKey()])->save();
+        }
+
+        return $internalVehicle;
+    }
+
+    /**
+     * @return array{driver_id: int|null, status: string}
+     */
+    protected function resolveDriverForVehiclePeriod(Vehicle $vehicle, Carbon $periodStart, Carbon $periodEnd): array
+    {
+        $matches = VehicleAllocation::query()
+            ->where('vehicle_id', $vehicle->getKey())
+            ->where('starts_at', '<=', $periodEnd)
+            ->where(function ($query) use ($periodStart): void {
+                $query->whereNull('ends_at')
+                    ->orWhere('ends_at', '>=', $periodStart);
+            })
+            ->pluck('driver_id')
+            ->filter()
+            ->unique()
+            ->values();
+
+        if ($matches->count() === 1) {
+            return [
+                'driver_id' => (int) $matches->first(),
+                'status' => 'ok',
+            ];
+        }
+
+        if ($matches->count() > 1) {
+            return [
+                'driver_id' => null,
+                'status' => 'ambiguous_driver',
+            ];
+        }
+
+        return [
+            'driver_id' => null,
+            'status' => 'unassigned_driver',
+        ];
+    }
+
+    /**
+     * @return array{locality: string|null, formatted_address: string|null, google_place_id: string|null}
+     */
+    protected function resolveGoogleLocation(?float $latitude, ?float $longitude): array
+    {
+        $fallback = [
+            'locality' => null,
+            'formatted_address' => null,
+            'google_place_id' => null,
+        ];
+
+        $key = config('services.google.maps_api_key');
+
+        if (! $latitude || ! $longitude || ! $key) {
+            return $fallback;
+        }
+
+        try {
+            $response = Http::acceptJson()
+                ->timeout(10)
+                ->get('https://maps.googleapis.com/maps/api/geocode/json', [
+                    'latlng' => "{$latitude},{$longitude}",
+                    'key' => $key,
+                    'language' => 'pt',
+                    'region' => 'pt',
+                ])
+                ->throw()
+                ->json();
+        } catch (Throwable $exception) {
+            Log::info('Google geocoding unavailable for Tesla location.', [
+                'message' => $exception->getMessage(),
+            ]);
+
+            return $fallback;
+        }
+
+        $result = $response['results'][0] ?? null;
+
+        if (! is_array($result)) {
+            return $fallback;
+        }
+
+        return [
+            'locality' => $this->localityFromGoogleResult($result),
+            'formatted_address' => $this->stringValue($result['formatted_address'] ?? null),
+            'google_place_id' => $this->stringValue($result['place_id'] ?? null),
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $result
+     */
+    protected function localityFromGoogleResult(array $result): ?string
+    {
+        $components = $result['address_components'] ?? [];
+
+        if (! is_array($components)) {
+            return null;
+        }
+
+        foreach (['locality', 'postal_town', 'administrative_area_level_2', 'administrative_area_level_1'] as $type) {
+            foreach ($components as $component) {
+                if (
+                    is_array($component)
+                    && in_array($type, $component['types'] ?? [], true)
+                    && isset($component['long_name'])
+                ) {
+                    return (string) $component['long_name'];
+                }
+            }
+        }
+
+        return null;
+    }
+
+    protected function normalizePlate(string $value): string
+    {
+        return strtoupper(preg_replace('/[^A-Z0-9]/', '', Str::ascii($value)) ?? '');
     }
 
     protected function syncVehicleExtras(TeslaVehicle $vehicle): void

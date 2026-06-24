@@ -6,10 +6,14 @@ use App\Models\TeslaChargingEvent;
 use App\Models\TeslaVehicle;
 use App\Models\TeslaVehicleError;
 use App\Models\TeslaVehicleSnapshot;
+use App\Services\TeslaService;
 use BackedEnum;
+use Filament\Actions\Action;
+use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Database\Eloquent\Collection;
+use Throwable;
 
 class TeslaVehicleDetails extends Page
 {
@@ -38,6 +42,47 @@ class TeslaVehicleDetails extends Page
         return $this->vehicle->display_name
             ? "Tesla {$this->vehicle->display_name}"
             : "Tesla {$this->vehicle->vin}";
+    }
+
+    /**
+     * @return array<int, Action>
+     */
+    protected function getHeaderActions(): array
+    {
+        return [
+            Action::make('createOdometerSnapshot')
+                ->label('Criar snapshot km')
+                ->icon('heroicon-m-camera')
+                ->color('warning')
+                ->requiresConfirmation()
+                ->modalHeading('Criar snapshot manual do odometro')
+                ->modalDescription('Vai buscar a leitura atual à Tesla. Se existir um snapshot manual anterior e a viatura estiver ligada ao cadastro interno, grava os km da semana para os settlements.')
+                ->action(function (TeslaService $teslaService): void {
+                    try {
+                        $snapshot = $teslaService->createManualOdometerSnapshot($this->vehicle->refresh());
+                    } catch (Throwable $exception) {
+                        Notification::make()
+                            ->danger()
+                            ->title('Snapshot nao criado')
+                            ->body($exception->getMessage())
+                            ->send();
+
+                        return;
+                    }
+
+                    $this->vehicle = $this->vehicle->refresh()->load(['account']);
+
+                    $weeklyMileage = $snapshot->weeklyMileage;
+
+                    Notification::make()
+                        ->success()
+                        ->title('Snapshot criado')
+                        ->body($weeklyMileage
+                            ? 'Foram gravados '.number_format((float) $weeklyMileage->weekly_km, 1, ',', ' ').' km para a semana.'
+                            : 'Snapshot guardado. Para calcular km semanais, e preciso existir uma leitura manual anterior e a viatura interna ligada.')
+                        ->send();
+                }),
+        ];
     }
 
     public function latestSnapshot(): ?TeslaVehicleSnapshot
@@ -172,6 +217,20 @@ class TeslaVehicleDetails extends Page
     public function latestRawPayload(): array
     {
         return $this->latestSnapshot()?->raw_payload ?? $this->vehicle->raw_payload ?? [];
+    }
+
+    /**
+     * @return Collection<int, TeslaVehicleSnapshot>
+     */
+    public function manualOdometerSnapshots(): Collection
+    {
+        return $this->vehicle->snapshots()
+            ->with('weeklyMileage')
+            ->where('is_manual', true)
+            ->whereNotNull('odometer')
+            ->latest('recorded_at')
+            ->limit(5)
+            ->get();
     }
 
     public function percentValue(mixed $value): string

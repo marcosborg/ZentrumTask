@@ -111,6 +111,14 @@
             white-space: pre-wrap;
         }
 
+        .tesla-detail__map {
+            border: 0;
+            border-radius: .875rem;
+            height: 18rem;
+            overflow: hidden;
+            width: 100%;
+        }
+
         @media (max-width: 1100px) {
             .tesla-detail__grid,
             .tesla-detail__split {
@@ -125,6 +133,9 @@
         $latestCharge = $chargingEvents->first();
         $errors = $this->recentErrors();
         $rawPayload = $this->latestRawPayload();
+        $manualSnapshots = $this->manualOdometerSnapshots();
+        $hasLocation = $snapshot?->latitude && $snapshot?->longitude;
+        $mapQuery = $hasLocation ? urlencode($snapshot->latitude . ',' . $snapshot->longitude) : null;
     @endphp
 
     <div class="tesla-detail">
@@ -221,24 +232,71 @@
 
                 <div class="tesla-detail__list" style="margin-top: 1rem;">
                     <div class="tesla-detail__row">
-                        <span class="tesla-detail__meta">Coordenadas</span>
-                        <strong>
-                            @if ($snapshot?->latitude && $snapshot?->longitude)
-                                {{ $snapshot->latitude }}, {{ $snapshot->longitude }}
-                            @else
-                                -
-                            @endif
-                        </strong>
+                        <span class="tesla-detail__meta">Localidade Google</span>
+                        <strong>{{ $snapshot?->locality ?: $snapshot?->formatted_address ?: 'Sem localidade Google' }}</strong>
                     </div>
                     <div class="tesla-detail__row">
                         <span class="tesla-detail__meta">Direcao / velocidade</span>
                         <strong>{{ $snapshot?->heading ?: '-' }} / {{ is_numeric($snapshot?->speed) ? number_format((float) $snapshot->speed, 1, ',', ' ') . ' mph' : '-' }}</strong>
                     </div>
                 </div>
+
+                <div style="margin-top: 1rem;">
+                    @if ($hasLocation)
+                        <iframe
+                            class="tesla-detail__map"
+                            loading="lazy"
+                            referrerpolicy="no-referrer-when-downgrade"
+                            src="https://www.google.com/maps?q={{ $mapQuery }}&z=15&output=embed"
+                            title="Mapa Google da localizacao da viatura"
+                        ></iframe>
+                        <div style="margin-top: .6rem;">
+                            <x-filament::button
+                                tag="a"
+                                href="https://www.google.com/maps/search/?api=1&query={{ $mapQuery }}"
+                                target="_blank"
+                                color="gray"
+                                size="sm"
+                                icon="heroicon-m-map-pin"
+                            >
+                                Abrir no Google Maps
+                            </x-filament::button>
+                        </div>
+                    @else
+                        <div class="tesla-detail__empty">Sem localizacao disponivel no ultimo snapshot.</div>
+                    @endif
+                </div>
             </x-filament::section>
         </div>
 
         <div class="tesla-detail__split">
+            <x-filament::section heading="Snapshots km">
+                @if ($manualSnapshots->isEmpty())
+                    <div class="tesla-detail__empty">Ainda nao existem snapshots manuais de odometro.</div>
+                @else
+                    <div class="tesla-detail__list">
+                        @foreach ($manualSnapshots as $manualSnapshot)
+                            <div class="tesla-detail__row">
+                                <span>
+                                    <strong>{{ $manualSnapshot->recorded_at?->format('Y-m-d H:i') ?: '-' }}</strong>
+                                    <br>
+                                    <span class="tesla-detail__meta">
+                                        {{ $manualSnapshot->weeklyMileage ? 'Semana ' . $manualSnapshot->weeklyMileage->period_start?->format('Y-m-d') . ' - ' . $manualSnapshot->weeklyMileage->period_end?->format('Y-m-d') : 'Snapshot manual' }}
+                                    </span>
+                                </span>
+                                <strong>
+                                    {{ $this->distanceValue($manualSnapshot->odometer) }}
+                                    @if ($manualSnapshot->weeklyMileage)
+                                        <br>
+                                        <span class="tesla-detail__meta">{{ number_format((float) $manualSnapshot->weeklyMileage->weekly_km, 1, ',', ' ') }} km semana</span>
+                                    @endif
+                                </strong>
+                            </div>
+                        @endforeach
+                    </div>
+                @endif
+            </x-filament::section>
+
             <x-filament::section heading="Ultimos carregamentos">
                 @if ($chargingEvents->isEmpty())
                     <div class="tesla-detail__empty">Sem dados de abastecimentos/carregamentos.</div>

@@ -10,6 +10,8 @@ class TeslaVehicleSnapshot extends Model
     protected $fillable = [
         'tesla_vehicle_id',
         'recorded_at',
+        'is_manual',
+        'vehicle_weekly_mileage_id',
         'vehicle_state',
         'charging_state',
         'battery_level',
@@ -21,6 +23,9 @@ class TeslaVehicleSnapshot extends Model
         'speed',
         'latitude',
         'longitude',
+        'locality',
+        'formatted_address',
+        'google_place_id',
         'heading',
         'shift_state',
         'charge_energy_added',
@@ -42,6 +47,11 @@ class TeslaVehicleSnapshot extends Model
         return $this->belongsTo(TeslaVehicle::class);
     }
 
+    public function weeklyMileage(): BelongsTo
+    {
+        return $this->belongsTo(VehicleWeeklyMileage::class, 'vehicle_weekly_mileage_id');
+    }
+
     /**
      * @return array<string, string>
      */
@@ -49,6 +59,8 @@ class TeslaVehicleSnapshot extends Model
     {
         return [
             'recorded_at' => 'datetime',
+            'is_manual' => 'boolean',
+            'vehicle_weekly_mileage_id' => 'integer',
             'battery_level' => 'integer',
             'usable_battery_level' => 'integer',
             'battery_range' => 'decimal:2',

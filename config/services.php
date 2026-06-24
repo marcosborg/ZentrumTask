@@ -94,4 +94,8 @@ return [
         'scopes' => env('TESLA_SCOPES', 'openid offline_access vehicle_device_data vehicle_location vehicle_charging_cmds'),
     ],
 
+    'google' => [
+        'maps_api_key' => env('GOOGLE_MAPS_API_KEY'),
+    ],
+
 ];
