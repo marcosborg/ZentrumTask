@@ -14,6 +14,7 @@ use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Http\Client\RequestException;
 use Throwable;
 
 class TeslaVehicleDetails extends Page
@@ -73,6 +74,15 @@ class TeslaVehicleDetails extends Page
 
                     try {
                         $response = $teslaService->setChargeLimit($this->vehicle->loadMissing('account'), $percent);
+                    } catch (RequestException $exception) {
+                        Notification::make()
+                            ->danger()
+                            ->title('Falha ao definir limite SOC')
+                            ->body($this->teslaCommandErrorMessage($exception))
+                            ->persistent()
+                            ->send();
+
+                        return;
                     } catch (Throwable $exception) {
                         Notification::make()
                             ->danger()
@@ -104,6 +114,17 @@ class TeslaVehicleDetails extends Page
                         ->send();
                 }),
         ];
+    }
+
+    protected function teslaCommandErrorMessage(RequestException $exception): string
+    {
+        $error = (string) ($exception->response?->json('error') ?? '');
+
+        if (str_contains($error, 'Vehicle Command Protocol required')) {
+            return 'A Tesla exige Vehicle Command Protocol para esta viatura. Temos OAuth/scopes corretos, mas falta configurar o Tesla Vehicle Command Proxy e emparelhar a chave virtual da aplicação no carro antes de enviar comandos.';
+        }
+
+        return $error !== '' ? $error : $exception->getMessage();
     }
 
     public function latestSnapshot(): ?TeslaVehicleSnapshot
