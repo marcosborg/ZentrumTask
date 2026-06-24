@@ -263,13 +263,15 @@ it('syncs tesla vehicles into the database', function (): void {
 
     expect($vehicle->vin)->toBe('5YJ3E1EA7JF000001')
         ->and($vehicle->display_name)->toBe('Zentrum Tesla')
-        ->and((float) $vehicle->odometer)->toBe(43210.5)
+        ->and((float) $vehicle->odometer)->toBe(69540.56)
         ->and($vehicle->battery_level)->toBe(78)
         ->and($vehicle->model)->toBe('model3');
 
     $snapshot = $vehicle->snapshots()->firstOrFail();
 
     expect($snapshot->battery_level)->toBe(78)
+        ->and((float) $snapshot->odometer)->toBe(69540.56)
+        ->and((float) $snapshot->est_battery_range)->toBe(290.49)
         ->and((float) $snapshot->tpms_pressure_fl)->toBe(3.01)
         ->and((float) $snapshot->inside_temp)->toBe(21.0);
 });

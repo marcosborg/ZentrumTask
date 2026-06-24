@@ -369,7 +369,7 @@ class TeslaService
 
         $vehicle->forceFill([
             'model' => $vehicleConfig['car_type'] ?? $vehicle->model,
-            'odometer' => $vehicleState['odometer'] ?? $vehicle->odometer,
+            'odometer' => $this->milesToKm($vehicleState['odometer'] ?? null) ?? $vehicle->odometer,
             'battery_level' => $chargeState['battery_level'] ?? $vehicle->battery_level,
             'raw_payload' => array_merge($vehicle->raw_payload ?? [], ['vehicle_data' => $data]),
             'last_seen_at' => now(),
@@ -388,10 +388,10 @@ class TeslaService
             'charging_state' => $this->stringValue($chargeState['charging_state'] ?? null),
             'battery_level' => $this->integerValue($chargeState['battery_level'] ?? null),
             'usable_battery_level' => $this->integerValue($chargeState['usable_battery_level'] ?? null),
-            'battery_range' => $this->floatValue($chargeState['battery_range'] ?? null),
-            'est_battery_range' => $this->floatValue($chargeState['est_battery_range'] ?? null),
-            'rated_battery_range' => $this->floatValue($chargeState['rated_battery_range'] ?? null),
-            'odometer' => $this->floatValue($vehicleState['odometer'] ?? null),
+            'battery_range' => $this->milesToKm($chargeState['battery_range'] ?? null),
+            'est_battery_range' => $this->milesToKm($chargeState['est_battery_range'] ?? null),
+            'rated_battery_range' => $this->milesToKm($chargeState['rated_battery_range'] ?? null),
+            'odometer' => $this->milesToKm($vehicleState['odometer'] ?? null),
             'speed' => $this->floatValue($driveState['speed'] ?? null),
             'latitude' => $this->floatValue($driveState['latitude'] ?? $driveState['native_latitude'] ?? null),
             'longitude' => $this->floatValue($driveState['longitude'] ?? $driveState['native_longitude'] ?? null),
@@ -485,6 +485,15 @@ class TeslaService
         $snapshot->forceFill([
             'vehicle_weekly_mileage_id' => $weeklyMileage->getKey(),
         ])->save();
+    }
+
+    protected function milesToKm(mixed $value): ?float
+    {
+        if (! is_numeric($value)) {
+            return null;
+        }
+
+        return round((float) $value * 1.609344, 2);
     }
 
     protected function resolveInternalVehicle(TeslaVehicle $vehicle): ?Vehicle
