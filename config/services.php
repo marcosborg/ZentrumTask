@@ -84,4 +84,14 @@ return [
         'initial_deposit_vat_rate' => env('IFTHENPAY_INITIAL_DEPOSIT_VAT_RATE', 23),
     ],
 
+    'tesla' => [
+        'client_id' => env('TESLA_CLIENT_ID'),
+        'client_secret' => env('TESLA_CLIENT_SECRET'),
+        'redirect_uri' => env('TESLA_REDIRECT_URI'),
+        'auth_url' => env('TESLA_AUTH_URL', 'https://auth.tesla.com/oauth2/v3/authorize'),
+        'token_url' => env('TESLA_TOKEN_URL', 'https://auth.tesla.com/oauth2/v3/token'),
+        'base_url' => env('TESLA_API_BASE_URL', 'https://fleet-api.prd.eu.vn.cloud.tesla.com'),
+        'scopes' => env('TESLA_SCOPES', 'openid offline_access vehicle_device_data vehicle_location vehicle_charging_cmds'),
+    ],
+
 ];

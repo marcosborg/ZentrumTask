@@ -11,6 +11,7 @@ use App\Http\Controllers\AppVehicleHandoverProcedureController;
 use App\Http\Controllers\BlogController;
 use App\Http\Controllers\CandidateApplicationController;
 use App\Http\Controllers\MediaProxyController;
+use App\Http\Controllers\TeslaController;
 use App\Http\Controllers\WebsiteChatController;
 use App\Http\Controllers\WebsiteController;
 use App\Models\DriverSettlement;
@@ -19,6 +20,7 @@ use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Storage;
 
 Route::get('/', [WebsiteController::class, 'index']);
+Route::redirect('/login', '/admin/login')->name('login');
 Route::options('/app/auth/login', fn () => response('', 204, [
     'Access-Control-Allow-Origin' => '*',
     'Access-Control-Allow-Methods' => 'POST, OPTIONS',
@@ -232,3 +234,12 @@ Route::middleware(['auth'])->get('/admin/km-semanais/exemplo.csv', function () {
         'Content-Type' => 'text/csv; charset=UTF-8',
     ]);
 })->name('weekly-km.sample');
+
+Route::middleware(['auth'])->prefix('admin/tesla')->name('admin.tesla.')->group(function (): void {
+    Route::get('/', [TeslaController::class, 'index'])->name('index');
+    Route::get('/connect', [TeslaController::class, 'redirectToTesla'])->name('connect');
+    Route::get('/callback', [TeslaController::class, 'callback'])->name('callback');
+    Route::post('/sync-vehicles', [TeslaController::class, 'syncVehicles'])->name('syncVehicles');
+});
+
+Route::get('/api/tesla/callback', [TeslaController::class, 'callback'])->name('tesla.callback');
