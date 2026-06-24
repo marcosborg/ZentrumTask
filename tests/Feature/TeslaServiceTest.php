@@ -133,12 +133,17 @@ it('shows a readable error when tesla token exchange fails', function (): void {
 });
 
 it('stores a tesla account after a successful oauth callback', function (): void {
+    $idToken = 'header.'.rtrim(strtr(base64_encode(json_encode([
+        'sub' => '89d88970-4869-46b9-9c60-44b87c1f6c9f',
+    ], JSON_THROW_ON_ERROR)), '+/', '-_'), '=').'.signature';
+
     Http::fake([
         'auth.tesla.test/oauth2/v3/token' => Http::response([
             'access_token' => 'access-token',
             'refresh_token' => 'refresh-token',
             'expires_in' => 3600,
             'scope' => 'openid offline_access vehicle_device_data',
+            'id_token' => $idToken,
         ]),
         'tesla.test/api/1/users/me' => Http::response([
             'response' => [
@@ -164,6 +169,7 @@ it('stores a tesla account after a successful oauth callback', function (): void
     $account = TeslaAccount::query()->firstOrFail();
 
     expect($account->user_id)->toBe($user->id)
+        ->and($account->tesla_user_id)->toBe('89d88970-4869-46b9-9c60-44b87c1f6c9f')
         ->and($account->owner_email)->toBe('owner@example.com')
         ->and(decrypt($account->access_token))->toBe('access-token')
         ->and(decrypt($account->refresh_token))->toBe('refresh-token');

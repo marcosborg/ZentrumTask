@@ -86,7 +86,7 @@ class TeslaController extends Controller
 
         $account = TeslaAccount::query()->create([
             'user_id' => $request->session()->pull('tesla_oauth_user_id') ?: $cachedUserId ?: Auth::id(),
-            'tesla_user_id' => $token['id_token'] ?? null,
+            'tesla_user_id' => $this->teslaUserIdFromToken($token['id_token'] ?? null),
             'email' => null,
             'owner_email' => 'unknown',
             'access_token' => encrypt((string) $token['access_token']),
@@ -182,5 +182,25 @@ class TeslaController extends Controller
     protected function stateCacheKey(string $state): string
     {
         return "tesla:oauth-state:{$state}";
+    }
+
+    protected function teslaUserIdFromToken(mixed $idToken): ?string
+    {
+        if (! is_string($idToken) || substr_count($idToken, '.') < 2) {
+            return null;
+        }
+
+        $payload = explode('.', $idToken)[1] ?? '';
+        $payload .= str_repeat('=', (4 - strlen($payload) % 4) % 4);
+        $decoded = base64_decode(strtr($payload, '-_', '+/'), true);
+
+        if (! is_string($decoded)) {
+            return null;
+        }
+
+        $claims = json_decode($decoded, true);
+        $subject = is_array($claims) ? $claims['sub'] ?? null : null;
+
+        return is_string($subject) && strlen($subject) <= 255 ? $subject : null;
     }
 }
