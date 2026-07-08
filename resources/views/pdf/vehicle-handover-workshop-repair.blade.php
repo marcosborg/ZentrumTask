@@ -118,8 +118,8 @@
         .card-cell--empty { border: 0; padding: 0; }
         .card-title { font-weight: bold; font-size: 12px; color: #0f1f33; margin-bottom: 6px; }
         .card-meta { color: #607086; font-size: 10px; margin-bottom: 7px; }
-        .photo { width: 100%; height: 118px; object-fit: cover; border: 1px solid #d4dde8; background: #f5f7fa; }
-        .photo--large { height: 150px; }
+        .photo { display: block; width: auto; height: auto; max-width: 100%; max-height: 118px; margin: 0 auto; border: 1px solid #d4dde8; background: #f5f7fa; }
+        .photo--large { max-height: 150px; }
         .placeholder { width: 100%; height: 118px; padding-top: 45px; text-align: center; color: #7b8798; border: 1px dashed #b9c6d6; background: #f7f9fb; }
         .description { color: #29394d; margin-top: 7px; white-space: pre-line; }
         .field-table { width: 100%; border-collapse: collapse; border: 1px solid #d4dde8; margin-bottom: 10px; page-break-inside: avoid; }

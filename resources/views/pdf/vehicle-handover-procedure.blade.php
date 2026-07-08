@@ -125,8 +125,8 @@
         .badge--ok { border-color: #9fc7ad; color: #166534; background: #f0f8f3; }
         .badge--warn { border-color: #e0b7b7; color: #991b1b; background: #fff5f5; }
         .value { margin-top: 7px; color: #0f1f33; font-size: 11px; }
-        .photo { width: 100%; height: 118px; object-fit: cover; border: 1px solid #d4dde8; background: #f5f7fa; }
-        .photo--large { height: 150px; }
+        .photo { display: block; width: auto; height: auto; max-width: 100%; max-height: 118px; margin: 0 auto; border: 1px solid #d4dde8; background: #f5f7fa; }
+        .photo--large { max-height: 150px; }
         .placeholder { width: 100%; height: 118px; padding-top: 45px; text-align: center; color: #7b8798; border: 1px dashed #b9c6d6; background: #f7f9fb; }
         .description { color: #29394d; margin-top: 7px; white-space: pre-line; }
         .video-layout { width: 100%; border-collapse: collapse; }
