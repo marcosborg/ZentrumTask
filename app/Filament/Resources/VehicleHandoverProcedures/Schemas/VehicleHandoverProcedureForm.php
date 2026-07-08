@@ -5,20 +5,24 @@ namespace App\Filament\Resources\VehicleHandoverProcedures\Schemas;
 use App\Models\Driver;
 use App\Models\Vehicle;
 use App\Services\VehicleHandoverProcedureService;
+use Filament\Forms\Components\BaseFileUpload;
 use Filament\Forms\Components\Checkbox;
 use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
-use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Textarea;
+use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\ViewField;
 use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Components\Section;
-use Filament\Schemas\Schema;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
+use Filament\Schemas\Schema;
+use Illuminate\Support\Facades\Log;
+use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
+use Throwable;
 
 class VehicleHandoverProcedureForm
 {
@@ -140,35 +144,24 @@ class VehicleHandoverProcedureForm
                     ->columns(2)
                     ->components(
                         collect($service->guidedPhotoZones())
-                            ->map(fn (array $zone) => FileUpload::make("guided_photo_items.{$zone['key']}.photo")
+                            ->map(fn (array $zone) => self::handoverUpload("guided_photo_items.{$zone['key']}.photo")
                                 ->label($zone['label'])
-                                ->image()
                                 ->disk('public')
                                 ->directory('vehicle-handovers/guided-photos')
                                 ->visibility('public'))
                             ->all()
                     ),
                 Section::make('Videos')
-                    ->description('Grava ou anexa, quando disponivel, um video do exterior e outro do interior. Maximo 250MB por video.')
+                    ->description('Grava ou anexa, quando disponivel, um video do exterior e outro do interior.')
                     ->columns(2)
                     ->components([
-                        FileUpload::make('video_items.exterior')
+                        self::handoverUpload('video_items.exterior')
                             ->label('Video exterior')
-                            ->acceptedFileTypes(['video/mp4', 'video/quicktime', 'video/webm', 'video/3gpp'])
-                            ->maxSize(256000)
-                            ->validationMessages([
-                                'max' => 'O video exterior pode ter no maximo 250MB.',
-                            ])
                             ->disk('public')
                             ->directory('vehicle-handovers/videos')
                             ->visibility('public'),
-                        FileUpload::make('video_items.interior')
+                        self::handoverUpload('video_items.interior')
                             ->label('Video interior')
-                            ->acceptedFileTypes(['video/mp4', 'video/quicktime', 'video/webm', 'video/3gpp'])
-                            ->maxSize(256000)
-                            ->validationMessages([
-                                'max' => 'O video interior pode ter no maximo 250MB.',
-                            ])
                             ->disk('public')
                             ->directory('vehicle-handovers/videos')
                             ->visibility('public'),
@@ -194,9 +187,8 @@ class VehicleHandoverProcedureForm
                                         Textarea::make('description')
                                             ->label('Descricao')
                                             ->columnSpanFull(),
-                                        FileUpload::make('photo')
+                                        self::handoverUpload('photo')
                                             ->label('Foto do dano')
-                                            ->image()
                                             ->disk('public')
                                             ->directory('vehicle-handovers/damage-photos')
                                             ->visibility('public')
@@ -207,9 +199,8 @@ class VehicleHandoverProcedureForm
                     ]),
                 Section::make('Fotos gerais')
                     ->components([
-                        FileUpload::make('general_photos')
+                        self::handoverUpload('general_photos')
                             ->label('Fotos opcionais')
-                            ->image()
                             ->multiple()
                             ->disk('public')
                             ->directory('vehicle-handovers/general-photos')
@@ -230,5 +221,44 @@ class VehicleHandoverProcedureForm
                             ->view('filament.forms.components.signature-pad'),
                     ]),
             ]);
+    }
+
+    protected static function handoverUpload(string $name): FileUpload
+    {
+        return FileUpload::make($name)
+            ->saveUploadedFileUsing(static function (BaseFileUpload $component, TemporaryUploadedFile $file): ?string {
+                try {
+                    if (! $file->exists()) {
+                        return null;
+                    }
+
+                    if (
+                        $component->shouldMoveFiles()
+                        && ($component->getDiskName() === (fn (): string => $this->disk)->call($file))
+                    ) {
+                        $path = trim($component->getDirectory().'/'.$component->getUploadedFileNameForStorage($file), '/');
+
+                        $component->getDisk()->move((fn (): string => $this->path)->call($file), $path);
+
+                        return $path;
+                    }
+
+                    $storeMethod = $component->getVisibility() === 'public' ? 'storePubliclyAs' : 'storeAs';
+
+                    return $file->{$storeMethod}(
+                        $component->getDirectory(),
+                        $component->getUploadedFileNameForStorage($file),
+                        $component->getDiskName(),
+                    );
+                } catch (Throwable $exception) {
+                    Log::warning('vehicle_handover_upload_failed', [
+                        'field' => $component->getStatePath(),
+                        'file' => $file->getClientOriginalName(),
+                        'error' => $exception->getMessage(),
+                    ]);
+
+                    return null;
+                }
+            });
     }
 }
