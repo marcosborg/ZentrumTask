@@ -23,6 +23,7 @@ use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
 use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Session\Middleware\StartSession;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Vite;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
 
 class AdminPanelProvider extends PanelProvider
@@ -391,6 +392,6 @@ class AdminPanelProvider extends PanelProvider
     private function hasBuiltViteAssets(): bool
     {
         return File::exists(public_path('build/manifest.json'))
-            || File::exists(public_path('hot'));
+            && ! Vite::isRunningHot();
     }
 }
