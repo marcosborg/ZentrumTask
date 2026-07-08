@@ -195,19 +195,28 @@ class VehicleHandoverProcedureService
                 ->where('vehicle_id', $vehicle->id)
                 ->where('driver_id', $driver->id)
                 ->latest('starts_at')
-                ->firstOrFail();
+                ->first();
 
-            $allocation->update([
-                'ends_at' => $performedAt,
-                'status' => 'completed',
-            ]);
+            if ($allocation) {
+                $allocation->update([
+                    'ends_at' => $performedAt,
+                    'status' => 'completed',
+                ]);
 
-            $vehicle->update(['status' => 'available']);
+                $vehicle->update(['status' => 'available']);
 
-            $procedure->update([
-                'closed_allocation_id' => $allocation->id,
-                'allocation_effective_end_date' => $performedAt->toDateString(),
-            ]);
+                $procedure->update([
+                    'closed_allocation_id' => $allocation->id,
+                    'allocation_effective_end_date' => $performedAt->toDateString(),
+                ]);
+            } else {
+                Log::warning('vehicle_handover_allocation_not_found', [
+                    'procedure_id' => $procedure->id,
+                    'type' => $data['type'],
+                    'vehicle_id' => $vehicle->id,
+                    'driver_id' => $driver->id,
+                ]);
+            }
         }
 
         if ($data['type'] === 'delivery') {
@@ -218,7 +227,17 @@ class VehicleHandoverProcedureService
                 ->latest('starts_at')
                 ->first();
 
-            if (! $allocation) {
+            $vehicleHasActiveAllocation = VehicleAllocation::query()
+                ->active()
+                ->where('vehicle_id', $vehicle->id)
+                ->exists();
+
+            $driverHasActiveAllocation = VehicleAllocation::query()
+                ->active()
+                ->where('driver_id', $driver->id)
+                ->exists();
+
+            if (! $allocation && ! $vehicleHasActiveAllocation && ! $driverHasActiveAllocation) {
                 $startDate = $performedAt->copy()->startOfDay()->addDay();
 
                 $allocation = VehicleAllocation::query()->create([
@@ -231,12 +250,23 @@ class VehicleHandoverProcedureService
                 ]);
             }
 
-            $vehicle->update(['status' => 'allocated']);
+            if ($allocation) {
+                $vehicle->update(['status' => 'allocated']);
 
-            $procedure->update([
-                'created_allocation_id' => $allocation->id,
-                'allocation_effective_start_date' => Carbon::parse($allocation->starts_at)->toDateString(),
-            ]);
+                $procedure->update([
+                    'created_allocation_id' => $allocation->id,
+                    'allocation_effective_start_date' => Carbon::parse($allocation->starts_at)->toDateString(),
+                ]);
+            } else {
+                Log::warning('vehicle_handover_allocation_not_created', [
+                    'procedure_id' => $procedure->id,
+                    'type' => $data['type'],
+                    'vehicle_id' => $vehicle->id,
+                    'driver_id' => $driver->id,
+                    'vehicle_has_active_allocation' => $vehicleHasActiveAllocation,
+                    'driver_has_active_allocation' => $driverHasActiveAllocation,
+                ]);
+            }
         }
 
         $procedure->refresh()->load(['vehicle.currentAllocation.driver', 'driver.currentAllocation.vehicle', 'operator', 'closedAllocation', 'createdAllocation']);
@@ -411,48 +441,6 @@ class VehicleHandoverProcedureService
             throw ValidationException::withMessages([
                 'type' => 'Tipo de procedimento invalido.',
             ]);
-        }
-
-        if ($type === 'delivery') {
-            $vehicleAllocation = $vehicle->currentAllocation;
-            $driverAllocation = $driver->currentAllocation;
-            $alreadyAllocatedToThisDriver = VehicleAllocation::query()
-                ->active()
-                ->where('vehicle_id', $vehicle->id)
-                ->where('driver_id', $driver->id)
-                ->exists();
-
-            if ($vehicleAllocation && (int) $vehicleAllocation->driver_id !== (int) $driver->id) {
-                throw ValidationException::withMessages([
-                    'vehicle_id' => 'Esta viatura ja esta alocada a outro motorista.',
-                ]);
-            }
-
-            if ($driverAllocation && (int) $driverAllocation->vehicle_id !== (int) $vehicle->id) {
-                throw ValidationException::withMessages([
-                    'driver_id' => 'O motorista ja tem outra viatura alocada.',
-                ]);
-            }
-
-            if (! $alreadyAllocatedToThisDriver && $vehicle->status !== 'available') {
-                throw ValidationException::withMessages([
-                    'vehicle_id' => 'A entrega exige uma viatura disponivel ou ja alocada a este motorista.',
-                ]);
-            }
-        }
-
-        if ($type === 'return') {
-            $allocation = VehicleAllocation::query()
-                ->active()
-                ->where('vehicle_id', $vehicle->id)
-                ->where('driver_id', $driver->id)
-                ->first();
-
-            if (! $allocation) {
-                throw ValidationException::withMessages([
-                    'vehicle_id' => 'A devolucao exige uma alocacao ativa entre viatura e motorista.',
-                ]);
-            }
         }
     }
 
