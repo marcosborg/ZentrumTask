@@ -197,6 +197,37 @@ class VehicleHandoverProcedureForm
                             ])
                             ->columnSpanFull(),
                     ]),
+                Section::make('Avarias')
+                    ->description('Regista problemas mecanicos, eletricos ou outros que nao sejam visiveis em fotografia.')
+                    ->components([
+                        Repeater::make('fault_items')
+                            ->label('Avarias registadas')
+                            ->defaultItems(0)
+                            ->schema([
+                                Grid::make(2)
+                                    ->schema([
+                                        Select::make('type')
+                                            ->label('Tipo')
+                                            ->options($service->faultTypes())
+                                            ->required()
+                                            ->native(false),
+                                        Select::make('severity')
+                                            ->label('Prioridade')
+                                            ->options([
+                                                'low' => 'Baixa',
+                                                'medium' => 'Media',
+                                                'high' => 'Alta',
+                                                'immobilized' => 'Viatura imobilizada',
+                                            ])
+                                            ->native(false),
+                                        Textarea::make('description')
+                                            ->label('Sintoma / descricao')
+                                            ->required()
+                                            ->columnSpanFull(),
+                                    ]),
+                            ])
+                            ->columnSpanFull(),
+                    ]),
                 Section::make('Fotos gerais')
                     ->components([
                         self::handoverUpload('general_photos')

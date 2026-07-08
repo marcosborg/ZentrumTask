@@ -16,8 +16,7 @@ class AppVehicleHandoverProcedureController extends AppApiController
 {
     public function __construct(
         private readonly VehicleHandoverProcedureService $service,
-    ) {
-    }
+    ) {}
 
     public function index(Request $request): JsonResponse
     {
@@ -43,6 +42,10 @@ class AppVehicleHandoverProcedureController extends AppApiController
             'checklist_items' => $this->service->checklistItems(),
             'damage_types' => collect($this->service->damageTypes())
                 ->map(fn (string $value): array => ['value' => $value, 'label' => ucfirst($value)])
+                ->values()
+                ->all(),
+            'fault_types' => collect($this->service->faultTypes())
+                ->map(fn (string $label, string $value): array => ['value' => $value, 'label' => $label])
                 ->values()
                 ->all(),
             'guided_photo_zones' => collect($this->service->guidedPhotoZones())
@@ -233,6 +236,15 @@ class AppVehicleHandoverProcedureController extends AppApiController
             'driver_snapshot' => $procedure->driver_snapshot,
             'checklist_payload' => $procedure->checklist_payload,
             'damage_items' => $damageItems,
+            'fault_items' => collect($procedure->fault_items ?? [])
+                ->map(fn (array $item): array => [
+                    'type' => $item['type'] ?? null,
+                    'type_label' => $this->service->faultTypes()[$item['type'] ?? ''] ?? ($item['type'] ?? null),
+                    'severity' => $item['severity'] ?? null,
+                    'description' => $item['description'] ?? null,
+                ])
+                ->values()
+                ->all(),
             'general_photo_urls' => $generalPhotoUrls,
             'guided_photo_items' => collect($procedure->guided_photo_items ?? [])
                 ->map(fn (array $item, string $key): array => [

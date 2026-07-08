@@ -65,6 +65,21 @@ class VehicleHandoverDefinition
     }
 
     /**
+     * @return array<string, string>
+     */
+    public static function faultTypes(): array
+    {
+        return [
+            'mechanical' => 'Mecanica',
+            'electrical' => 'Eletrica',
+            'battery' => 'Bateria',
+            'tires_brakes' => 'Pneus / travagem',
+            'software' => 'Software',
+            'other' => 'Outro',
+        ];
+    }
+
+    /**
      * @return array<int, string>
      */
     public static function vehicleZones(): array

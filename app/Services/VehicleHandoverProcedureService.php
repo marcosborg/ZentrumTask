@@ -10,6 +10,7 @@ use App\Models\VehicleAllocation;
 use App\Models\VehicleHandoverProcedure;
 use App\Support\VehicleHandoverDefinition;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Barryvdh\DomPDF\PDF as DomPdf;
 use chillerlan\QRCode\QRCode;
 use chillerlan\QRCode\QROptions;
 use Illuminate\Http\UploadedFile;
@@ -40,6 +41,14 @@ class VehicleHandoverProcedureService
     public function damageTypes(): array
     {
         return VehicleHandoverDefinition::damageTypes();
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function faultTypes(): array
+    {
+        return VehicleHandoverDefinition::faultTypes();
     }
 
     /**
@@ -80,6 +89,7 @@ class VehicleHandoverProcedureService
             $videoItems = $this->normalizeVideoItems((array) ($data['video_items'] ?? []));
             $checklist = $this->normalizeChecklistPayload((array) ($data['checklist_payload'] ?? []), $guidedPhotoItems);
             $damageItems = $this->normalizeDamageItems((array) ($data['damage_items'] ?? []));
+            $faultItems = $this->normalizeFaultItems((array) ($data['fault_items'] ?? []));
             $generalPhotoPaths = $this->storeGeneralPhotos((array) ($data['general_photos'] ?? []));
 
             $procedure->update([
@@ -92,6 +102,7 @@ class VehicleHandoverProcedureService
                 'driver_snapshot' => $this->driverSnapshot($driver),
                 'checklist_payload' => $checklist,
                 'damage_items' => $damageItems,
+                'fault_items' => $faultItems,
                 'general_photo_paths' => $generalPhotoPaths,
                 'guided_photo_items' => $guidedPhotoItems,
                 'video_items' => $videoItems,
@@ -162,6 +173,7 @@ class VehicleHandoverProcedureService
         $videoItems = $this->normalizeVideoItems((array) ($data['video_items'] ?? []));
         $checklist = $this->normalizeChecklistPayload((array) ($data['checklist_payload'] ?? []), $guidedPhotoItems);
         $damageItems = $this->normalizeDamageItems((array) ($data['damage_items'] ?? []));
+        $faultItems = $this->normalizeFaultItems((array) ($data['fault_items'] ?? []));
         $generalPhotoPaths = $this->storeGeneralPhotos((array) ($data['general_photos'] ?? []));
 
         $procedure = VehicleHandoverProcedure::query()->create([
@@ -177,6 +189,7 @@ class VehicleHandoverProcedureService
             'driver_snapshot' => $this->driverSnapshot($driver),
             'checklist_payload' => $checklist,
             'damage_items' => $damageItems,
+            'fault_items' => $faultItems,
             'general_photo_paths' => $generalPhotoPaths,
             'guided_photo_items' => $guidedPhotoItems,
             'video_items' => $videoItems,
@@ -319,6 +332,21 @@ class VehicleHandoverProcedureService
             'html_snapshot' => $html,
             'pdf_path' => $pdfPath,
         ]);
+    }
+
+    public function generateWorkshopRepairPdf(VehicleHandoverProcedure $procedure): DomPdf
+    {
+        $procedure->loadMissing(['vehicle', 'driver', 'operator']);
+
+        $pdf = Pdf::loadView('pdf.vehicle-handover-workshop-repair', [
+            'procedure' => $procedure,
+            'typeLabels' => VehicleHandoverDefinition::typeLabels(),
+            'logo' => $this->logoDataUri(),
+        ])->setPaper('a4');
+
+        $pdf->getDomPDF()->set_option('enable_remote', true);
+
+        return $pdf;
     }
 
     /**
@@ -544,6 +572,49 @@ class VehicleHandoverProcedureService
                     'zone' => $zone,
                     'description' => $description !== '' ? $description : null,
                     'photo_path' => $this->storeSinglePhoto($item['photo'] ?? null, 'vehicle-handovers/damage-photos'),
+                ];
+            })
+            ->filter()
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $items
+     * @return array<int, array{type: string, severity: string|null, description: string|null}>
+     */
+    protected function normalizeFaultItems(array $items): array
+    {
+        return collect($items)
+            ->map(function (mixed $item): ?array {
+                if (! is_array($item)) {
+                    return null;
+                }
+
+                $type = trim((string) ($item['type'] ?? ''));
+                $severity = trim((string) ($item['severity'] ?? ''));
+                $description = trim((string) ($item['description'] ?? ''));
+
+                if ($type === '' && $severity === '' && $description === '') {
+                    return null;
+                }
+
+                if (! array_key_exists($type, $this->faultTypes())) {
+                    throw ValidationException::withMessages([
+                        'fault_items' => 'Tipo de avaria invalido.',
+                    ]);
+                }
+
+                if ($severity !== '' && ! in_array($severity, ['low', 'medium', 'high', 'immobilized'], true)) {
+                    throw ValidationException::withMessages([
+                        'fault_items' => 'Prioridade da avaria invalida.',
+                    ]);
+                }
+
+                return [
+                    'type' => $type,
+                    'severity' => $severity !== '' ? $severity : null,
+                    'description' => $description !== '' ? $description : null,
                 ];
             })
             ->filter()

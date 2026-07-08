@@ -56,6 +56,20 @@ class ViewVehicleHandoverProcedure extends ViewRecord
                         'procedimento-'.$record->id.'.pdf'
                     );
                 }),
+            Action::make('downloadWorkshopRepairPdf')
+                ->label('Ficha de oficina')
+                ->icon('heroicon-o-wrench-screwdriver')
+                ->color('warning')
+                ->visible(fn (): bool => collect($this->record->damage_items ?? [])->isNotEmpty() || collect($this->record->fault_items ?? [])->isNotEmpty())
+                ->action(function () {
+                    $record = $this->record;
+                    $pdf = app(VehicleHandoverProcedureService::class)->generateWorkshopRepairPdf($record);
+
+                    return response()->streamDownload(
+                        fn () => print ($pdf->output()),
+                        'ficha-oficina-'.$record->id.'.pdf'
+                    );
+                }),
         ];
     }
 }

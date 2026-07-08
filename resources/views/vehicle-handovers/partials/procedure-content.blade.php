@@ -2,6 +2,20 @@
     use Illuminate\Support\Facades\Storage;
     use Illuminate\Support\Number;
 
+    $faultTypeLabels = \App\Support\VehicleHandoverDefinition::faultTypes();
+    $severityLabels = [
+        'low' => 'Baixa',
+        'medium' => 'Media',
+        'high' => 'Alta',
+        'immobilized' => 'Viatura imobilizada',
+    ];
+    $faultItems = collect($procedure->fault_items ?? [])
+        ->map(fn ($item) => [
+            'type' => $faultTypeLabels[$item['type'] ?? ''] ?? ucfirst((string) ($item['type'] ?? 'Avaria')),
+            'severity' => $severityLabels[$item['severity'] ?? ''] ?? null,
+            'description' => $item['description'] ?? 'Sem descricao adicional.',
+        ])
+        ->values();
     $generalPhotoUrls = collect($procedure->general_photo_paths ?? [])
         ->map(fn ($path) => $path ? Storage::disk('public')->url($path) : null)
         ->filter()
@@ -94,6 +108,25 @@
             @endif
         </section>
     </div>
+
+    <section>
+        <h2>Avarias</h2>
+        @if($faultItems->isNotEmpty())
+            <div class="handover-doc__stack">
+                @foreach($faultItems as $item)
+                    <div class="handover-doc__damage">
+                        <div class="handover-doc__damage-head">
+                            <strong>{{ $item['type'] }}</strong>
+                            <span>{{ $item['severity'] ? 'Prioridade: '.$item['severity'] : 'Prioridade nao indicada' }}</span>
+                        </div>
+                        <p>{{ $item['description'] }}</p>
+                    </div>
+                @endforeach
+            </div>
+        @else
+            <p class="handover-doc__muted">Sem avarias registadas.</p>
+        @endif
+    </section>
 
     <section>
         <h2>Mapa fotografico</h2>
