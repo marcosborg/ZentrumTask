@@ -7,12 +7,32 @@ use App\Models\VehicleAllocation;
 use App\Models\VehicleHandoverProcedure;
 use App\Services\VehicleHandoverProcedureService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
 
 uses(RefreshDatabase::class);
 
-it('records a delivery handover even when allocation state is conflicting', function () {
+it('stores handover videos before the procedure is completed', function () {
+    Storage::fake('public');
+
+    $user = User::factory()->create();
+    $token = 'handover-media-token';
+    Cache::put('app_auth_token:'.$token, $user->id, now()->addMinute());
+
+    $response = $this->withToken($token)->post('/app/ops/vehicle-handovers/media', [
+        'video' => UploadedFile::fake()->create('exterior.webm', 1024, 'video/webm'),
+    ]);
+
+    $response
+        ->assertCreated()
+        ->assertJsonStructure(['path', 'url']);
+
+    Storage::disk('public')->assertExists($response->json('path'));
+});
+
+it('records a delivery handover and associates the selected driver and vehicle', function () {
     Mail::fake();
     Storage::fake('public');
 
@@ -22,21 +42,7 @@ it('records a delivery handover even when allocation state is conflicting', func
         'license_plate' => 'CA-20-AG',
         'make' => 'Hyundai',
         'model' => 'Ioniq',
-        'status' => 'allocated',
-    ]);
-    $otherVehicle = Vehicle::query()->create([
-        'license_plate' => 'BV-10-BS',
-        'make' => 'Tesla',
-        'model' => 'Model 3',
-        'status' => 'allocated',
-    ]);
-
-    VehicleAllocation::factory()->create([
-        'vehicle_id' => $otherVehicle->id,
-        'driver_id' => $driver->id,
-        'starts_at' => now()->subDay(),
-        'ends_at' => null,
-        'status' => 'active',
+        'status' => 'available',
     ]);
 
     $procedure = app(VehicleHandoverProcedureService::class)->create([
@@ -60,7 +66,7 @@ it('records a delivery handover even when allocation state is conflicting', func
     ], $operator);
 
     expect($procedure)->toBeInstanceOf(VehicleHandoverProcedure::class)
-        ->and($procedure->created_allocation_id)->toBeNull()
+        ->and($procedure->created_allocation_id)->not->toBeNull()
         ->and($procedure->fault_items)->toHaveCount(1)
         ->and($procedure->fault_items[0]['type'])->toBe('electrical');
 
@@ -72,7 +78,39 @@ it('records a delivery handover even when allocation state is conflicting', func
         'notes' => 'Aciedente.',
     ]);
 
-    expect(VehicleAllocation::query()->active()->where('driver_id', $driver->id)->count())->toBe(1);
+    $this->assertDatabaseHas(VehicleAllocation::class, [
+        'id' => $procedure->created_allocation_id,
+        'vehicle_id' => $handoverVehicle->id,
+        'driver_id' => $driver->id,
+        'status' => 'active',
+    ]);
+
+    expect($handoverVehicle->refresh()->status)->toBe('allocated');
+});
+
+it('rejects a delivery when the selected driver already has another vehicle', function () {
+    Mail::fake();
+    Storage::fake('public');
+
+    $operator = User::factory()->create();
+    $driver = Driver::factory()->create();
+    $availableVehicle = Vehicle::factory()->create(['status' => 'available']);
+    $allocatedVehicle = Vehicle::factory()->create(['status' => 'allocated']);
+
+    VehicleAllocation::factory()->create([
+        'vehicle_id' => $allocatedVehicle->id,
+        'driver_id' => $driver->id,
+        'ends_at' => null,
+        'status' => 'active',
+    ]);
+
+    expect(fn () => app(VehicleHandoverProcedureService::class)->create([
+        'type' => 'delivery',
+        'vehicle_id' => $availableVehicle->id,
+        'driver_id' => $driver->id,
+        'operator_signature_data_url' => 'operator-signature',
+        'driver_signature_data_url' => 'driver-signature',
+    ], $operator))->toThrow(\Illuminate\Validation\ValidationException::class);
 });
 
 it('generates a workshop repair pdf when damages are registered', function () {

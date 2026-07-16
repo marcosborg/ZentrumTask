@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\StoreVehicleHandoverMediaRequest;
 use App\Models\Driver;
 use App\Models\Vehicle;
 use App\Models\VehicleHandoverProcedure;
@@ -121,7 +122,7 @@ class AppVehicleHandoverProcedureController extends AppApiController
         ], 201);
     }
 
-    public function exchange(Request $request): JsonResponse
+    public function storeMedia(StoreVehicleHandoverMediaRequest $request): JsonResponse
     {
         $user = $this->resolveAppUser($request);
 
@@ -131,26 +132,17 @@ class AppVehicleHandoverProcedureController extends AppApiController
             ], 401);
         }
 
-        try {
-            $payload = $request->all();
-            $procedures = $this->service->createExchange(
-                (array) ($payload['return_procedure'] ?? []),
-                (array) ($payload['delivery_procedure'] ?? []),
-                $user,
-            );
-        } catch (ValidationException $exception) {
+        $path = $request->file('video')?->store('vehicle-handovers/videos', 'public');
+
+        if (! $path) {
             return $this->corsJson([
-                'message' => 'Nao foi possivel guardar a troca.',
-                'errors' => $exception->errors(),
+                'message' => 'Nao foi possivel guardar o video.',
             ], 422);
         }
 
         return $this->corsJson([
-            'message' => 'Troca registada com sucesso.',
-            'procedures' => [
-                'return' => $this->serializeProcedureDetail($procedures['return']),
-                'delivery' => $this->serializeProcedureDetail($procedures['delivery']),
-            ],
+            'path' => $path,
+            'url' => Storage::disk('public')->url($path),
         ], 201);
     }
 
