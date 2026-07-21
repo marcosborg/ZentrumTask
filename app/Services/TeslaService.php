@@ -321,6 +321,11 @@ class TeslaService
         return $snapshot->refresh();
     }
 
+    public function captureTirePressureSnapshot(TeslaVehicle $vehicle): ?TeslaVehicleSnapshot
+    {
+        return $this->hydrateVehicleData($vehicle);
+    }
+
     protected function client(?TeslaAccount $account = null): PendingRequest
     {
         $request = Http::acceptJson()->timeout(20);

@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class TeslaVehicle extends Model
 {
@@ -39,6 +40,11 @@ class TeslaVehicle extends Model
     public function snapshots(): HasMany
     {
         return $this->hasMany(TeslaVehicleSnapshot::class);
+    }
+
+    public function latestSnapshot(): HasOne
+    {
+        return $this->hasOne(TeslaVehicleSnapshot::class)->latestOfMany('recorded_at');
     }
 
     public function chargingEvents(): HasMany
