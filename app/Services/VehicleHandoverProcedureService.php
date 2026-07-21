@@ -21,7 +21,6 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Throwable;
 
@@ -128,35 +127,6 @@ class VehicleHandoverProcedureService
         }
 
         return $procedure->refresh();
-    }
-
-    /**
-     * @return array{return: VehicleHandoverProcedure, delivery: VehicleHandoverProcedure}
-     */
-    public function createExchange(array $returnData, array $deliveryData, User $operator): array
-    {
-        $exchangeUuid = (string) Str::uuid();
-        $returnData['type'] = 'return';
-        $deliveryData['type'] = 'delivery';
-        $returnData['exchange_group_uuid'] = $exchangeUuid;
-        $deliveryData['exchange_group_uuid'] = $exchangeUuid;
-
-        $procedures = DB::transaction(function () use ($deliveryData, $operator, $returnData): array {
-            $returnProcedure = $this->createProcedure($returnData, $operator);
-            $deliveryData['exchange_related_procedure_id'] = $returnProcedure->id;
-            $deliveryProcedure = $this->createProcedure($deliveryData, $operator);
-
-            $returnProcedure->updateQuietly(['exchange_related_procedure_id' => $deliveryProcedure->id]);
-
-            return [
-                'return' => $returnProcedure->refresh(),
-                'delivery' => $deliveryProcedure->refresh(),
-            ];
-        });
-
-        $this->sendProceduresMail(collect([$procedures['return'], $procedures['delivery']]));
-
-        return $procedures;
     }
 
     private function createProcedure(array $data, User $operator): VehicleHandoverProcedure
@@ -468,6 +438,22 @@ class VehicleHandoverProcedureService
         if (! in_array($type, ['delivery', 'return'], true)) {
             throw ValidationException::withMessages([
                 'type' => 'Tipo de procedimento invalido.',
+            ]);
+        }
+
+        if ($type !== 'delivery') {
+            return;
+        }
+
+        if ($vehicle->currentAllocation && $vehicle->currentAllocation->driver_id !== $driver->id) {
+            throw ValidationException::withMessages([
+                'vehicle_id' => 'Esta viatura ja esta associada a outro motorista. Regista primeiro a devolucao.',
+            ]);
+        }
+
+        if ($driver->currentAllocation && $driver->currentAllocation->vehicle_id !== $vehicle->id) {
+            throw ValidationException::withMessages([
+                'driver_id' => 'Este motorista ja tem outra viatura. Regista primeiro a devolucao.',
             ]);
         }
     }
