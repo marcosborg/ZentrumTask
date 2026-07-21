@@ -13,6 +13,7 @@ const app = express();
 
 app.use(express.json({ limit: '2mb' }));
 
+const host = process.env.HOST || '127.0.0.1';
 const port = Number(process.env.PORT || 3100);
 const laravelBaseUrl = (process.env.LARAVEL_CHAT_BASE_URL || 'https://zentrum-tvde.com').replace(/\/+$/, '');
 const sessionStorePath = resolve(process.env.SESSION_STORE_PATH || './storage/sessions.json');
@@ -26,13 +27,34 @@ let lastQrAt = null;
 let lastError = null;
 const processingMessages = new Set();
 const chatQueues = new Map();
+let reconnectTimer = null;
+let isShuttingDown = false;
+
+function log(level, event, details = {}) {
+  const entry = {
+    timestamp: new Date().toISOString(),
+    level,
+    event,
+    ...details,
+  };
+
+  const output = JSON.stringify(entry);
+
+  if (level === 'error') {
+    console.error(output);
+  } else if (level === 'warn') {
+    console.warn(output);
+  } else {
+    console.log(output);
+  }
+}
 
 process.on('unhandledRejection', (error) => {
-  console.error('unhandled_rejection', error?.stack || error);
+  log('error', 'unhandled_rejection', { error: error?.stack || String(error) });
 });
 
 process.on('uncaughtException', (error) => {
-  console.error('uncaught_exception', error?.stack || error);
+  log('error', 'uncaught_exception', { error: error?.stack || String(error) });
 });
 
 async function readSessionStore() {
@@ -169,14 +191,14 @@ client.on('qr', (qr) => {
   lastWhatsappState = 'qr';
   lastQr = qr;
   lastQrAt = new Date().toISOString();
+  log('info', 'whatsapp_qr_ready', { generated_at: lastQrAt });
   console.log('Scan this QR code with WhatsApp Business: Settings > Linked devices > Link a device');
-  console.log('Or open http://127.0.0.1:3100/qr');
   qrcode.generate(qr, { small: true });
 });
 
 client.on('authenticated', () => {
   lastWhatsappState = 'authenticated';
-  console.log('WhatsApp authenticated.');
+  log('info', 'whatsapp_authenticated');
 });
 
 client.on('ready', () => {
@@ -184,30 +206,49 @@ client.on('ready', () => {
   lastWhatsappState = 'ready';
   lastQr = null;
   lastError = null;
-  console.log('WhatsApp bot is ready.');
+  log('info', 'whatsapp_ready');
 });
 
 client.on('loading_screen', (percent, message) => {
-  console.log('WhatsApp loading:', percent, message);
+  log('info', 'whatsapp_loading', { percent, message });
 });
 
 client.on('change_state', (state) => {
-  console.log('WhatsApp state:', state);
+  log('info', 'whatsapp_state_changed', { state });
 });
 
 client.on('auth_failure', (message) => {
   isWhatsappReady = false;
   lastWhatsappState = 'auth_failure';
   lastError = message;
-  console.error('WhatsApp authentication failed:', message);
+  log('error', 'whatsapp_authentication_failed', { error: message });
 });
 
 client.on('disconnected', (reason) => {
   isWhatsappReady = false;
   lastWhatsappState = 'disconnected';
   lastError = reason;
-  console.warn('WhatsApp disconnected:', reason);
+  log('warn', 'whatsapp_disconnected', { reason });
+  scheduleReconnect();
 });
+
+function scheduleReconnect() {
+  if (isShuttingDown || reconnectTimer) {
+    return;
+  }
+
+  reconnectTimer = setTimeout(async () => {
+    reconnectTimer = null;
+
+    try {
+      await client.destroy().catch(() => undefined);
+      await client.initialize();
+    } catch (error) {
+      log('error', 'whatsapp_reconnect_failed', { error: error?.stack || String(error) });
+      scheduleReconnect();
+    }
+  }, 10000);
+}
 
 client.on('message', async (message) => {
   if (!isWhatsappReady) {
@@ -239,7 +280,7 @@ client.on('message', async (message) => {
 });
 
 async function handleIncomingMessage(message, messageKey) {
-  console.log('incoming_message', {
+  log('info', 'incoming_message', {
     from: message.from,
     id: messageKey,
     type: message.type,
@@ -269,7 +310,7 @@ async function handleIncomingMessage(message, messageKey) {
     const reply = await askLaravelChat(message.from, text, externalName, externalPhone);
     await replyInChunks(message, reply);
   } catch (error) {
-    console.error('whatsapp_message_failed', {
+    log('error', 'whatsapp_message_failed', {
       from: message.from,
       id: messageKey,
       error: error?.response?.data || error?.message || error,
@@ -320,33 +361,40 @@ app.get('/qr', async (_request, response) => {
 </body>`);
 });
 
-app.post('/debug/send', async (request, response) => {
-  try {
-    const { to, message } = request.body || {};
-
-    if (!to || !message) {
-      response.status(422).json({ ok: false, error: 'Missing to or message.' });
-      return;
-    }
-
-    await client.sendMessage(to, message);
-    response.json({ ok: true });
-  } catch (error) {
-    response.status(500).json({
-      ok: false,
-      error: error?.message || String(error),
-    });
-  }
-});
-
-const server = app.listen(port, () => {
-  console.log(`Zentrum WhatsApp Web bot health server listening on port ${port}`);
+const server = app.listen(port, host, () => {
+  log('info', 'health_server_listening', { host, port });
 });
 
 server.on('error', (error) => {
-  console.error('health_server_failed', error);
+  log('error', 'health_server_failed', { error: error?.stack || String(error) });
 });
 
 client.initialize().catch((error) => {
-  console.error('whatsapp_initialize_failed', error?.stack || error);
+  log('error', 'whatsapp_initialize_failed', { error: error?.stack || String(error) });
+  scheduleReconnect();
 });
+
+async function shutdown(signal) {
+  if (isShuttingDown) {
+    return;
+  }
+
+  isShuttingDown = true;
+  log('info', 'shutdown_started', { signal });
+
+  if (reconnectTimer) {
+    clearTimeout(reconnectTimer);
+    reconnectTimer = null;
+  }
+
+  await new Promise((resolveClose) => server.close(resolveClose));
+  await client.destroy().catch((error) => {
+    log('warn', 'whatsapp_destroy_failed', { error: error?.message || String(error) });
+  });
+
+  log('info', 'shutdown_complete', { signal });
+  process.exit(0);
+}
+
+process.once('SIGINT', () => shutdown('SIGINT'));
+process.once('SIGTERM', () => shutdown('SIGTERM'));
