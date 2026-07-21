@@ -134,13 +134,10 @@ class TeslaIntegration extends Page implements HasTable
                 ->icon('heroicon-m-paper-airplane')
                 ->color('danger')
                 ->disabled(fn (): bool => $this->eligibleTirePressureAlertVehicles()->isEmpty())
+                ->requiresConfirmation()
                 ->modalHeading('Enviar todos os avisos de pressao')
                 ->modalSubmitActionLabel('Enviar todos os emails')
-                ->modalDescription('Sera enviado um email individual a cada motorista listado abaixo.')
-                ->modalContent(fn (): View => view(
-                    'filament.pages.actions.tesla-tire-pressure-bulk-email-preview',
-                    ['vehicles' => $this->eligibleTirePressureAlertVehicles()],
-                ))
+                ->modalDescription(fn (): string => 'Serão enviados '.$this->eligibleTirePressureAlertVehicles()->count().' emails individuais. Apenas são incluídas viaturas anómalas, online e com motorista/email válido.')
                 ->action(function (): void {
                     $vehicles = $this->eligibleTirePressureAlertVehicles();
                     $sent = 0;

@@ -217,6 +217,11 @@ it('sends all alerts only to eligible drivers', function (): void {
 
     Livewire::actingAs($user)
         ->test(TeslaIntegration::class)
+        ->mountAction('emailAllTirePressureAlerts')
+        ->assertActionMounted('emailAllTirePressureAlerts');
+
+    Livewire::actingAs($user)
+        ->test(TeslaIntegration::class)
         ->callAction('emailAllTirePressureAlerts')
         ->assertNotified('Envio de avisos concluido');
 
