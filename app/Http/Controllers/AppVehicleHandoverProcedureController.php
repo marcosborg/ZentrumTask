@@ -94,7 +94,87 @@ class AppVehicleHandoverProcedureController extends AppApiController
                 ->map(fn (VehicleHandoverProcedure $procedure): array => $this->serializeProcedureSummary($procedure))
                 ->values()
                 ->all(),
+            'active_draft' => ($draft = $this->service->activeDraft($user))
+                ? $this->serializeProcedureDetail($draft)
+                : null,
         ]);
+    }
+
+    public function storeDraft(Request $request): JsonResponse
+    {
+        $user = $this->resolveAppUser($request);
+        if (! $user) {
+            return $this->corsJson(['message' => 'Sessao invalida.'], 401);
+        }
+
+        try {
+            $procedure = $this->service->createDraft($request->all(), $user);
+        } catch (ValidationException $exception) {
+            return $this->corsJson(['message' => 'Nao foi possivel criar o rascunho.', 'errors' => $exception->errors()], 422);
+        }
+
+        return $this->corsJson(['procedure' => $this->serializeProcedureDetail($procedure)], 201);
+    }
+
+    public function updateDraft(Request $request, VehicleHandoverProcedure $vehicleHandoverProcedure): JsonResponse
+    {
+        $user = $this->resolveAppUser($request);
+        if (! $user || $vehicleHandoverProcedure->operator_user_id !== $user->id) {
+            return $this->corsJson(['message' => 'Rascunho nao encontrado.'], $user ? 404 : 401);
+        }
+
+        try {
+            $procedure = $this->service->updateDraft($vehicleHandoverProcedure, $request->all());
+        } catch (ValidationException $exception) {
+            return $this->corsJson(['message' => 'Nao foi possivel guardar.', 'errors' => $exception->errors()], 422);
+        }
+
+        return $this->corsJson(['procedure' => $this->serializeProcedureDetail($procedure)]);
+    }
+
+    public function storeDraftMedia(Request $request, VehicleHandoverProcedure $vehicleHandoverProcedure): JsonResponse
+    {
+        $user = $this->resolveAppUser($request);
+        if (! $user || $vehicleHandoverProcedure->operator_user_id !== $user->id) {
+            return $this->corsJson(['message' => 'Rascunho nao encontrado.'], $user ? 404 : 401);
+        }
+
+        try {
+            $media = $request->file('media') ?? $request->input('media');
+            $procedure = $this->service->storeDraftMedia($vehicleHandoverProcedure, (string) $request->input('kind'), (string) $request->input('key'), $media);
+        } catch (ValidationException $exception) {
+            return $this->corsJson(['message' => 'Nao foi possivel guardar o ficheiro.', 'errors' => $exception->errors()], 422);
+        }
+
+        return $this->corsJson(['procedure' => $this->serializeProcedureDetail($procedure)]);
+    }
+
+    public function complete(Request $request, VehicleHandoverProcedure $vehicleHandoverProcedure): JsonResponse
+    {
+        $user = $this->resolveAppUser($request);
+        if (! $user || $vehicleHandoverProcedure->operator_user_id !== $user->id) {
+            return $this->corsJson(['message' => 'Rascunho nao encontrado.'], $user ? 404 : 401);
+        }
+
+        try {
+            $procedure = $this->service->completeDraft($vehicleHandoverProcedure, $user);
+        } catch (ValidationException $exception) {
+            return $this->corsJson(['message' => 'Nao foi possivel concluir o auto.', 'errors' => $exception->errors()], 422);
+        }
+
+        return $this->corsJson(['procedure' => $this->serializeProcedureDetail($procedure)]);
+    }
+
+    public function destroyDraft(Request $request, VehicleHandoverProcedure $vehicleHandoverProcedure): JsonResponse
+    {
+        $user = $this->resolveAppUser($request);
+        if (! $user || $vehicleHandoverProcedure->operator_user_id !== $user->id) {
+            return $this->corsJson(['message' => 'Rascunho nao encontrado.'], $user ? 404 : 401);
+        }
+
+        $this->service->deleteDraft($vehicleHandoverProcedure);
+
+        return $this->corsJson(['message' => 'Rascunho eliminado.']);
     }
 
     public function store(Request $request): JsonResponse
@@ -212,6 +292,7 @@ class AppVehicleHandoverProcedureController extends AppApiController
                 'type' => $item['type'] ?? null,
                 'zone' => $item['zone'] ?? null,
                 'description' => $item['description'] ?? null,
+                'photo_path' => $item['photo_path'] ?? null,
                 'photo_url' => ! empty($item['photo_path']) ? Storage::disk('public')->url($item['photo_path']) : null,
             ])
             ->values()
@@ -219,6 +300,9 @@ class AppVehicleHandoverProcedureController extends AppApiController
 
         return array_merge($this->serializeProcedureSummary($procedure), [
             'status' => $procedure->status,
+            'draft_step' => $procedure->draft_step,
+            'completed_at' => optional($procedure->completed_at)?->toIso8601String(),
+            'last_synced_at' => optional($procedure->last_synced_at)?->toIso8601String(),
             'performed_date_label' => optional($procedure->performed_at)?->format('d/m/Y'),
             'allocation_effective_start_date' => optional($procedure->allocation_effective_start_date)?->toDateString(),
             'allocation_effective_start_date_label' => optional($procedure->allocation_effective_start_date)?->format('d/m/Y'),
@@ -238,6 +322,7 @@ class AppVehicleHandoverProcedureController extends AppApiController
                 ->values()
                 ->all(),
             'general_photo_urls' => $generalPhotoUrls,
+            'general_photo_paths' => $procedure->general_photo_paths ?? [],
             'guided_photo_items' => collect($procedure->guided_photo_items ?? [])
                 ->map(fn (array $item, string $key): array => [
                     'key' => $key,

@@ -24,6 +24,19 @@ class VehicleHandoverProceduresTable
                     ->badge()
                     ->color(fn (string $state): string => $state === 'delivery' ? 'success' : 'warning')
                     ->formatStateUsing(fn (string $state): string => $state === 'delivery' ? 'Entrega' : 'Devolucao'),
+                TextColumn::make('status')
+                    ->label('Estado')
+                    ->badge()
+                    ->color(fn (string $state): string => $state === 'draft' ? 'warning' : 'success')
+                    ->formatStateUsing(fn (string $state): string => $state === 'draft' ? 'Rascunho' : 'Concluido'),
+                TextColumn::make('draft_step')
+                    ->label('Fase')
+                    ->placeholder('-')
+                    ->formatStateUsing(fn (?string $state): string => match ($state) {
+                        'photos' => 'Fotografias', 'videos' => 'Videos', 'checklist' => 'Checklist',
+                        'damage' => 'Danos e fotos', 'notes' => 'Notas', 'signatures' => 'Assinaturas',
+                        'review' => 'Conclusao', default => '-',
+                    }),
                 TextColumn::make('vehicle.license_plate')
                     ->label('Viatura')
                     ->searchable()
@@ -51,6 +64,7 @@ class VehicleHandoverProceduresTable
                         'delivery' => 'Entrega',
                         'return' => 'Devolucao',
                     ]),
+                SelectFilter::make('status')->label('Estado')->options(['draft' => 'Rascunho', 'completed' => 'Concluido']),
             ])
             ->recordActions([
                 EditAction::make(),

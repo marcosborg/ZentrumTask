@@ -4,6 +4,7 @@ namespace App\Filament\Resources\VehicleHandoverProcedures\Schemas;
 
 use App\Models\Driver;
 use App\Models\Vehicle;
+use App\Models\VehicleHandoverProcedure;
 use App\Services\VehicleHandoverProcedureService;
 use Filament\Forms\Components\BaseFileUpload;
 use Filament\Forms\Components\Checkbox;
@@ -245,10 +246,12 @@ class VehicleHandoverProcedureForm
                         ViewField::make('operator_signature_data_url')
                             ->label('Assinatura do operador')
                             ->required()
+                            ->disabled(fn (?VehicleHandoverProcedure $record): bool => $record?->status === 'completed')
                             ->view('filament.forms.components.signature-pad'),
                         ViewField::make('driver_signature_data_url')
                             ->label('Assinatura do motorista')
                             ->required()
+                            ->disabled()
                             ->view('filament.forms.components.signature-pad'),
                     ]),
             ]);

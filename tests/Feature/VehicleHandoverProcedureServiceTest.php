@@ -94,8 +94,8 @@ it('rejects a delivery when the selected driver already has another vehicle', fu
 
     $operator = User::factory()->create();
     $driver = Driver::factory()->create();
-    $availableVehicle = Vehicle::factory()->create(['status' => 'available']);
-    $allocatedVehicle = Vehicle::factory()->create(['status' => 'allocated']);
+    $availableVehicle = Vehicle::query()->create(['license_plate' => 'AA-01-AA', 'make' => 'Test', 'model' => 'Available', 'status' => 'available']);
+    $allocatedVehicle = Vehicle::query()->create(['license_plate' => 'BB-02-BB', 'make' => 'Test', 'model' => 'Allocated', 'status' => 'allocated']);
 
     VehicleAllocation::factory()->create([
         'vehicle_id' => $allocatedVehicle->id,
@@ -111,6 +111,200 @@ it('rejects a delivery when the selected driver already has another vehicle', fu
         'operator_signature_data_url' => 'operator-signature',
         'driver_signature_data_url' => 'driver-signature',
     ], $operator))->toThrow(\Illuminate\Validation\ValidationException::class);
+});
+
+it('rejects a delivery when the vehicle already has a driver', function () {
+    Mail::fake();
+    Storage::fake('public');
+
+    $operator = User::factory()->create();
+    $driver = Driver::factory()->create();
+    $vehicle = Vehicle::query()->create(['license_plate' => 'CC-03-CC', 'make' => 'Test', 'model' => 'Allocated', 'status' => 'allocated']);
+
+    VehicleAllocation::factory()->create([
+        'vehicle_id' => $vehicle->id,
+        'driver_id' => $driver->id,
+        'ends_at' => null,
+        'status' => 'active',
+    ]);
+
+    expect(fn () => app(VehicleHandoverProcedureService::class)->create([
+        'type' => 'delivery',
+        'vehicle_id' => $vehicle->id,
+        'driver_id' => $driver->id,
+        'operator_signature_data_url' => 'operator-signature',
+        'driver_signature_data_url' => 'driver-signature',
+    ], $operator))->toThrow(\Illuminate\Validation\ValidationException::class);
+});
+
+it('rejects a return when the vehicle has no assigned driver', function () {
+    Mail::fake();
+    Storage::fake('public');
+
+    $operator = User::factory()->create();
+    $driver = Driver::factory()->create();
+    $vehicle = Vehicle::query()->create(['license_plate' => 'DD-04-DD', 'make' => 'Test', 'model' => 'Available', 'status' => 'available']);
+
+    expect(fn () => app(VehicleHandoverProcedureService::class)->create([
+        'type' => 'return',
+        'vehicle_id' => $vehicle->id,
+        'driver_id' => $driver->id,
+        'operator_signature_data_url' => 'operator-signature',
+        'driver_signature_data_url' => 'driver-signature',
+    ], $operator))->toThrow(\Illuminate\Validation\ValidationException::class);
+});
+
+it('rejects a return for a driver not assigned to the vehicle', function () {
+    Mail::fake();
+    Storage::fake('public');
+
+    $operator = User::factory()->create();
+    $assignedDriver = Driver::factory()->create();
+    $otherDriver = Driver::factory()->create();
+    $vehicle = Vehicle::query()->create(['license_plate' => 'EE-05-EE', 'make' => 'Test', 'model' => 'Allocated', 'status' => 'allocated']);
+
+    VehicleAllocation::factory()->create([
+        'vehicle_id' => $vehicle->id,
+        'driver_id' => $assignedDriver->id,
+        'ends_at' => null,
+        'status' => 'active',
+    ]);
+
+    expect(fn () => app(VehicleHandoverProcedureService::class)->create([
+        'type' => 'return',
+        'vehicle_id' => $vehicle->id,
+        'driver_id' => $otherDriver->id,
+        'operator_signature_data_url' => 'operator-signature',
+        'driver_signature_data_url' => 'driver-signature',
+    ], $operator))->toThrow(\Illuminate\Validation\ValidationException::class);
+});
+
+it('records a return for the assigned driver and closes the allocation', function () {
+    Mail::fake();
+    Storage::fake('public');
+
+    $operator = User::factory()->create();
+    $driver = Driver::factory()->create();
+    $vehicle = Vehicle::query()->create([
+        'license_plate' => 'FF-06-FF',
+        'make' => 'Test',
+        'model' => 'Allocated',
+        'status' => 'allocated',
+    ]);
+    $allocation = VehicleAllocation::factory()->create([
+        'vehicle_id' => $vehicle->id,
+        'driver_id' => $driver->id,
+        'ends_at' => null,
+        'status' => 'active',
+    ]);
+
+    $procedure = app(VehicleHandoverProcedureService::class)->create([
+        'type' => 'return',
+        'performed_at' => '2026-07-21 10:00:00',
+        'vehicle_id' => $vehicle->id,
+        'driver_id' => $driver->id,
+        'operator_signature_data_url' => 'operator-signature',
+        'driver_signature_data_url' => 'driver-signature',
+    ], $operator);
+
+    expect($procedure->closed_allocation_id)->toBe($allocation->id)
+        ->and($allocation->refresh()->status)->toBe('completed')
+        ->and($vehicle->refresh()->status)->toBe('available');
+});
+
+it('creates a persistent draft without changing vehicle allocation or sending mail', function () {
+    Mail::fake();
+    Storage::fake('public');
+
+    $operator = User::factory()->create();
+    $driver = Driver::factory()->create();
+    $vehicle = Vehicle::query()->create(['license_plate' => 'GG-07-GG', 'make' => 'Test', 'model' => 'Draft', 'status' => 'available']);
+    $service = app(VehicleHandoverProcedureService::class);
+
+    $draft = $service->createDraft([
+        'type' => 'delivery', 'vehicle_id' => $vehicle->id, 'driver_id' => $driver->id,
+    ], $operator);
+
+    expect($draft->status)->toBe('draft')
+        ->and($draft->draft_step)->toBe('photos')
+        ->and($draft->created_allocation_id)->toBeNull()
+        ->and($vehicle->refresh()->status)->toBe('available')
+        ->and($service->activeDraft($operator)?->id)->toBe($draft->id);
+    Mail::assertNothingSent();
+});
+
+it('persists draft fields and requires the driver signature before completion', function () {
+    Mail::fake();
+    Storage::fake('public');
+
+    $operator = User::factory()->create();
+    $driver = Driver::factory()->create();
+    $vehicle = Vehicle::query()->create(['license_plate' => 'HH-08-HH', 'make' => 'Test', 'model' => 'Draft', 'status' => 'available']);
+    $service = app(VehicleHandoverProcedureService::class);
+    $draft = $service->createDraft(['type' => 'delivery', 'vehicle_id' => $vehicle->id, 'driver_id' => $driver->id], $operator);
+
+    $service->updateDraft($draft, [
+        'draft_step' => 'signatures', 'notes' => 'Guardado por fases',
+        'operator_signature_data_url' => 'operator-signature',
+    ]);
+
+    expect($draft->refresh()->notes)->toBe('Guardado por fases')
+        ->and($draft->draft_step)->toBe('signatures');
+    expect(fn () => $service->completeDraft($draft, $operator))
+        ->toThrow(\Illuminate\Validation\ValidationException::class);
+    expect($vehicle->refresh()->status)->toBe('available');
+});
+
+it('completes a signed draft exactly once and creates the allocation', function () {
+    Mail::fake();
+    Storage::fake('public');
+
+    $operator = User::factory()->create();
+    $driver = Driver::factory()->create();
+    $vehicle = Vehicle::query()->create(['license_plate' => 'II-09-II', 'make' => 'Test', 'model' => 'Draft', 'status' => 'available']);
+    $service = app(VehicleHandoverProcedureService::class);
+    $draft = $service->createDraft(['type' => 'delivery', 'vehicle_id' => $vehicle->id, 'driver_id' => $driver->id], $operator);
+    $service->updateDraft($draft, [
+        'operator_signature_data_url' => 'operator-signature',
+        'driver_signature_data_url' => 'driver-signature',
+    ]);
+
+    $completed = $service->completeDraft($draft, $operator);
+
+    expect($completed->status)->toBe('completed')
+        ->and($completed->completed_at)->not->toBeNull()
+        ->and($completed->created_allocation_id)->not->toBeNull()
+        ->and($vehicle->refresh()->status)->toBe('allocated');
+    expect(fn () => $service->completeDraft($completed, $operator))
+        ->toThrow(\Illuminate\Validation\ValidationException::class);
+});
+
+it('creates resumes updates and completes a draft through the app api', function () {
+    Mail::fake();
+    Storage::fake('public');
+
+    $operator = User::factory()->create();
+    $token = 'handover-draft-token';
+    Cache::put('app_auth_token:'.$token, $operator->id, now()->addMinute());
+    $driver = Driver::factory()->create();
+    $vehicle = Vehicle::query()->create(['license_plate' => 'JJ-10-JJ', 'make' => 'Test', 'model' => 'Api', 'status' => 'available']);
+
+    $created = $this->withToken($token)->postJson('/app/ops/vehicle-handovers/draft', [
+        'type' => 'delivery', 'vehicle_id' => $vehicle->id, 'driver_id' => $driver->id,
+    ])->assertCreated()->assertJsonPath('procedure.status', 'draft');
+    $draftId = $created->json('procedure.id');
+
+    $this->withToken($token)->patchJson("/app/ops/vehicle-handovers/{$draftId}/draft", [
+        'draft_step' => 'signatures',
+        'operator_signature_data_url' => 'operator-signature',
+        'driver_signature_data_url' => 'driver-signature',
+    ])->assertSuccessful()->assertJsonPath('procedure.draft_step', 'signatures');
+
+    $this->withToken($token)->getJson('/app/ops/vehicle-handovers')
+        ->assertSuccessful()->assertJsonPath('active_draft.id', $draftId);
+
+    $this->withToken($token)->postJson("/app/ops/vehicle-handovers/{$draftId}/complete")
+        ->assertSuccessful()->assertJsonPath('procedure.status', 'completed');
 });
 
 it('generates a workshop repair pdf when damages are registered', function () {

@@ -14,6 +14,7 @@ class VehicleHandoverProcedure extends Model
     protected $fillable = [
         'type',
         'status',
+        'draft_step',
         'vehicle_id',
         'driver_id',
         'operator_user_id',
@@ -22,6 +23,8 @@ class VehicleHandoverProcedure extends Model
         'exchange_group_uuid',
         'exchange_related_procedure_id',
         'performed_at',
+        'completed_at',
+        'last_synced_at',
         'allocation_effective_start_date',
         'allocation_effective_end_date',
         'vehicle_snapshot',
@@ -82,6 +85,8 @@ class VehicleHandoverProcedure extends Model
     {
         return [
             'performed_at' => 'datetime',
+            'completed_at' => 'datetime',
+            'last_synced_at' => 'datetime',
             'allocation_effective_start_date' => 'date',
             'allocation_effective_end_date' => 'date',
             'vehicle_snapshot' => 'array',

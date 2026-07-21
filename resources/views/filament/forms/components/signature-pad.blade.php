@@ -76,13 +76,14 @@
                 this.state = '';
             },
         }"
-        class="space-y-3"
+        class="space-y-3 {{ $isDisabled() ? 'pointer-events-none opacity-90' : '' }}"
     >
         <canvas
             x-ref="canvas"
             style="width: 100%; height: 180px; border: 1px dashed #cbd5e1; border-radius: 0.75rem; background: #fff;"
         ></canvas>
 
+        @if (! $isDisabled())
         <div class="flex justify-end">
             <button
                 type="button"
@@ -92,5 +93,6 @@
                 Limpar assinatura
             </button>
         </div>
+        @endif
     </div>
 </x-dynamic-component>

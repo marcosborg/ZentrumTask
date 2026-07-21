@@ -75,8 +75,185 @@ class VehicleHandoverProcedureService
         return $procedure->refresh();
     }
 
+    public function activeDraft(User $operator): ?VehicleHandoverProcedure
+    {
+        return VehicleHandoverProcedure::query()
+            ->with(['vehicle', 'driver', 'operator'])
+            ->where('operator_user_id', $operator->id)
+            ->where('status', 'draft')
+            ->latest('updated_at')
+            ->first();
+    }
+
+    public function createDraft(array $data, User $operator): VehicleHandoverProcedure
+    {
+        if ($draft = $this->activeDraft($operator)) {
+            return $draft;
+        }
+
+        $vehicle = Vehicle::query()->with('currentAllocation.driver')->findOrFail($data['vehicle_id']);
+        $driver = Driver::query()->with('currentAllocation.vehicle')->findOrFail($data['driver_id']);
+        $this->guardBusinessRules((string) $data['type'], $vehicle, $driver);
+
+        return VehicleHandoverProcedure::query()->create([
+            'type' => $data['type'],
+            'status' => 'draft',
+            'draft_step' => 'photos',
+            'vehicle_id' => $vehicle->id,
+            'driver_id' => $driver->id,
+            'operator_user_id' => $operator->id,
+            'performed_at' => ! empty($data['performed_at']) ? Carbon::parse($data['performed_at']) : now(),
+            'vehicle_snapshot' => $this->vehicleSnapshot($vehicle),
+            'driver_snapshot' => $this->driverSnapshot($driver),
+            'checklist_payload' => $this->normalizeChecklistPayload([], []),
+            'damage_items' => [],
+            'fault_items' => [],
+            'general_photo_paths' => [],
+            'guided_photo_items' => $this->normalizeGuidedPhotoItems([]),
+            'video_items' => $this->normalizeVideoItems([]),
+            'operator_signature_data_url' => '',
+            'driver_signature_data_url' => '',
+            'last_synced_at' => now(),
+        ]);
+    }
+
+    public function updateDraft(VehicleHandoverProcedure $procedure, array $data): VehicleHandoverProcedure
+    {
+        $this->guardDraft($procedure);
+        $updates = ['last_synced_at' => now()];
+
+        if (array_key_exists('draft_step', $data)) {
+            $updates['draft_step'] = in_array($data['draft_step'], ['photos', 'videos', 'checklist', 'damage', 'notes', 'signatures', 'review'], true)
+                ? $data['draft_step'] : $procedure->draft_step;
+        }
+        if (array_key_exists('performed_at', $data)) {
+            $updates['performed_at'] = Carbon::parse((string) $data['performed_at']);
+        }
+        if (array_key_exists('checklist_payload', $data)) {
+            $updates['checklist_payload'] = $this->normalizeChecklistPayload((array) $data['checklist_payload'], (array) $procedure->guided_photo_items);
+        }
+        if (array_key_exists('damage_items', $data)) {
+            $updates['damage_items'] = $this->normalizeDamageItems((array) $data['damage_items']);
+        }
+        if (array_key_exists('general_photos', $data)) {
+            $updates['general_photo_paths'] = $this->storeGeneralPhotos((array) $data['general_photos']);
+        }
+        if (array_key_exists('notes', $data)) {
+            $updates['notes'] = trim((string) $data['notes']) ?: null;
+        }
+        if (array_key_exists('operator_signature_data_url', $data)) {
+            $updates['operator_signature_data_url'] = (string) $data['operator_signature_data_url'];
+        }
+        if (array_key_exists('driver_signature_data_url', $data)) {
+            $updates['driver_signature_data_url'] = (string) $data['driver_signature_data_url'];
+        }
+
+        $procedure->update($updates);
+
+        return $procedure->refresh();
+    }
+
+    public function storeDraftMedia(VehicleHandoverProcedure $procedure, string $kind, string $key, mixed $media): VehicleHandoverProcedure
+    {
+        $this->guardDraft($procedure);
+
+        if ($kind === 'photo') {
+            $definition = collect($this->guidedPhotoZones())->firstWhere('key', $key);
+            if (! $definition) {
+                throw ValidationException::withMessages(['key' => 'Zona fotografica invalida.']);
+            }
+            $items = (array) $procedure->guided_photo_items;
+            $items[$key] = [
+                'label' => $definition['label'], 'view' => $definition['view'], 'required' => false,
+                'photo_path' => $this->storeSinglePhoto($media, 'vehicle-handovers/guided-photos'),
+            ];
+            $procedure->update(['guided_photo_items' => $items, 'last_synced_at' => now()]);
+        } elseif ($kind === 'video' && in_array($key, ['exterior', 'interior'], true)) {
+            $path = $this->storeSingleVideo($media);
+            $url = $path ? Storage::disk('public')->url($path) : null;
+            $items = (array) $procedure->video_items;
+            $items[$key] = [
+                'label' => $key === 'exterior' ? 'Video exterior' : 'Video interior', 'required' => false,
+                'video_path' => $path, 'qr_path' => $url ? $this->storeQrCode($url, $key) : null, 'url' => $url,
+            ];
+            $procedure->update(['video_items' => $items, 'last_synced_at' => now()]);
+        } else {
+            throw ValidationException::withMessages(['kind' => 'Tipo de media invalido.']);
+        }
+
+        return $procedure->refresh();
+    }
+
+    public function deleteDraft(VehicleHandoverProcedure $procedure): void
+    {
+        $this->guardDraft($procedure);
+        $procedure->delete();
+    }
+
+    public function completeDraft(VehicleHandoverProcedure $procedure, User $operator): VehicleHandoverProcedure
+    {
+        $procedure = DB::transaction(function () use ($procedure): VehicleHandoverProcedure {
+            $procedure->refresh();
+            $this->guardDraft($procedure);
+            if (trim((string) $procedure->driver_signature_data_url) === '') {
+                throw ValidationException::withMessages(['driver_signature_data_url' => 'A assinatura do motorista e obrigatoria.']);
+            }
+            if (trim((string) $procedure->operator_signature_data_url) === '') {
+                throw ValidationException::withMessages(['operator_signature_data_url' => 'A assinatura do operador e obrigatoria.']);
+            }
+
+            $vehicle = Vehicle::query()->with('currentAllocation.driver')->lockForUpdate()->findOrFail($procedure->vehicle_id);
+            $driver = Driver::query()->with('currentAllocation.vehicle')->findOrFail($procedure->driver_id);
+            $this->guardBusinessRules($procedure->type, $vehicle, $driver);
+            $performedAt = $procedure->performed_at ?? now();
+
+            if ($procedure->type === 'return') {
+                $allocation = VehicleAllocation::query()->active()->where('vehicle_id', $vehicle->id)->where('driver_id', $driver->id)->firstOrFail();
+                $allocation->update(['ends_at' => $performedAt, 'status' => 'completed']);
+                $vehicle->update(['status' => 'available']);
+                $procedure->closed_allocation_id = $allocation->id;
+                $procedure->allocation_effective_end_date = $performedAt->toDateString();
+            } else {
+                $allocation = VehicleAllocation::query()->create([
+                    'vehicle_id' => $vehicle->id, 'driver_id' => $driver->id,
+                    'starts_at' => $performedAt->copy()->startOfDay()->addDay(), 'status' => 'active',
+                    'handover_location' => 'Entrega de viatura', 'notes' => $procedure->notes,
+                ]);
+                $vehicle->update(['status' => 'allocated']);
+                $procedure->created_allocation_id = $allocation->id;
+                $procedure->allocation_effective_start_date = Carbon::parse($allocation->starts_at)->toDateString();
+            }
+
+            $procedure->status = 'completed';
+            $procedure->draft_step = null;
+            $procedure->completed_at = now();
+            $procedure->last_synced_at = now();
+            $procedure->save();
+
+            return $procedure->refresh();
+        });
+
+        $this->generateArtifacts($procedure);
+        $this->sendProceduresMail(collect([$procedure]));
+
+        return $procedure->refresh();
+    }
+
+    protected function guardDraft(VehicleHandoverProcedure $procedure): void
+    {
+        if ($procedure->status !== 'draft') {
+            throw ValidationException::withMessages(['status' => 'Este auto ja foi concluido.']);
+        }
+    }
+
     public function update(VehicleHandoverProcedure $procedure, array $data, User $operator): VehicleHandoverProcedure
     {
+        $isDraft = $procedure->status === 'draft';
+        if ($isDraft) {
+            // A assinatura do motorista e recolhida exclusivamente na app.
+            unset($data['driver_signature_data_url']);
+        }
+
         $procedure = DB::transaction(function () use ($data, $operator, $procedure): VehicleHandoverProcedure {
             $vehicle = Vehicle::query()->findOrFail($data['vehicle_id'] ?? $procedure->vehicle_id);
             $driver = Driver::query()->findOrFail($data['driver_id'] ?? $procedure->driver_id);
@@ -116,6 +293,12 @@ class VehicleHandoverProcedureService
 
             return $procedure->refresh();
         });
+
+        if ($isDraft) {
+            $procedure->updateQuietly(['last_synced_at' => now()]);
+
+            return $procedure->refresh();
+        }
 
         try {
             $this->generateArtifacts($procedure);
@@ -273,6 +456,7 @@ class VehicleHandoverProcedureService
     {
         return VehicleHandoverProcedure::query()
             ->with(['vehicle', 'driver', 'operator'])
+            ->where('status', 'completed')
             ->latest('performed_at')
             ->limit($limit)
             ->get();
@@ -441,13 +625,25 @@ class VehicleHandoverProcedureService
             ]);
         }
 
-        if ($type !== 'delivery') {
+        if ($type === 'return') {
+            if (! $vehicle->currentAllocation) {
+                throw ValidationException::withMessages([
+                    'vehicle_id' => 'A devolucao exige uma viatura com motorista atribuido.',
+                ]);
+            }
+
+            if ($vehicle->currentAllocation->driver_id !== $driver->id) {
+                throw ValidationException::withMessages([
+                    'driver_id' => 'O motorista selecionado nao esta atribuido a esta viatura.',
+                ]);
+            }
+
             return;
         }
 
-        if ($vehicle->currentAllocation && $vehicle->currentAllocation->driver_id !== $driver->id) {
+        if ($vehicle->currentAllocation) {
             throw ValidationException::withMessages([
-                'vehicle_id' => 'Esta viatura ja esta associada a outro motorista. Regista primeiro a devolucao.',
+                'vehicle_id' => 'A entrega exige uma viatura sem motorista atribuido. Regista primeiro a devolucao.',
             ]);
         }
 

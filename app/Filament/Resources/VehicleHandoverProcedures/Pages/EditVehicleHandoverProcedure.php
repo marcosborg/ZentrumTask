@@ -5,9 +5,12 @@ namespace App\Filament\Resources\VehicleHandoverProcedures\Pages;
 use App\Filament\Resources\VehicleHandoverProcedures\VehicleHandoverProcedureResource;
 use App\Models\VehicleHandoverProcedure;
 use App\Services\VehicleHandoverProcedureService;
+use Filament\Actions\Action;
 use Filament\Actions\ViewAction;
+use Filament\Notifications\Notification;
 use Filament\Resources\Pages\EditRecord;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Validation\ValidationException;
 
 class EditVehicleHandoverProcedure extends EditRecord
 {
@@ -53,6 +56,21 @@ class EditVehicleHandoverProcedure extends EditRecord
     protected function getHeaderActions(): array
     {
         return [
+            Action::make('complete')
+                ->label('Concluir auto')
+                ->color('success')
+                ->requiresConfirmation()
+                ->visible(fn (): bool => $this->record->status === 'draft')
+                ->action(function (): void {
+                    try {
+                        $this->save();
+                        app(VehicleHandoverProcedureService::class)->completeDraft($this->record, auth()->user());
+                        Notification::make()->success()->title('Auto concluido')->send();
+                        $this->redirect(static::getResource()::getUrl('view', ['record' => $this->record]));
+                    } catch (ValidationException $exception) {
+                        Notification::make()->danger()->title('Nao foi possivel concluir')->body(collect($exception->errors())->flatten()->first())->send();
+                    }
+                }),
             ViewAction::make(),
         ];
     }

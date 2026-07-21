@@ -46,7 +46,7 @@ Route::options('/app/kanban/{path?}', fn () => response('', 204, [
 ]))->where('path', '.*');
 Route::options('/app/ops/{path?}', fn () => response('', 204, [
     'Access-Control-Allow-Origin' => '*',
-    'Access-Control-Allow-Methods' => 'GET, POST, OPTIONS',
+    'Access-Control-Allow-Methods' => 'GET, POST, PATCH, DELETE, OPTIONS',
     'Access-Control-Allow-Headers' => 'Authorization, Content-Type, X-Requested-With, Accept',
 ]))->where('path', '.*');
 Route::options('/app/devices/{path?}', fn () => response('', 204, [
@@ -74,6 +74,16 @@ Route::post('/app/ops/vehicle-handovers', [AppVehicleHandoverProcedureController
     ->withoutMiddleware([VerifyCsrfToken::class])
     ->middleware('throttle:30,1')
     ->name('app.ops.vehicle-handovers.store');
+Route::post('/app/ops/vehicle-handovers/draft', [AppVehicleHandoverProcedureController::class, 'storeDraft'])
+    ->withoutMiddleware([VerifyCsrfToken::class])->middleware('throttle:30,1')->name('app.ops.vehicle-handovers.draft.store');
+Route::patch('/app/ops/vehicle-handovers/{vehicleHandoverProcedure}/draft', [AppVehicleHandoverProcedureController::class, 'updateDraft'])
+    ->withoutMiddleware([VerifyCsrfToken::class])->middleware('throttle:120,1')->name('app.ops.vehicle-handovers.draft.update');
+Route::post('/app/ops/vehicle-handovers/{vehicleHandoverProcedure}/media', [AppVehicleHandoverProcedureController::class, 'storeDraftMedia'])
+    ->withoutMiddleware([VerifyCsrfToken::class])->middleware('throttle:120,1')->name('app.ops.vehicle-handovers.draft.media');
+Route::post('/app/ops/vehicle-handovers/{vehicleHandoverProcedure}/complete', [AppVehicleHandoverProcedureController::class, 'complete'])
+    ->withoutMiddleware([VerifyCsrfToken::class])->middleware('throttle:30,1')->name('app.ops.vehicle-handovers.complete');
+Route::delete('/app/ops/vehicle-handovers/{vehicleHandoverProcedure}/draft', [AppVehicleHandoverProcedureController::class, 'destroyDraft'])
+    ->withoutMiddleware([VerifyCsrfToken::class])->middleware('throttle:30,1')->name('app.ops.vehicle-handovers.draft.destroy');
 Route::post('/app/ops/vehicle-handovers/media', [AppVehicleHandoverProcedureController::class, 'storeMedia'])
     ->withoutMiddleware([VerifyCsrfToken::class])
     ->middleware('throttle:60,1')
