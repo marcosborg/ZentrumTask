@@ -31,7 +31,11 @@ class CreateDriverMessageCampaign extends CreateRecord
         $campaign = DB::transaction(function () use ($data, $driverIds, &$deliveriesToDispatch): DriverMessageCampaign {
             $campaign = DriverMessageCampaign::query()->create([...$data, 'created_by_user_id' => auth()->id()]);
 
-            Driver::query()->whereKey($driverIds)->orderBy('name')->get()
+            Driver::query()
+                ->whereKey($driverIds)
+                ->whereHas('billingProfiles', fn ($query) => $query->active())
+                ->orderBy('name')
+                ->get()
                 ->each(function (Driver $driver) use ($campaign, &$deliveriesToDispatch): void {
                     $delivery = $campaign->deliveries()->create([
                         'driver_id' => $driver->id,

@@ -4,6 +4,7 @@ use App\Filament\Resources\DriverMessageCampaigns\Pages\CreateDriverMessageCampa
 use App\Jobs\SendDriverCampaignEmail;
 use App\Mail\DriverCampaignMail;
 use App\Models\Driver;
+use App\Models\DriverBillingProfile;
 use App\Models\DriverMessageCampaign;
 use App\Models\DriverMessageDelivery;
 use App\Models\User;
@@ -26,6 +27,8 @@ it('creates individual history records and queues email for every selected drive
         'email' => null,
         'phone' => null,
     ]);
+    DriverBillingProfile::factory()->create(['driver_id' => $withContacts->id]);
+    DriverBillingProfile::factory()->create(['driver_id' => $withoutContacts->id]);
 
     $this->actingAs($user);
 
@@ -47,6 +50,28 @@ it('creates individual history records and queues email for every selected drive
         ->and($campaign->deliveries->firstWhere('driver_id', $withoutContacts->id)->whatsapp_status)->toBe('unavailable');
 
     Queue::assertPushed(SendDriverCampaignEmail::class, 1);
+});
+
+it('excludes drivers without an active billing profile from selection', function () {
+    $user = User::factory()->create();
+    $driver = Driver::factory()->create();
+    DriverBillingProfile::factory()->create([
+        'driver_id' => $driver->id,
+        'active' => false,
+    ]);
+
+    $this->actingAs($user);
+
+    Livewire::test(CreateDriverMessageCampaign::class)
+        ->fillForm([
+            'subject' => 'Aviso importante',
+            'body' => 'Esta é a mensagem.',
+            'driver_ids' => [$driver->id],
+        ])
+        ->call('create')
+        ->assertHasFormErrors(['driver_ids.0']);
+
+    expect(DriverMessageCampaign::query()->exists())->toBeFalse();
 });
 
 it('sends an individual email and updates its history', function () {

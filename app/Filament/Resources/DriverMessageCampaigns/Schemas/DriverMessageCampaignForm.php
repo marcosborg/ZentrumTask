@@ -27,6 +27,7 @@ class DriverMessageCampaignForm
                         CheckboxList::make('driver_ids')
                             ->label('Destinatários')
                             ->options(fn (): array => Driver::query()
+                                ->whereHas('billingProfiles', fn ($query) => $query->active())
                                 ->orderBy('name')
                                 ->get(['id', 'name', 'email', 'phone'])
                                 ->mapWithKeys(fn (Driver $driver): array => [
