@@ -34,6 +34,7 @@ class CreateDriverMessageCampaign extends CreateRecord
             Driver::query()
                 ->whereKey($driverIds)
                 ->whereHas('billingProfiles', fn ($query) => $query->active())
+                ->whereHas('allocations', fn ($query) => $query->active())
                 ->orderBy('name')
                 ->get()
                 ->each(function (Driver $driver) use ($campaign, &$deliveriesToDispatch): void {

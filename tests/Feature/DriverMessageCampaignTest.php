@@ -8,6 +8,8 @@ use App\Models\DriverBillingProfile;
 use App\Models\DriverMessageCampaign;
 use App\Models\DriverMessageDelivery;
 use App\Models\User;
+use App\Models\Vehicle;
+use App\Models\VehicleAllocation;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Queue;
@@ -29,6 +31,18 @@ it('creates individual history records and queues email for every selected drive
     ]);
     DriverBillingProfile::factory()->create(['driver_id' => $withContacts->id]);
     DriverBillingProfile::factory()->create(['driver_id' => $withoutContacts->id]);
+    VehicleAllocation::factory()->create([
+        'vehicle_id' => Vehicle::query()->create(['license_plate' => 'AA-01-AA', 'make' => 'Tesla', 'model' => 'Model 3'])->id,
+        'driver_id' => $withContacts->id,
+        'status' => 'active',
+        'ends_at' => null,
+    ]);
+    VehicleAllocation::factory()->create([
+        'vehicle_id' => Vehicle::query()->create(['license_plate' => 'BB-02-BB', 'make' => 'Tesla', 'model' => 'Model Y'])->id,
+        'driver_id' => $withoutContacts->id,
+        'status' => 'active',
+        'ends_at' => null,
+    ]);
 
     $this->actingAs($user);
 
@@ -58,6 +72,37 @@ it('excludes drivers without an active billing profile from selection', function
     DriverBillingProfile::factory()->create([
         'driver_id' => $driver->id,
         'active' => false,
+    ]);
+    VehicleAllocation::factory()->create([
+        'vehicle_id' => Vehicle::query()->create(['license_plate' => 'CC-03-CC', 'make' => 'Tesla', 'model' => 'Model S'])->id,
+        'driver_id' => $driver->id,
+        'status' => 'active',
+        'ends_at' => null,
+    ]);
+
+    $this->actingAs($user);
+
+    Livewire::test(CreateDriverMessageCampaign::class)
+        ->fillForm([
+            'subject' => 'Aviso importante',
+            'body' => 'Esta é a mensagem.',
+            'driver_ids' => [$driver->id],
+        ])
+        ->call('create')
+        ->assertHasFormErrors(['driver_ids.0']);
+
+    expect(DriverMessageCampaign::query()->exists())->toBeFalse();
+});
+
+it('excludes drivers without a currently assigned vehicle from selection', function () {
+    $user = User::factory()->create();
+    $driver = Driver::factory()->create();
+    DriverBillingProfile::factory()->create(['driver_id' => $driver->id]);
+    VehicleAllocation::factory()->create([
+        'vehicle_id' => Vehicle::query()->create(['license_plate' => 'DD-04-DD', 'make' => 'Tesla', 'model' => 'Model X'])->id,
+        'driver_id' => $driver->id,
+        'status' => 'ended',
+        'ends_at' => now()->subDay(),
     ]);
 
     $this->actingAs($user);

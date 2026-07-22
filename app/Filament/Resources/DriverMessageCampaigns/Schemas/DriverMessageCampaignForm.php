@@ -28,6 +28,7 @@ class DriverMessageCampaignForm
                             ->label('Destinatários')
                             ->options(fn (): array => Driver::query()
                                 ->whereHas('billingProfiles', fn ($query) => $query->active())
+                                ->whereHas('allocations', fn ($query) => $query->active())
                                 ->orderBy('name')
                                 ->get(['id', 'name', 'email', 'phone'])
                                 ->mapWithKeys(fn (Driver $driver): array => [
