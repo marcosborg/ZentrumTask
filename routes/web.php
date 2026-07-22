@@ -10,6 +10,7 @@ use App\Http\Controllers\AppOpsController;
 use App\Http\Controllers\AppVehicleHandoverProcedureController;
 use App\Http\Controllers\BlogController;
 use App\Http\Controllers\CandidateApplicationController;
+use App\Http\Controllers\DriverMessageWhatsAppController;
 use App\Http\Controllers\MediaProxyController;
 use App\Http\Controllers\TeslaController;
 use App\Http\Controllers\WebsiteChatController;
@@ -21,6 +22,8 @@ use Illuminate\Support\Facades\Storage;
 
 Route::get('/', [WebsiteController::class, 'index']);
 Route::redirect('/login', '/admin/login')->name('login');
+Route::middleware('auth')->get('/admin/driver-messages/{delivery}/whatsapp', DriverMessageWhatsAppController::class)
+    ->name('driver-messages.whatsapp');
 Route::options('/app/auth/login', fn () => response('', 204, [
     'Access-Control-Allow-Origin' => '*',
     'Access-Control-Allow-Methods' => 'POST, OPTIONS',

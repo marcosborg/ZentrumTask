@@ -91,6 +91,11 @@ class Driver extends Model
         return $this->hasMany(DriverDepositDebit::class);
     }
 
+    public function messageDeliveries(): HasMany
+    {
+        return $this->hasMany(DriverMessageDelivery::class);
+    }
+
     public function candidateApplication(): \Illuminate\Database\Eloquent\Relations\BelongsTo
     {
         return $this->belongsTo(CandidateApplication::class);
