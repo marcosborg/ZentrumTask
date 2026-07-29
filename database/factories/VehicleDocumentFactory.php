@@ -24,7 +24,9 @@ class VehicleDocumentFactory extends Factory
             'document_number' => $this->faker->optional()->bothify('DOC-#####'),
             'issuer' => $this->faker->optional()->company(),
             'issue_date' => $this->faker->optional()->date(),
-            'expires_at' => $this->faker->optional()->dateTimeBetween('-3 months', '+12 months')->format('Y-m-d'),
+            'expires_at' => $this->faker->optional()->passthrough(
+                $this->faker->dateTimeBetween('-3 months', '+12 months')->format('Y-m-d')
+            ),
             'notes' => $this->faker->optional()->sentence(),
         ];
     }

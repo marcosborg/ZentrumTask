@@ -23,7 +23,6 @@
           </div>
           <div class="fleet-index-stats">
             <span class="fleet-status fleet-status--success">{{ $vehicles->where('status', 'available')->count() }} disponiveis</span>
-            <span class="fleet-status fleet-status--danger">{{ $vehicles->where('status', '!=', 'available')->count() }} indisponiveis</span>
           </div>
         </div>
 

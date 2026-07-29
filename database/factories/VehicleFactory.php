@@ -18,7 +18,9 @@ class VehicleFactory extends Factory
     {
         return [
             'license_plate' => strtoupper($this->faker->bothify('??-##-??')),
-            'vin' => $this->faker->optional()->unique()->regexify('[A-HJ-NPR-Z0-9]{17}'),
+            'vin' => $this->faker->optional()->passthrough(
+                $this->faker->unique()->regexify('[A-HJ-NPR-Z0-9]{17}')
+            ),
             'make' => ucfirst($this->faker->word()),
             'model' => ucfirst($this->faker->word()),
             'trim' => $this->faker->optional()->word(),
