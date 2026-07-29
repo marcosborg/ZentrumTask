@@ -55,7 +55,6 @@ jobs:
           -backend-config="key=zentrum/production.tfstate"
           -backend-config="region=${AWS_REGION}"
           -backend-config="encrypt=true"
-          -backend-config="use_lockfile=true"
 
       - name: Validate
         working-directory: infra/terraform
