@@ -40,7 +40,7 @@ class ViewVehicleHandoverProcedure extends ViewRecord
                     $record = $this->record;
 
                     if ($record->pdf_path && \Storage::disk('public')->exists($record->pdf_path)) {
-                        return response()->download(\Storage::disk('public')->path($record->pdf_path), 'procedimento-'.$record->id.'.pdf');
+                        return \Storage::disk('public')->download($record->pdf_path, 'procedimento-'.$record->id.'.pdf');
                     }
 
                     $pdf = Pdf::loadView('pdf.vehicle-handover-procedure', [

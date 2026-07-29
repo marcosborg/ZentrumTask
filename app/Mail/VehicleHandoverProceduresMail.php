@@ -53,7 +53,7 @@ class VehicleHandoverProceduresMail extends Mailable
     {
         return $this->procedures
             ->filter(fn (VehicleHandoverProcedure $procedure): bool => filled($procedure->pdf_path) && Storage::disk('public')->exists($procedure->pdf_path))
-            ->map(fn (VehicleHandoverProcedure $procedure): Attachment => Attachment::fromPath(Storage::disk('public')->path($procedure->pdf_path))
+            ->map(fn (VehicleHandoverProcedure $procedure): Attachment => Attachment::fromStorageDisk('public', $procedure->pdf_path)
                 ->as('auto-viatura-'.$procedure->id.'.pdf')
                 ->withMime('application/pdf'))
             ->values()

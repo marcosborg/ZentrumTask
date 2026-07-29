@@ -1,5 +1,9 @@
 .env
 .vscode
 node_modules/
+.terraform/
+*.tfstate
+*.tfstate.*
+tfplan
 public/build/
 /storage/app/private/firebase-service-account.json
