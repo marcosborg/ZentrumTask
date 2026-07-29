@@ -55,9 +55,6 @@ jobs:
       - name: Install PHP dependencies
         run: composer install --no-interaction --prefer-dist --no-progress
 
-      - name: Install frontend dependencies
-        run: npm ci
-
       - name: Configure test environment
         run: |
           cp .env.example .env
@@ -67,6 +64,9 @@ jobs:
         run: |
           vendor/bin/pint --dirty
           git diff --exit-code
+
+      - name: Install frontend dependencies
+        run: npm ci
 
       - name: Build frontend
         run: npm run build
