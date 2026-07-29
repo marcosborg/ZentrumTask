@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\Board;
+use App\Models\ChatSession;
 use App\Models\Stage;
 use App\Models\Task;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -73,9 +74,10 @@ it('creates a website chat kanban lead only after collecting name and phone', fu
     ])->assertOk();
 
     $task = Task::query()->firstOrFail();
+    $chatSession = ChatSession::query()->where('session_token', $session)->firstOrFail();
 
     expect($task->title)->toStartWith('Chat website: Maria Costa')
-        ->and($task->external_reference)->toBe('website-chat-1')
+        ->and($task->external_reference)->toBe('website-chat-'.$chatSession->id)
         ->and($task->meta['source'])->toBe('website')
         ->and($task->meta['contact_name'])->toBe('Maria Costa')
         ->and($task->meta['phone'])->toBe('912 345 678')

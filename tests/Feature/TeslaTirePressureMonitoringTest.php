@@ -251,7 +251,7 @@ it('renders the pressure readings risks and manufacturer disclaimer in the email
 
 it('disables the alert action without a current driver email', function (): void {
     $user = User::factory()->create();
-    $vehicle = TeslaVehicle::factory()->create();
+    $vehicle = TeslaVehicle::factory()->create(['state' => 'online']);
     TeslaVehicleSnapshot::query()->create([
         'tesla_vehicle_id' => $vehicle->id,
         'recorded_at' => now(),
