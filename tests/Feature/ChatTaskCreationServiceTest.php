@@ -9,6 +9,13 @@ uses(RefreshDatabase::class);
 
 function createChatLeadBoard(): void
 {
+    Board::query()->create([
+        'name' => 'Arquivo',
+        'slug' => 'arquivo',
+        'is_active' => false,
+        'position' => 0,
+    ]);
+
     $board = Board::query()->create([
         'name' => 'Leads',
         'slug' => 'leads',

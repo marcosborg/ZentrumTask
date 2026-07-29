@@ -2,7 +2,25 @@
 
 afterEach(function (): void {
     putenv('PUBLIC_FILESYSTEM_DRIVER');
-    unset($_ENV['PUBLIC_FILESYSTEM_DRIVER'], $_SERVER['PUBLIC_FILESYSTEM_DRIVER']);
+    unset(
+        $_ENV['PUBLIC_FILESYSTEM_DRIVER'],
+        $_SERVER['PUBLIC_FILESYSTEM_DRIVER'],
+        $_ENV['MEDIA_URL'],
+        $_SERVER['MEDIA_URL'],
+        $_ENV['APP_URL'],
+        $_SERVER['APP_URL'],
+    );
+});
+
+it('falls back to the app url when the media url is blank', function () {
+    $_ENV['MEDIA_URL'] = '';
+    $_SERVER['MEDIA_URL'] = '';
+    $_ENV['APP_URL'] = 'http://localhost';
+    $_SERVER['APP_URL'] = 'http://localhost';
+
+    $configuration = require config_path('filesystems.php');
+
+    expect($configuration['disks']['public']['url'])->toBe('http://localhost/storage');
 });
 
 it('keeps the public disk local by default', function () {

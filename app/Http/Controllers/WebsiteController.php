@@ -101,12 +101,14 @@ class WebsiteController extends Controller
         ]);
 
         $stage = Stage::query()
-            ->where('board_id', 1)
+            ->whereHas('board', fn ($query) => $query->where('is_active', true))
             ->where('is_initial', true)
+            ->orderBy('board_id')
             ->orderBy('position')
             ->first()
             ?? Stage::query()
-                ->where('board_id', 1)
+                ->whereHas('board', fn ($query) => $query->where('is_active', true))
+                ->orderBy('board_id')
                 ->orderBy('position')
                 ->first();
 
@@ -134,7 +136,7 @@ class WebsiteController extends Controller
             }
 
             return Task::query()->create([
-                'board_id' => 1,
+                'board_id' => $stage->board_id,
                 'stage_id' => $stage->id,
                 'title' => $title,
                 'description' => $description,
