@@ -27,7 +27,7 @@ jobs:
     runs-on: ubuntu-latest
     environment: production
     env:
-      AWS_REGION: eu-south-2
+      AWS_REGION: eu-west-3
       ECS_CLUSTER: zentrum-production
       ECS_WEB_SERVICE: zentrum-production-web
       ECS_WORKER_SERVICE: zentrum-production-worker
