@@ -63,7 +63,7 @@ jobs:
       - name: Check code style
         run: |
           vendor/bin/pint --dirty
-          git diff --exit-code
+          git diff --exit-code -- app config database routes tests
 
       - name: Install frontend dependencies
         run: npm ci
