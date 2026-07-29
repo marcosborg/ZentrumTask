@@ -303,19 +303,21 @@ class ChatTaskCreationService
     private function resolveLeadStage(): ?Stage
     {
         return Stage::query()
-            ->where('board_id', 1)
+            ->whereHas('board', fn ($query) => $query->where('is_active', true))
             ->where(function ($query): void {
                 $query
                     ->where('is_initial', true)
                     ->orWhereRaw('LOWER(name) = ?', ['entrada'])
                     ->orWhereRaw('LOWER(slug) = ?', ['entrada']);
             })
+            ->orderBy('board_id')
             ->orderByRaw("CASE WHEN LOWER(name) = 'entrada' OR LOWER(slug) = 'entrada' THEN 0 ELSE 1 END")
             ->orderByDesc('is_initial')
             ->orderBy('position')
             ->first()
             ?? Stage::query()
-                ->where('board_id', 1)
+                ->whereHas('board', fn ($query) => $query->where('is_active', true))
+                ->orderBy('board_id')
                 ->orderBy('position')
                 ->first();
     }

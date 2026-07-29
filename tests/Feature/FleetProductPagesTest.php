@@ -12,6 +12,13 @@ uses(RefreshDatabase::class);
 
 function createWebsiteLeadStage(): Stage
 {
+    Board::query()->create([
+        'name' => 'Arquivo',
+        'slug' => 'arquivo',
+        'is_active' => false,
+        'position' => 0,
+    ]);
+
     $board = Board::query()->create([
         'name' => 'Website',
         'slug' => 'website',
