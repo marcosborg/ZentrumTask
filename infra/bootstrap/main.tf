@@ -52,7 +52,73 @@ resource "aws_iam_role" "github_infrastructure" {
   })
 }
 
-resource "aws_iam_role_policy_attachment" "administrator" {
-  role       = aws_iam_role.github_infrastructure.name
-  policy_arn = "arn:aws:iam::aws:policy/AdministratorAccess"
+resource "aws_iam_role_policy" "infrastructure" {
+  name = "zentrum-infrastructure"
+  role = aws_iam_role.github_infrastructure.id
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "cloudfront:*",
+          "ec2:*",
+          "ecr:*",
+          "ecs:*",
+          "elasticfilesystem:*",
+          "elasticloadbalancing:*",
+          "logs:*",
+          "rds:*",
+          "secretsmanager:*"
+        ]
+        Resource = "*"
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "s3:CreateBucket",
+          "s3:GetBucketLocation",
+          "s3:ListAllMyBuckets"
+        ]
+        Resource = "*"
+      },
+      {
+        Effect   = "Allow"
+        Action   = "s3:*"
+        Resource = ["arn:aws:s3:::zentrum-*", "arn:aws:s3:::zentrum-*/*"]
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "iam:CreateRole",
+          "iam:DeleteRole",
+          "iam:GetRole",
+          "iam:ListRolePolicies",
+          "iam:ListAttachedRolePolicies",
+          "iam:PassRole",
+          "iam:PutRolePolicy",
+          "iam:GetRolePolicy",
+          "iam:DeleteRolePolicy",
+          "iam:AttachRolePolicy",
+          "iam:DetachRolePolicy",
+          "iam:TagRole",
+          "iam:UntagRole"
+        ]
+        Resource = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/zentrum-*"
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "iam:GetOpenIDConnectProvider",
+          "iam:ListOpenIDConnectProviders"
+        ]
+        Resource = "*"
+      },
+      {
+        Effect   = "Allow"
+        Action   = "iam:CreateServiceLinkedRole"
+        Resource = "arn:aws:iam::*:role/aws-service-role/*"
+      }
+    ]
+  })
 }
