@@ -381,6 +381,16 @@ resource "aws_iam_role_policy" "task" {
       Effect   = "Allow"
       Action   = ["elasticfilesystem:ClientMount", "elasticfilesystem:ClientWrite"]
       Resource = aws_efs_file_system.private.arn
+    },
+    {
+      Effect = "Allow"
+      Action = [
+        "ssmmessages:CreateControlChannel",
+        "ssmmessages:CreateDataChannel",
+        "ssmmessages:OpenControlChannel",
+        "ssmmessages:OpenDataChannel"
+      ]
+      Resource = "*"
     }
   ] })
 }
