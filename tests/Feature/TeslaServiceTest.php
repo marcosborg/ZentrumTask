@@ -25,6 +25,15 @@ function teslaPageUrl(): string
     return \App\Filament\Pages\TeslaIntegration::getUrl();
 }
 
+it('starts tesla OAuth outside the dynamic vehicle details route', function (): void {
+    $user = User::factory()->create();
+
+    $response = $this->actingAs($user)->get(route('tesla.connect'));
+
+    $response->assertRedirectContains('https://auth.tesla.test/oauth2/v3/authorize');
+    expect(route('tesla.connect', absolute: false))->toBe('/api/tesla/connect');
+});
+
 it('lists vehicles for a tesla account', function (): void {
     Http::fake([
         'tesla.test/api/1/vehicles' => Http::response([

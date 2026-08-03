@@ -124,7 +124,7 @@
             </div>
 
             <div class="tesla-admin__actions">
-                <x-filament::button tag="a" href="{{ route('admin.tesla.connect') }}" icon="heroicon-m-link">
+                <x-filament::button tag="a" href="{{ route('tesla.connect') }}" icon="heroicon-m-link">
                     Ligar conta Tesla
                 </x-filament::button>
 

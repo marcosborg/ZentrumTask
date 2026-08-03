@@ -249,9 +249,11 @@ Route::middleware(['auth'])->get('/admin/km-semanais/exemplo.csv', function () {
 })->name('weekly-km.sample');
 
 Route::middleware(['auth'])->prefix('admin/tesla')->name('admin.tesla.')->group(function (): void {
-    Route::get('/connect', [TeslaController::class, 'redirectToTesla'])->name('connect');
     Route::get('/callback', [TeslaController::class, 'callback'])->name('callback');
     Route::post('/sync-vehicles', [TeslaController::class, 'syncVehicles'])->name('syncVehicles');
 });
 
+Route::get('/api/tesla/connect', [TeslaController::class, 'redirectToTesla'])
+    ->middleware('auth')
+    ->name('tesla.connect');
 Route::get('/api/tesla/callback', [TeslaController::class, 'callback'])->name('tesla.callback');
