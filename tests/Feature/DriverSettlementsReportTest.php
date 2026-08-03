@@ -164,6 +164,30 @@ it('derives the weekly workflow checklist from email receipt and payment state',
     ]);
 });
 
+it('shows current weekly mileage with odometer readings in the tooltip', function () {
+    $settlement = createReportSettlement();
+    $vehicle = Vehicle::factory()->create();
+
+    VehicleWeeklyMileage::factory()->create([
+        'vehicle_id' => $vehicle->id,
+        'driver_id' => $settlement->driver_id,
+        'period_start' => '2026-05-04',
+        'period_end' => '2026-05-10',
+        'weekly_km' => 2350,
+        'assignment_status' => 'ok',
+        'raw_row' => [
+            'previous_odometer' => 101250.4,
+            'current_odometer' => 103600.4,
+        ],
+    ]);
+
+    Livewire::test(DriverSettlementsReport::class)
+        ->assertSee('Km semana')
+        ->assertSee('2 350,0 km')
+        ->assertSee('101 250,4 km')
+        ->assertSee('103 600,4 km');
+});
+
 it('recalculates only one driver settlement without changing the others', function () {
     $driverOne = Driver::factory()->create();
     $driverTwo = Driver::factory()->create();

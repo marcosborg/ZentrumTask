@@ -73,6 +73,11 @@ class DriverSettlementsReport extends Page implements HasTable
     /** @var array<int, array{name: string, email: string}> */
     private array $driverIdentityCache = [];
 
+    /** @var array<int, array{current: float, previous_odometer: ?float, current_odometer: ?float}> */
+    private array $weeklyMileageCache = [];
+
+    private bool $weeklyMileageCacheBuilt = false;
+
     public function mount(): void {}
 
     public function mountHasFilters(): void
@@ -373,6 +378,17 @@ class DriverSettlementsReport extends Page implements HasTable
                     ->alignRight()
                     ->state(fn (DriverSettlement $record): float => $this->adjustmentsForSettlement($record)['total'])
                     ->formatStateUsing(fn ($state): string => $this->formatEffectMoney(-1 * (float) $state, 'signed')),
+                TextColumn::make('weekly_km')
+                    ->label('Km semana')
+                    ->alignRight()
+                    ->state(fn (DriverSettlement $record): float => $this->weeklyMileageFor($record)['current'])
+                    ->formatStateUsing(fn ($state): string => number_format((float) $state, 1, ',', ' ').' km')
+                    ->tooltip(function (DriverSettlement $record): string {
+                        $mileage = $this->weeklyMileageFor($record);
+
+                        return 'Odómetro semana anterior: '.$this->formatOdometer($mileage['previous_odometer'])."\n"
+                            .'Odómetro esta semana: '.$this->formatOdometer($mileage['current_odometer']);
+                    }),
                 TextColumn::make('extra_km_expenses')
                     ->label('Km extra')
                     ->alignRight()
@@ -2185,6 +2201,106 @@ class DriverSettlementsReport extends Page implements HasTable
     {
         $this->billingCache = [];
         $this->billingCacheBuilt = false;
+        $this->weeklyMileageCache = [];
+        $this->weeklyMileageCacheBuilt = false;
+    }
+
+    /**
+     * @return array{current: float, previous_odometer: ?float, current_odometer: ?float}
+     */
+    private function weeklyMileageFor(DriverSettlement $record): array
+    {
+        if (! $this->weeklyMileageCacheBuilt) {
+            $this->buildWeeklyMileageCache();
+        }
+
+        return $this->weeklyMileageCache[$record->id] ?? [
+            'current' => 0.0,
+            'previous_odometer' => null,
+            'current_odometer' => null,
+        ];
+    }
+
+    private function buildWeeklyMileageCache(): void
+    {
+        if ($this->weeklyMileageCacheBuilt) {
+            return;
+        }
+
+        $records = $this->getTableRecords();
+
+        if ($records instanceof Paginator || $records instanceof CursorPaginator) {
+            $records = $records->getCollection();
+        }
+
+        $records = collect($records)->values();
+
+        if ($records->isEmpty()) {
+            $this->weeklyMileageCacheBuilt = true;
+
+            return;
+        }
+
+        $driverIds = $records->pluck('driver_id')->filter()->unique()->values();
+        $earliestPreviousStart = $records
+            ->map(function (DriverSettlement $record): Carbon {
+                $start = Carbon::parse($record->period_start)->startOfDay();
+                $days = $start->diffInDays(Carbon::parse($record->period_end)->startOfDay()) + 1;
+
+                return $start->copy()->subDays($days);
+            })
+            ->min();
+        $latestEnd = Carbon::parse($records->max('period_end'))->endOfDay();
+
+        $mileagesByDriver = VehicleWeeklyMileage::query()
+            ->whereIn('driver_id', $driverIds)
+            ->where('assignment_status', 'ok')
+            ->whereDate('period_start', '>=', $earliestPreviousStart)
+            ->whereDate('period_end', '<=', $latestEnd)
+            ->get(['driver_id', 'period_start', 'period_end', 'weekly_km', 'raw_row'])
+            ->groupBy('driver_id');
+
+        foreach ($records as $record) {
+            $start = Carbon::parse($record->period_start)->startOfDay();
+            $end = Carbon::parse($record->period_end)->startOfDay();
+            $days = $start->diffInDays($end) + 1;
+            $previousStart = $start->copy()->subDays($days);
+            $previousEnd = $start->copy()->subDay();
+            $driverMileages = $mileagesByDriver->get($record->driver_id, collect());
+
+            $current = $driverMileages
+                ->filter(fn (VehicleWeeklyMileage $mileage): bool => $mileage->period_start->betweenIncluded($start, $end)
+                    && $mileage->period_end->betweenIncluded($start, $end))
+                ->sum(fn (VehicleWeeklyMileage $mileage): float => (float) $mileage->weekly_km);
+            $currentMileageRows = $driverMileages
+                ->filter(fn (VehicleWeeklyMileage $mileage): bool => $mileage->period_start->betweenIncluded($start, $end)
+                    && $mileage->period_end->betweenIncluded($start, $end));
+            $currentOdometer = $currentMileageRows
+                ->map(fn (VehicleWeeklyMileage $mileage): ?float => is_numeric($mileage->raw_row['current_odometer'] ?? null)
+                    ? (float) $mileage->raw_row['current_odometer']
+                    : null)
+                ->filter(fn (?float $odometer): bool => $odometer !== null)
+                ->max();
+            $previousOdometer = $currentMileageRows
+                ->map(fn (VehicleWeeklyMileage $mileage): ?float => is_numeric($mileage->raw_row['previous_odometer'] ?? null)
+                    ? (float) $mileage->raw_row['previous_odometer']
+                    : null)
+                ->filter(fn (?float $odometer): bool => $odometer !== null)
+                ->min();
+
+            $this->weeklyMileageCache[$record->id] = [
+                'current' => round((float) $current, 2),
+                'previous_odometer' => $previousOdometer !== null ? round((float) $previousOdometer, 2) : null,
+                'current_odometer' => $currentOdometer !== null ? round((float) $currentOdometer, 2) : null,
+            ];
+        }
+
+        $this->weeklyMileageCacheBuilt = true;
+    }
+
+    private function formatOdometer(?float $odometer): string
+    {
+        return $odometer === null ? 'Sem leitura' : number_format($odometer, 1, ',', ' ').' km';
     }
 
     /**
