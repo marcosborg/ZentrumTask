@@ -218,6 +218,37 @@ resource "aws_cloudfront_origin_access_control" "media" {
   signing_protocol                  = "sigv4"
 }
 
+resource "aws_cloudfront_response_headers_policy" "media_cors" {
+  name = "${local.name}-media-cors"
+
+  cors_config {
+    access_control_allow_credentials = false
+
+    access_control_allow_headers {
+      items = ["*"]
+    }
+
+    access_control_allow_methods {
+      items = ["GET", "HEAD", "OPTIONS"]
+    }
+
+    access_control_allow_origins {
+      items = [
+        "https://${var.domain_name}",
+        "http://127.0.0.1:8000",
+        "http://localhost:8000",
+      ]
+    }
+
+    access_control_expose_headers {
+      items = ["Content-Length", "Content-Type", "ETag"]
+    }
+
+    access_control_max_age_sec = 3600
+    origin_override            = true
+  }
+}
+
 resource "aws_cloudfront_distribution" "media" {
   enabled         = true
   is_ipv6_enabled = true
@@ -227,10 +258,11 @@ resource "aws_cloudfront_distribution" "media" {
     origin_access_control_id = aws_cloudfront_origin_access_control.media.id
   }
   default_cache_behavior {
-    target_origin_id       = "media"
-    viewer_protocol_policy = "redirect-to-https"
-    allowed_methods        = ["GET", "HEAD", "OPTIONS"]
-    cached_methods         = ["GET", "HEAD", "OPTIONS"]
+    target_origin_id           = "media"
+    viewer_protocol_policy     = "redirect-to-https"
+    allowed_methods            = ["GET", "HEAD", "OPTIONS"]
+    cached_methods             = ["GET", "HEAD", "OPTIONS"]
+    response_headers_policy_id = aws_cloudfront_response_headers_policy.media_cors.id
     forwarded_values {
       query_string = false
       cookies { forward = "none" }
