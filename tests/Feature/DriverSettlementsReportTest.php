@@ -188,6 +188,37 @@ it('shows current weekly mileage with odometer readings in the tooltip', functio
         ->assertSee('103 600,4 km');
 });
 
+it('allows the extra km charge to be overridden directly on a settlement', function () {
+    $settlement = createReportSettlement([
+        'expenses_total' => 200,
+        'amount_payable' => 400,
+        'amount_due' => 400,
+        'rules_snapshot' => [
+            'amount_payable_base' => 400,
+            'vat_multiplier' => 1,
+            'extra_km_total' => 120,
+        ],
+    ]);
+
+    DriverBalance::query()->create([
+        'driver_id' => $settlement->driver_id,
+        'current_balance' => 400,
+        'last_settlement_id' => $settlement->id,
+        'is_settled' => false,
+    ]);
+
+    (new DriverSettlementsReport)->setExtraKmOverride($settlement, 0);
+
+    $settlement->refresh();
+
+    expect((float) $settlement->expenses_total)->toBe(80.0)
+        ->and((float) $settlement->amount_payable)->toBe(520.0)
+        ->and((float) $settlement->amount_due)->toBe(520.0)
+        ->and((float) data_get($settlement->rules_snapshot, 'extra_km_calculated_total'))->toBe(120.0)
+        ->and((float) data_get($settlement->rules_snapshot, 'extra_km_override'))->toBe(0.0)
+        ->and((float) DriverBalance::query()->where('driver_id', $settlement->driver_id)->value('current_balance'))->toBe(520.0);
+});
+
 it('recalculates only one driver settlement without changing the others', function () {
     $driverOne = Driver::factory()->create();
     $driverTwo = Driver::factory()->create();

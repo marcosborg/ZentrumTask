@@ -392,7 +392,7 @@ class DriverSettlementsReport extends Page implements HasTable
                 TextColumn::make('extra_km_expenses')
                     ->label('Km extra')
                     ->alignRight()
-                    ->state(fn (DriverSettlement $record): float => $this->extraKmExpensesForSettlement($record)['total'])
+                    ->state(fn (DriverSettlement $record): float => $this->effectiveExtraKmTotal($record))
                     ->formatStateUsing(fn ($state): string => $this->formatEffectMoney($state, 'subtract')),
                 TextColumn::make('expenses_total')
                     ->label('Despesas')
@@ -515,6 +515,7 @@ class DriverSettlementsReport extends Page implements HasTable
                 $this->manageGreenReceiptAction(),
                 $this->downloadGreenReceiptAction(),
                 $this->manageAdjustmentsAction(),
+                $this->overrideExtraKmAction(),
                 $this->adjustBalanceAction(),
                 $this->markPaidAction(),
                 $this->recalculateSettlementAction(),
@@ -1209,6 +1210,104 @@ class DriverSettlementsReport extends Page implements HasTable
                     ->title('Saldo atualizado')
                     ->send();
             });
+    }
+
+    private function overrideExtraKmAction(): Action
+    {
+        return Action::make('overrideExtraKm')
+            ->label('Definir Km extra')
+            ->icon(Heroicon::OutlinedPencilSquare)
+            ->color('warning')
+            ->modalHeading('Definir valor de Km extra')
+            ->modalDescription('Este valor substitui o débito calculado automaticamente neste settlement. Use 0 para não debitar o motorista.')
+            ->fillForm(fn (DriverSettlement $record): array => [
+                'amount' => number_format($this->effectiveExtraKmTotal($record), 2, ',', ''),
+            ])
+            ->form([
+                TextInput::make('amount')
+                    ->label('Valor a debitar')
+                    ->prefix('€')
+                    ->required()
+                    ->helperText('Introduza 0 para não cobrar Km extra.'),
+            ])
+            ->action(function (DriverSettlement $record, array $data): void {
+                $amount = $this->parseLocalizedDecimal($data['amount'] ?? null);
+
+                if ($amount === null || $amount < 0) {
+                    Notification::make()
+                        ->danger()
+                        ->title('Valor de Km extra inválido')
+                        ->send();
+
+                    return;
+                }
+
+                $this->setExtraKmOverride($record, round($amount, 2));
+                $this->resetBillingCache();
+                $this->resetTable();
+
+                Notification::make()
+                    ->success()
+                    ->title('Km extra atualizado')
+                    ->body('Valor definido manualmente: '.$this->formatMoney($amount))
+                    ->send();
+            });
+    }
+
+    public function setExtraKmOverride(DriverSettlement $record, float $amount): void
+    {
+        DB::transaction(function () use ($record, $amount): void {
+            $record->refresh();
+            $rules = is_array($record->rules_snapshot) ? $record->rules_snapshot : [];
+            $currentExtraKmTotal = $this->effectiveExtraKmTotal($record);
+            $targetExtraKmTotal = round(max(0, $amount), 2);
+            $delta = round($targetExtraKmTotal - $currentExtraKmTotal, 2);
+            $amountPayableBase = round((float) ($rules['amount_payable_base'] ?? $record->amount_payable) - $delta, 2);
+
+            $rules['extra_km_calculated_total'] = (float) ($rules['extra_km_calculated_total'] ?? $rules['extra_km_total'] ?? 0);
+            $rules['extra_km_override'] = $targetExtraKmTotal;
+            $rules['extra_km_total'] = $targetExtraKmTotal;
+            $rules['amount_payable_base'] = $amountPayableBase;
+
+            $record->forceFill([
+                'expenses_total' => round((float) $record->expenses_total + $delta, 2),
+                'rules_snapshot' => $rules,
+            ])->save();
+
+            $this->applyAdjustmentForward($record->fresh(), (float) $record->carry_over_balance);
+
+            $updated = $record->fresh();
+            DriverBalanceMovement::query()
+                ->where('driver_settlement_id', $record->id)
+                ->where('type', 'settlement')
+                ->update(['amount' => $updated->amount_payable]);
+
+            $latestSettlement = DriverSettlement::query()
+                ->where('driver_id', $record->driver_id)
+                ->latest('period_end')
+                ->latest('id')
+                ->first(['id', 'amount_due']);
+
+            if ($latestSettlement) {
+                $this->resolveBalance((int) $record->driver_id)->forceFill([
+                    'current_balance' => $latestSettlement->amount_due,
+                    'last_settlement_id' => $latestSettlement->id,
+                    'is_settled' => false,
+                    'settled_at' => null,
+                ])->save();
+            }
+        });
+    }
+
+    private function effectiveExtraKmTotal(DriverSettlement $settlement): float
+    {
+        $rules = is_array($settlement->rules_snapshot) ? $settlement->rules_snapshot : [];
+
+        if (isset($rules['extra_km_override']) && is_numeric($rules['extra_km_override'])) {
+            return round((float) $rules['extra_km_override'], 2);
+        }
+
+        return round((float) ($rules['extra_km_total'] ?? $this->extraKmExpensesForSettlement($settlement)['total']), 2);
     }
 
     private function manageGreenReceiptAction(): Action
