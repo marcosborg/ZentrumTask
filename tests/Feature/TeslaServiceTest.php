@@ -222,6 +222,53 @@ it('stores a tesla account after a successful oauth callback', function (): void
         ->and(decrypt($account->refresh_token))->toBe('refresh-token');
 });
 
+it('updates an existing tesla account after reconnecting', function (): void {
+    $teslaUserId = '89d88970-4869-46b9-9c60-44b87c1f6c9f';
+    $idToken = 'header.'.rtrim(strtr(base64_encode(json_encode([
+        'sub' => $teslaUserId,
+    ], JSON_THROW_ON_ERROR)), '+/', '-_'), '=').'.signature';
+
+    $user = User::factory()->create();
+    $account = TeslaAccount::factory()->create([
+        'user_id' => $user->id,
+        'tesla_user_id' => $teslaUserId,
+        'access_token' => encrypt('old-access-token'),
+        'refresh_token' => encrypt('old-refresh-token'),
+        'owner_email' => 'owner@example.com',
+    ]);
+
+    Http::fake([
+        'auth.tesla.test/oauth2/v3/token' => Http::response([
+            'access_token' => 'new-access-token',
+            'refresh_token' => 'new-refresh-token',
+            'expires_in' => 3600,
+            'scope' => 'openid offline_access vehicle_device_data',
+            'id_token' => $idToken,
+        ]),
+        'tesla.test/api/1/users/me' => Http::response([
+            'response' => [
+                'email' => 'owner@example.com',
+            ],
+        ]),
+    ]);
+
+    $this->actingAs($user)
+        ->withSession([
+            'tesla_oauth_state' => 'expected-state',
+            'tesla_oauth_user_id' => $user->id,
+        ])
+        ->get(route('tesla.callback', [
+            'state' => 'expected-state',
+            'code' => 'valid-code',
+        ]))
+        ->assertRedirect(teslaPageUrl())
+        ->assertSessionHas('success');
+
+    expect(TeslaAccount::query()->count())->toBe(1)
+        ->and(decrypt($account->refresh()->access_token))->toBe('new-access-token')
+        ->and(decrypt($account->refresh_token))->toBe('new-refresh-token');
+});
+
 it('stores a tesla account when the oauth state is validated from cache', function (): void {
     Http::fake([
         'auth.tesla.test/oauth2/v3/token' => Http::response([

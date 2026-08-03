@@ -68,16 +68,28 @@ class TeslaController extends Controller
 
         $cachedUserId = is_array($cachedState) ? $cachedState['user_id'] ?? null : null;
 
-        $account = TeslaAccount::query()->create([
+        $teslaUserId = $this->teslaUserIdFromToken($token['id_token'] ?? null);
+        $account = $teslaUserId !== null
+            ? TeslaAccount::query()->firstOrNew(['tesla_user_id' => $teslaUserId])
+            : new TeslaAccount;
+
+        $account->fill([
             'user_id' => $request->session()->pull('tesla_oauth_user_id') ?: $cachedUserId ?: Auth::id(),
-            'tesla_user_id' => $this->teslaUserIdFromToken($token['id_token'] ?? null),
-            'email' => null,
-            'owner_email' => 'unknown',
+            'tesla_user_id' => $teslaUserId,
             'access_token' => encrypt((string) $token['access_token']),
             'refresh_token' => encrypt((string) $token['refresh_token']),
             'expires_at' => now()->addSeconds((int) ($token['expires_in'] ?? 3600)),
             'scopes' => $this->teslaService->scopesFrom($token['scope'] ?? config('services.tesla.scopes')),
         ]);
+
+        if (! $account->exists) {
+            $account->fill([
+                'email' => null,
+                'owner_email' => 'unknown',
+            ]);
+        }
+
+        $account->save();
 
         try {
             $profile = $this->teslaService->getUserMe($account);
