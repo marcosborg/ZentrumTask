@@ -23,6 +23,15 @@ it('falls back to the app url when the media url is blank', function () {
     expect($configuration['disks']['public']['url'])->toBe('http://localhost/storage');
 });
 
+it('uses an explicit remote media url without adding the local storage prefix', function () {
+    $_ENV['MEDIA_URL'] = 'https://media.example.com';
+    $_SERVER['MEDIA_URL'] = 'https://media.example.com';
+
+    $configuration = require config_path('filesystems.php');
+
+    expect($configuration['disks']['public']['url'])->toBe('https://media.example.com');
+});
+
 it('keeps the public disk local by default', function () {
     $configuration = require config_path('filesystems.php');
 

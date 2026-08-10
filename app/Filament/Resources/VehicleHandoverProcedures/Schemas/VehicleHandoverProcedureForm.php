@@ -23,6 +23,7 @@ use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
 use Illuminate\Support\Facades\Log;
 use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
+use Symfony\Component\Mime\MimeTypes;
 use Throwable;
 
 class VehicleHandoverProcedureForm
@@ -260,6 +261,17 @@ class VehicleHandoverProcedureForm
     protected static function handoverUpload(string $name): FileUpload
     {
         return FileUpload::make($name)
+            ->fetchFileInformation(false)
+            ->getUploadedFileUsing(static function (BaseFileUpload $component, string $file, string|array|null $storedFileNames): array {
+                $mimeType = MimeTypes::getDefault()->getMimeTypes(pathinfo($file, PATHINFO_EXTENSION))[0] ?? 'application/octet-stream';
+
+                return [
+                    'name' => ($component->isMultiple() ? ($storedFileNames[$file] ?? null) : $storedFileNames) ?? basename($file),
+                    'size' => 0,
+                    'type' => $mimeType,
+                    'url' => $component->getDisk()->url($file),
+                ];
+            })
             ->saveUploadedFileUsing(static function (BaseFileUpload $component, TemporaryUploadedFile $file): ?string {
                 try {
                     if (! $file->exists()) {
