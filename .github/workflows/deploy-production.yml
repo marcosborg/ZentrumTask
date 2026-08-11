@@ -80,8 +80,7 @@ jobs:
           aws lightsail download-default-key-pair \
             --region "$AWS_REGION" \
             --query privateKeyBase64 \
-            --output text \
-            | base64 --decode > lightsail.pem
+            --output text > lightsail.pem
           chmod 600 lightsail.pem
 
           aws ecr get-login-password --region "$AWS_REGION" \
