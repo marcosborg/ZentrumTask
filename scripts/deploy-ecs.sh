@@ -53,10 +53,58 @@ run_migrations() {
         --query 'tasks[0].taskArn' \
         --output text)"
 
+    if [[ -z "$task_arn" || "$task_arn" = "None" ]]; then
+        echo "Migration task could not be started." >&2
+        return 1
+    fi
+
     aws ecs wait tasks-stopped --cluster "$ECS_CLUSTER" --tasks "$task_arn"
-    local exit_code
-    exit_code="$(aws ecs describe-tasks --cluster "$ECS_CLUSTER" --tasks "$task_arn" --query 'tasks[0].containers[0].exitCode' --output text)"
-    [[ "$exit_code" = "0" ]]
+
+    local task_details exit_code stopped_reason container_reason
+    task_details="$(aws ecs describe-tasks --cluster "$ECS_CLUSTER" --tasks "$task_arn" --output json)"
+    exit_code="$(jq -r '.tasks[0].containers[] | select(.name == "app") | .exitCode // "unknown"' <<< "$task_details")"
+
+    if [[ "$exit_code" = "0" ]]; then
+        return 0
+    fi
+
+    stopped_reason="$(jq -r '.tasks[0].stoppedReason // "Unavailable"' <<< "$task_details")"
+    container_reason="$(jq -r '.tasks[0].containers[] | select(.name == "app") | .reason // "Unavailable"' <<< "$task_details")"
+
+    echo "Migration task failed." >&2
+    echo "Task: $task_arn" >&2
+    echo "Exit code: $exit_code" >&2
+    echo "Stopped reason: $stopped_reason" >&2
+    echo "Container reason: $container_reason" >&2
+
+    local log_group log_prefix log_stream task_id log_output
+    log_group="$(aws ecs describe-task-definition \
+        --task-definition "$task_definition" \
+        --query 'taskDefinition.containerDefinitions[?name==`app`].logConfiguration.options."awslogs-group" | [0]' \
+        --output text)"
+    log_prefix="$(aws ecs describe-task-definition \
+        --task-definition "$task_definition" \
+        --query 'taskDefinition.containerDefinitions[?name==`app`].logConfiguration.options."awslogs-stream-prefix" | [0]' \
+        --output text)"
+    task_id="${task_arn##*/}"
+    log_stream="${log_prefix}/app/${task_id}"
+
+    for _ in {1..6}; do
+        if log_output="$(aws logs get-log-events \
+            --log-group-name "$log_group" \
+            --log-stream-name "$log_stream" \
+            --limit 100 \
+            --query 'events[].message' \
+            --output text 2>&1)"; then
+            echo "Migration task logs ($log_stream):" >&2
+            echo "$log_output" >&2
+            break
+        fi
+
+        sleep 2
+    done
+
+    return 1
 }
 
 rollback() {
