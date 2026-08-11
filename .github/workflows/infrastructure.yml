@@ -70,6 +70,23 @@ jobs:
 
           echo "TF_VAR_certificate_arn=$certificate_arn" >> "$GITHUB_ENV"
 
+      - name: Adopt existing media CORS policy
+        working-directory: infra/terraform
+        shell: bash
+        run: |
+          if terraform state show aws_cloudfront_response_headers_policy.media_cors >/dev/null 2>&1; then
+            exit 0
+          fi
+
+          policy_id="$(aws cloudfront list-response-headers-policies \
+            --type custom \
+            --query "ResponseHeadersPolicyList.Items[?ResponseHeadersPolicy.ResponseHeadersPolicyConfig.Name=='zentrum-production-media-cors'].ResponseHeadersPolicy.Id | [0]" \
+            --output text)"
+
+          if [[ -n "$policy_id" && "$policy_id" != "None" ]]; then
+            terraform import aws_cloudfront_response_headers_policy.media_cors "$policy_id"
+          fi
+
       - name: Validate
         working-directory: infra/terraform
         run: terraform validate
@@ -104,3 +121,7 @@ jobs:
         if: inputs.action == 'apply'
         working-directory: infra/terraform
         run: terraform apply -auto-approve tfplan
+
+      - name: Wait for database availability
+        if: inputs.action == 'apply'
+        run: aws rds wait db-instance-available --db-instance-identifier zentrum-production

@@ -43,30 +43,37 @@ run_migrations() {
     local network
     network="$(aws ecs describe-services --cluster "$ECS_CLUSTER" --services "$ECS_WEB_SERVICE" --query 'services[0].networkConfiguration' --output json)"
 
-    local task_arn
-    task_arn="$(aws ecs run-task \
-        --cluster "$ECS_CLUSTER" \
-        --launch-type FARGATE \
-        --task-definition "$task_definition" \
-        --network-configuration "$network" \
-        --overrides '{"containerOverrides":[{"name":"app","command":["php","artisan","migrate","--force"]}]}' \
-        --query 'tasks[0].taskArn' \
-        --output text)"
+    local task_arn attempt
+    for attempt in {1..5}; do
+        task_arn="$(aws ecs run-task \
+            --cluster "$ECS_CLUSTER" \
+            --launch-type FARGATE \
+            --task-definition "$task_definition" \
+            --network-configuration "$network" \
+            --overrides '{"containerOverrides":[{"name":"app","command":["php","artisan","migrate","--force"]}]}' \
+            --query 'tasks[0].taskArn' \
+            --output text)"
 
-    if [[ -z "$task_arn" || "$task_arn" = "None" ]]; then
-        echo "Migration task could not be started." >&2
-        return 1
-    fi
+        if [[ -z "$task_arn" || "$task_arn" = "None" ]]; then
+            echo "Migration task could not be started." >&2
+            return 1
+        fi
 
-    aws ecs wait tasks-stopped --cluster "$ECS_CLUSTER" --tasks "$task_arn"
+        aws ecs wait tasks-stopped --cluster "$ECS_CLUSTER" --tasks "$task_arn"
 
-    local task_details exit_code stopped_reason container_reason
-    task_details="$(aws ecs describe-tasks --cluster "$ECS_CLUSTER" --tasks "$task_arn" --output json)"
-    exit_code="$(jq -r '.tasks[0].containers[] | select(.name == "app") | .exitCode // "unknown"' <<< "$task_details")"
+        local task_details exit_code stopped_reason container_reason
+        task_details="$(aws ecs describe-tasks --cluster "$ECS_CLUSTER" --tasks "$task_arn" --output json)"
+        exit_code="$(jq -r '.tasks[0].containers[] | select(.name == "app") | .exitCode // "unknown"' <<< "$task_details")"
 
-    if [[ "$exit_code" = "0" ]]; then
-        return 0
-    fi
+        if [[ "$exit_code" = "0" ]]; then
+            return 0
+        fi
+
+        if [[ "$attempt" -lt 5 ]]; then
+            echo "Migration attempt $attempt failed; retrying in 30 seconds." >&2
+            sleep 30
+        fi
+    done
 
     stopped_reason="$(jq -r '.tasks[0].stoppedReason // "Unavailable"' <<< "$task_details")"
     container_reason="$(jq -r '.tasks[0].containers[] | select(.name == "app") | .reason // "Unavailable"' <<< "$task_details")"
