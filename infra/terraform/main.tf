@@ -519,10 +519,10 @@ resource "aws_ecs_task_definition" "app" {
 }
 
 resource "aws_ecs_service" "app" {
-  for_each               = aws_ecs_task_definition.app
+  for_each               = { web = ["web"], worker = ["worker"], scheduler = ["scheduler"] }
   name                   = "${local.name}-${each.key}"
   cluster                = aws_ecs_cluster.main.id
-  task_definition        = each.value.arn
+  task_definition        = aws_ecs_task_definition.app[each.key].arn
   desired_count          = 1
   launch_type            = "FARGATE"
   platform_version       = "1.4.0"
