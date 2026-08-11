@@ -28,11 +28,8 @@ jobs:
     environment: production
     env:
       AWS_REGION: eu-west-3
-      ECS_CLUSTER: zentrum-production
-      ECS_WEB_SERVICE: zentrum-production-web
-      ECS_WORKER_SERVICE: zentrum-production-worker
-      ECS_SCHEDULER_SERVICE: zentrum-production-scheduler
       ECR_REPOSITORY: zentrum-production
+      LIGHTSAIL_HOST: 13.36.150.163
 
     steps:
       - name: Resolve release
@@ -77,5 +74,30 @@ jobs:
       - name: Deploy, migrate and verify
         env:
           IMAGE_URI: ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ steps.release.outputs.sha }}
-          HEALTHCHECK_URL: ${{ vars.PRODUCTION_HEALTHCHECK_URL }}
-        run: bash scripts/deploy-ecs.sh
+        run: |
+          trap 'rm -f lightsail.pem' EXIT
+
+          aws lightsail download-default-key-pair \
+            --region "$AWS_REGION" \
+            --query privateKeyBase64 \
+            --output text \
+            | base64 --decode > lightsail.pem
+          chmod 600 lightsail.pem
+
+          aws ecr get-login-password --region "$AWS_REGION" \
+            | ssh \
+              -o BatchMode=yes \
+              -o ConnectTimeout=20 \
+              -o StrictHostKeyChecking=accept-new \
+              -i lightsail.pem \
+              "ubuntu@${LIGHTSAIL_HOST}" \
+              "sudo docker login --username AWS --password-stdin '${{ steps.login-ecr.outputs.registry }}'"
+
+          ssh \
+            -o BatchMode=yes \
+            -o ConnectTimeout=20 \
+            -o StrictHostKeyChecking=accept-new \
+            -i lightsail.pem \
+            "ubuntu@${LIGHTSAIL_HOST}" \
+            "bash -s -- '$IMAGE_URI'" \
+            < scripts/deploy-lightsail.sh
