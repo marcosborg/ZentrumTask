@@ -11,7 +11,7 @@ on:
         default: plan
       certificate_arn:
         description: Validated ACM certificate ARN
-        required: true
+        required: false
       image_tag:
         description: Initial immutable image tag
         required: false
@@ -55,6 +55,20 @@ jobs:
           -backend-config="key=zentrum/production.tfstate"
           -backend-config="region=${AWS_REGION}"
           -backend-config="encrypt=true"
+
+      - name: Reuse current certificate
+        if: inputs.certificate_arn == ''
+        working-directory: infra/terraform
+        shell: bash
+        run: |
+          certificate_arn="$(terraform state show -no-color aws_lb_listener.https | sed -n 's/^ *certificate_arn *= *"\([^"]*\)"/\1/p')"
+
+          if [[ -z "$certificate_arn" ]]; then
+            echo "Could not determine the current ACM certificate ARN." >&2
+            exit 1
+          fi
+
+          echo "TF_VAR_certificate_arn=$certificate_arn" >> "$GITHUB_ENV"
 
       - name: Validate
         working-directory: infra/terraform
