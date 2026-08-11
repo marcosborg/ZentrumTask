@@ -378,17 +378,6 @@ class DriverSettlementsReport extends Page implements HasTable
                     ->alignRight()
                     ->state(fn (DriverSettlement $record): float => $this->adjustmentsForSettlement($record)['total'])
                     ->formatStateUsing(fn ($state): string => $this->formatEffectMoney(-1 * (float) $state, 'signed')),
-                TextColumn::make('weekly_km')
-                    ->label('Km semana')
-                    ->alignRight()
-                    ->state(fn (DriverSettlement $record): float => $this->weeklyMileageFor($record)['current'])
-                    ->formatStateUsing(fn ($state): string => number_format((float) $state, 1, ',', ' ').' km')
-                    ->tooltip(function (DriverSettlement $record): string {
-                        $mileage = $this->weeklyMileageFor($record);
-
-                        return 'Odómetro semana anterior: '.$this->formatOdometer($mileage['previous_odometer'])."\n"
-                            .'Odómetro esta semana: '.$this->formatOdometer($mileage['current_odometer']);
-                    }),
                 TextColumn::make('extra_km_expenses')
                     ->label('Km extra')
                     ->alignRight()
@@ -1057,6 +1046,7 @@ class DriverSettlementsReport extends Page implements HasTable
                 'prio_total' => $this->formatMoney($prioExpenses['total'] ?? 0),
                 'via_verde_total' => $this->formatMoney($viaVerdeExpenses['total'] ?? 0),
                 'adjustments_total' => $this->formatMoney($adjustments['total'] ?? 0),
+                'extra_km_total' => $this->formatMoney($this->effectiveExtraKmTotal($record)),
                 'total' => $this->formatMoney($expensesTotal),
                 'prio_rows' => collect($prioExpenses['rows'] ?? [])->map(fn (array $row): array => [
                     'occurred_at' => $row['occurred_at'] instanceof Carbon ? $row['occurred_at']->format('d/m/Y H:i') : '-',

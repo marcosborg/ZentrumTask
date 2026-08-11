@@ -164,7 +164,7 @@ it('derives the weekly workflow checklist from email receipt and payment state',
     ]);
 });
 
-it('shows current weekly mileage with odometer readings in the tooltip', function () {
+it('hides weekly mileage while keeping the extra km monetary value', function () {
     $settlement = createReportSettlement();
     $vehicle = Vehicle::factory()->create();
 
@@ -182,10 +182,23 @@ it('shows current weekly mileage with odometer readings in the tooltip', functio
     ]);
 
     Livewire::test(DriverSettlementsReport::class)
-        ->assertSee('Km semana')
-        ->assertSee('2 350,0 km')
-        ->assertSee('101 250,4 km')
-        ->assertSee('103 600,4 km');
+        ->assertDontSee('Km semana')
+        ->assertDontSee('2 350,0 km')
+        ->assertSee('Km extra');
+});
+
+it('shows only the extra km monetary value in the client settlement email', function () {
+    $html = view('emails.driver-settlement-summary', [
+        'payload' => [
+            'expenses' => [
+                'extra_km_total' => '64,40 €',
+            ],
+        ],
+    ])->render();
+
+    expect($html)
+        ->toContain('<strong>Km extra</strong><br>64,40 €')
+        ->not->toContain('Km semana');
 });
 
 it('allows the extra km charge to be overridden directly on a settlement', function () {

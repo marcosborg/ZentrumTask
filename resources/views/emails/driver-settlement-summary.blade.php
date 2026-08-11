@@ -34,7 +34,7 @@
                         <td style="padding:8px; border:1px solid #e5e7eb; text-align:right;">{{ $payload['calculation']['tips_total'] ?? '-' }}</td>
                     </tr>
                     <tr style="background:#f9fafb;">
-                        <td style="padding:8px; border:1px solid #e5e7eb;">- Despesas (PRIO + Via Verde + Ajustes)</td>
+                        <td style="padding:8px; border:1px solid #e5e7eb;">- Despesas (PRIO + Via Verde + Ajustes + Km extra)</td>
                         <td style="padding:8px; border:1px solid #e5e7eb; text-align:right;">{{ $payload['calculation']['expenses_total'] ?? '-' }}</td>
                     </tr>
                     <tr>
@@ -98,6 +98,7 @@
                         <td style="padding:8px; border:1px solid #e5e7eb;"><strong>PRIO</strong><br>{{ $payload['expenses']['prio_total'] ?? '-' }}</td>
                         <td style="padding:8px; border:1px solid #e5e7eb;"><strong>Via Verde</strong><br>{{ $payload['expenses']['via_verde_total'] ?? '-' }}</td>
                         <td style="padding:8px; border:1px solid #e5e7eb;"><strong>Ajustes</strong><br>{{ $payload['expenses']['adjustments_total'] ?? '-' }}</td>
+                        <td style="padding:8px; border:1px solid #e5e7eb;"><strong>Km extra</strong><br>{{ $payload['expenses']['extra_km_total'] ?? '-' }}</td>
                         <td style="padding:8px; border:1px solid #e5e7eb;"><strong>Total</strong><br>{{ $payload['expenses']['total'] ?? '-' }}</td>
                     </tr>
                 </table>
