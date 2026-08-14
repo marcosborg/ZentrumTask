@@ -2,7 +2,7 @@
 
 namespace App\Filament\Pages;
 
-use App\Support\DatabaseReplicationService;
+use App\Jobs\ReplicateDatabase;
 use BackedEnum;
 use Filament\Actions\Action;
 use Filament\Notifications\Notification;
@@ -69,19 +69,13 @@ class DownloadDatabaseBackup extends Page
 
     protected function replicateDatabase(string $sourceMode, string $targetMode): void
     {
-        $result = app(DatabaseReplicationService::class)->replicate($sourceMode, $targetMode);
+        ReplicateDatabase::dispatch($sourceMode, $targetMode);
 
-        $notification = Notification::make()
-            ->title($result->title)
-            ->body($result->message);
-
-        if ($result->successful) {
-            $notification->success();
-        } else {
-            $notification->danger();
-        }
-
-        $notification->send();
+        Notification::make()
+            ->success()
+            ->title('Copia iniciada')
+            ->body('A copia esta a correr em segundo plano. O resultado final fica registado em storage/logs/laravel.log.')
+            ->send();
     }
 
     protected function runOptimizeClear(): void
@@ -214,5 +208,4 @@ class DownloadDatabaseBackup extends Page
             DB::reconnect($connection);
         }
     }
-
 }

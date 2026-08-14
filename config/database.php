@@ -221,6 +221,19 @@ return [
         'binary' => env('DB_RESTORE_BINARY', null),
     ],
 
+    'replication' => [
+        'production_dump' => [
+            'strategy' => env('DB_REPLICATION_PRODUCTION_DUMP_STRATEGY', 'local'),
+            'aws_binary' => env('DB_REPLICATION_AWS_BINARY', 'aws'),
+            'aws_region' => env('DB_REPLICATION_AWS_REGION', env('AWS_DEFAULT_REGION', 'eu-west-3')),
+            'lightsail_instance' => env('DB_REPLICATION_LIGHTSAIL_INSTANCE'),
+            'host' => env('DB_REPLICATION_SSH_HOST'),
+            'ssh_binary' => env('DB_REPLICATION_SSH_BINARY', 'ssh'),
+            'ssh_user' => env('DB_REPLICATION_SSH_USER', 'ubuntu'),
+            'container' => env('DB_REPLICATION_DOCKER_CONTAINER'),
+        ],
+    ],
+
     'mode' => $databaseMode,
 
     'profiles' => $databaseProfiles,

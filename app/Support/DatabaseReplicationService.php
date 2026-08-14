@@ -26,7 +26,9 @@ class DatabaseReplicationService
         }
 
         try {
-            $dumpBinary = $this->resolveDumpBinary($sourceProfile['driver']);
+            $dumpBinary = $this->usesLightsailDump($sourceMode)
+                ? null
+                : $this->resolveDumpBinary($sourceProfile['driver']);
             $importBinary = $this->resolveImportBinary($targetProfile['driver']);
         } catch (RuntimeException $exception) {
             return DatabaseReplicationResult::failure(
@@ -44,25 +46,18 @@ class DatabaseReplicationService
             );
         }
 
-        $dumpProcess = $this->buildDumpProcess($sourceProfile, $dumpBinary, $targetDatabaseExists);
-        $dumpProcess->run();
+        $dumpResult = $this->dumpDatabase(
+            $sourceMode,
+            $sourceProfile,
+            $dumpBinary,
+            $targetDatabaseExists
+        );
 
-        if (! $dumpProcess->isSuccessful()) {
-            Log::error('Database dump failed', [
-                'source' => $sourceMode,
-                'command' => $dumpProcess->getCommandLine(),
-                'exit_code' => $dumpProcess->getExitCode(),
-                'error_output' => $dumpProcess->getErrorOutput(),
-                'output' => $dumpProcess->getOutput(),
-            ]);
-
-            return DatabaseReplicationResult::failure(
-                trim($dumpProcess->getErrorOutput() ?: $dumpProcess->getOutput()),
-                'Erro a exportar base de dados'
-            );
+        if (! $dumpResult['successful']) {
+            return DatabaseReplicationResult::failure($dumpResult['message'], 'Erro a exportar base de dados');
         }
 
-        $dumpContents = $dumpProcess->getOutput();
+        $dumpContents = $this->sanitizeDumpContents($dumpResult['contents']);
 
         if ($dumpContents === '') {
             return DatabaseReplicationResult::failure(
@@ -131,7 +126,6 @@ class DatabaseReplicationService
             '--host='.$configuration['host'],
             '--port='.(string) $configuration['port'],
             '--user='.$configuration['username'],
-            '--password='.(string) ($configuration['password'] ?? ''),
             '--no-tablespaces',
             '--single-transaction',
             '--routines',
@@ -171,7 +165,6 @@ class DatabaseReplicationService
             '--host='.$configuration['host'],
             '--port='.(string) $configuration['port'],
             '--user='.$configuration['username'],
-            '--password='.(string) ($configuration['password'] ?? ''),
             '--database='.$configuration['database'],
         ];
 
@@ -200,7 +193,6 @@ class DatabaseReplicationService
             '--host='.$configuration['host'],
             '--port='.(string) $configuration['port'],
             '--user='.$configuration['username'],
-            '--password='.(string) ($configuration['password'] ?? ''),
             '--execute=CREATE DATABASE IF NOT EXISTS `'.$configuration['database'].'` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci',
         ];
 
@@ -245,7 +237,6 @@ class DatabaseReplicationService
             '--host='.$configuration['host'],
             '--port='.(string) $configuration['port'],
             '--user='.$configuration['username'],
-            '--password='.(string) ($configuration['password'] ?? ''),
             '--batch',
             '--skip-column-names',
             '--execute=SELECT SCHEMA_NAME FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME = \''.$this->escapeSqlString($configuration['database']).'\'',
@@ -286,6 +277,351 @@ class DatabaseReplicationService
         $profiles = Config::get('database.profiles', []);
 
         return $profiles[$mode] ?? null;
+    }
+
+    /**
+     * @param  array{
+     *     driver: string,
+     *     host: string,
+     *     port: string|int,
+     *     database: string,
+     *     username: string,
+     *     password: string|null
+     * }  $configuration
+     * @return array{successful: bool, contents: string, message: string}
+     */
+    protected function dumpDatabase(
+        string $sourceMode,
+        array $configuration,
+        ?string $binary,
+        bool $ignoreTransientTables
+    ): array {
+        if ($this->usesLightsailDump($sourceMode)) {
+            return $this->dumpFromLightsail($configuration['database'], $ignoreTransientTables);
+        }
+
+        if ($binary === null) {
+            return [
+                'successful' => false,
+                'contents' => '',
+                'message' => 'Nao encontrei o binario de exportacao.',
+            ];
+        }
+
+        $process = $this->buildDumpProcess($configuration, $binary, $ignoreTransientTables);
+        $process->run();
+
+        return $this->dumpProcessResult($process, $sourceMode);
+    }
+
+    /**
+     * @return array{successful: bool, contents: string, message: string}
+     */
+    protected function dumpFromLightsail(string $database, bool $ignoreTransientTables): array
+    {
+        $configuration = Config::get('database.replication.production_dump', []);
+        $region = (string) ($configuration['aws_region'] ?? '');
+        $instance = (string) ($configuration['lightsail_instance'] ?? '');
+        $container = (string) ($configuration['container'] ?? '');
+
+        if ($region === '' || $instance === '' || $container === '') {
+            return [
+                'successful' => false,
+                'contents' => '',
+                'message' => 'Configure a regiao AWS, a instancia Lightsail e o contentor da producao no .env.',
+            ];
+        }
+
+        $keyPath = null;
+
+        try {
+            $host = $this->resolveLightsailHost($configuration, $region, $instance);
+            $keyPath = $this->downloadLightsailKey($configuration, $region);
+            $process = $this->buildLightsailDumpProcess(
+                $configuration,
+                $host,
+                $keyPath,
+                $container,
+                $database,
+                $ignoreTransientTables
+            );
+            $process->run();
+
+            $result = $this->dumpProcessResult($process, 'production');
+
+            if (! $result['successful']) {
+                return $result;
+            }
+
+            $contents = gzdecode($result['contents']);
+
+            if ($contents === false) {
+                return [
+                    'successful' => false,
+                    'contents' => '',
+                    'message' => 'A exportacao recebida da producao nao e um arquivo gzip valido.',
+                ];
+            }
+
+            return [
+                'successful' => true,
+                'contents' => $contents,
+                'message' => '',
+            ];
+        } catch (Throwable $exception) {
+            Log::error('Lightsail database dump crashed', [
+                'exception' => $exception->getMessage(),
+            ]);
+
+            return [
+                'successful' => false,
+                'contents' => '',
+                'message' => $exception->getMessage(),
+            ];
+        } finally {
+            if ($keyPath !== null && is_file($keyPath)) {
+                $this->deletePrivateKey($keyPath);
+            }
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $configuration
+     */
+    protected function resolveLightsailHost(array $configuration, string $region, string $instance): string
+    {
+        $configuredHost = (string) ($configuration['host'] ?? '');
+
+        if ($configuredHost !== '') {
+            return $configuredHost;
+        }
+
+        $process = new Process([
+            (string) ($configuration['aws_binary'] ?? 'aws'),
+            'lightsail',
+            'get-instance',
+            '--instance-name',
+            $instance,
+            '--region',
+            $region,
+            '--query',
+            'instance.publicIpAddress',
+            '--output',
+            'text',
+        ], base_path());
+        $process->setEnv($this->processEnvironment(null));
+        $process->setTimeout(60);
+        $process->mustRun();
+
+        $host = trim($process->getOutput());
+
+        if (filter_var($host, FILTER_VALIDATE_IP) === false) {
+            throw new RuntimeException('A AWS nao devolveu um endereco valido para a instancia Lightsail.');
+        }
+
+        return $host;
+    }
+
+    /**
+     * @param  array<string, mixed>  $configuration
+     */
+    protected function downloadLightsailKey(array $configuration, string $region): string
+    {
+        $process = new Process([
+            (string) ($configuration['aws_binary'] ?? 'aws'),
+            'lightsail',
+            'download-default-key-pair',
+            '--region',
+            $region,
+            '--query',
+            'privateKeyBase64',
+            '--output',
+            'text',
+        ], base_path());
+        $process->setEnv($this->processEnvironment(null));
+        $process->setTimeout(60);
+        $process->mustRun();
+
+        $privateKey = trim($process->getOutput());
+
+        if (! str_contains($privateKey, 'BEGIN RSA PRIVATE KEY')) {
+            $decoded = base64_decode($privateKey, true);
+
+            if ($decoded !== false) {
+                $privateKey = $decoded;
+            }
+        }
+
+        if (! str_contains($privateKey, 'BEGIN RSA PRIVATE KEY')) {
+            throw new RuntimeException('A AWS nao devolveu uma chave privada Lightsail valida.');
+        }
+
+        $keyPath = tempnam(sys_get_temp_dir(), 'zentrum-lightsail-');
+
+        if ($keyPath === false || file_put_contents($keyPath, $privateKey.PHP_EOL) === false) {
+            throw new RuntimeException('Nao consegui preparar a chave temporaria de acesso a producao.');
+        }
+
+        $this->securePrivateKey($keyPath);
+
+        return $keyPath;
+    }
+
+    protected function securePrivateKey(string $keyPath): void
+    {
+        if (DIRECTORY_SEPARATOR !== '\\') {
+            chmod($keyPath, 0600);
+
+            return;
+        }
+
+        $username = $_SERVER['USERNAME'] ?? getenv('USERNAME') ?: '';
+
+        if ($username === '') {
+            throw new RuntimeException('Nao consegui identificar o utilizador Windows para proteger a chave SSH.');
+        }
+
+        $process = new Process([
+            'icacls',
+            $keyPath,
+            '/inheritance:r',
+            '/grant:r',
+            $username.':(R)',
+        ]);
+        $process->setTimeout(30);
+        $process->mustRun();
+    }
+
+    protected function deletePrivateKey(string $keyPath): void
+    {
+        if (DIRECTORY_SEPARATOR === '\\') {
+            $username = $_SERVER['USERNAME'] ?? getenv('USERNAME') ?: '';
+
+            if ($username !== '') {
+                $process = new Process([
+                    'icacls',
+                    $keyPath,
+                    '/grant:r',
+                    $username.':(F)',
+                ]);
+                $process->setTimeout(30);
+                $process->run();
+            }
+        }
+
+        if (! unlink($keyPath)) {
+            Log::warning('Temporary Lightsail key could not be deleted', [
+                'path' => $keyPath,
+            ]);
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $configuration
+     */
+    protected function buildLightsailDumpProcess(
+        array $configuration,
+        string $host,
+        string $keyPath,
+        string $container,
+        string $database,
+        bool $ignoreTransientTables
+    ): Process {
+        foreach ([$container, $database] as $identifier) {
+            if (preg_match('/^[A-Za-z0-9_.-]+$/', $identifier) !== 1) {
+                throw new RuntimeException('A configuracao remota contem um identificador invalido.');
+            }
+        }
+
+        $dumpArguments = [
+            'mysqldump',
+            '--host="$DB_HOST_PRODUCTION"',
+            '--port="$DB_PORT_PRODUCTION"',
+            '--user="$DB_USERNAME_PRODUCTION"',
+            '--no-tablespaces',
+            '--single-transaction',
+            '--routines',
+            '--events',
+            '--add-drop-table',
+            $database,
+        ];
+
+        if ($ignoreTransientTables) {
+            foreach ($this->ignoredReplicationTables($database) as $table) {
+                $dumpArguments[] = '--ignore-table='.$table;
+            }
+        }
+
+        $script = 'MYSQL_PWD="$DB_PASSWORD_PRODUCTION" '.implode(' ', $dumpArguments).' | gzip -c';
+        $remoteCommand = 'sudo docker exec '.$container.' sh -lc '.$this->quotePosix($script);
+        $sshUser = (string) ($configuration['ssh_user'] ?? 'ubuntu');
+
+        if (preg_match('/^[A-Za-z0-9_.-]+$/', $sshUser) !== 1) {
+            throw new RuntimeException('O utilizador SSH configurado e invalido.');
+        }
+
+        $process = new Process([
+            (string) ($configuration['ssh_binary'] ?? 'ssh'),
+            '-n',
+            '-i',
+            $keyPath,
+            '-o',
+            'BatchMode=yes',
+            '-o',
+            'ConnectTimeout=20',
+            '-o',
+            'StrictHostKeyChecking=accept-new',
+            $sshUser.'@'.$host,
+            $remoteCommand,
+        ], base_path());
+        $process->setEnv($this->processEnvironment(null));
+        $process->setTimeout(300);
+
+        return $process;
+    }
+
+    /**
+     * @return array{successful: bool, contents: string, message: string}
+     */
+    protected function dumpProcessResult(Process $process, string $sourceMode): array
+    {
+        if ($process->isSuccessful()) {
+            return [
+                'successful' => true,
+                'contents' => $process->getOutput(),
+                'message' => '',
+            ];
+        }
+
+        Log::error('Database dump failed', [
+            'source' => $sourceMode,
+            'command' => $process->getCommandLine(),
+            'exit_code' => $process->getExitCode(),
+            'error_output' => $process->getErrorOutput(),
+            'output_bytes' => strlen($process->getOutput()),
+        ]);
+
+        return [
+            'successful' => false,
+            'contents' => '',
+            'message' => trim($process->getErrorOutput() ?: $process->getOutput()),
+        ];
+    }
+
+    protected function usesLightsailDump(string $sourceMode): bool
+    {
+        return $sourceMode === 'production'
+            && Config::get('database.replication.production_dump.strategy') === 'lightsail';
+    }
+
+    protected function sanitizeDumpContents(string $contents): string
+    {
+        return (string) preg_replace('/^\/\*M!999999\\\\- enable the sandbox mode \*\/\R?/', '', $contents, 1);
+    }
+
+    protected function quotePosix(string $value): string
+    {
+        return "'".str_replace("'", "'\"'\"'", $value)."'";
     }
 
     protected function resolveDumpBinary(string $driver): string
@@ -349,6 +685,11 @@ class DatabaseReplicationService
             'PATH' => $path,
             'TEMP' => $temp,
             'TMP' => $temp,
+            'USERPROFILE' => $_SERVER['USERPROFILE'] ?? getenv('USERPROFILE') ?: '',
+            'APPDATA' => $_SERVER['APPDATA'] ?? getenv('APPDATA') ?: '',
+            'LOCALAPPDATA' => $_SERVER['LOCALAPPDATA'] ?? getenv('LOCALAPPDATA') ?: '',
+            'AWS_PROFILE' => $_SERVER['AWS_PROFILE'] ?? getenv('AWS_PROFILE') ?: '',
+            'AWS_DEFAULT_PROFILE' => $_SERVER['AWS_DEFAULT_PROFILE'] ?? getenv('AWS_DEFAULT_PROFILE') ?: '',
         ];
 
         $filtered = array_filter($env, static fn (string $value): bool => $value !== '');
