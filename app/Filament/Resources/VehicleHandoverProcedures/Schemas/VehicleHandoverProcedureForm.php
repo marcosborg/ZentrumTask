@@ -23,6 +23,7 @@ use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
 use Illuminate\Support\Facades\Log;
 use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
+use RuntimeException;
 use Symfony\Component\Mime\MimeTypes;
 use Throwable;
 
@@ -293,11 +294,14 @@ class VehicleHandoverProcedureForm
                 return $path;
             }
 
-            return $file->storeAs(
-                $component->getDirectory(),
-                $component->getUploadedFileNameForStorage($file),
-                $component->getDiskName(),
-            );
+            $path = trim($component->getDirectory().'/'.$component->getUploadedFileNameForStorage($file), '/');
+            $stream = $file->readStream();
+
+            if (! is_resource($stream) || ! $component->getDisk()->put($path, $stream)) {
+                throw new RuntimeException('The handover upload could not be written to storage.');
+            }
+
+            return $path;
         } catch (Throwable $exception) {
             Log::warning('vehicle_handover_upload_failed', [
                 'field' => $component->getStatePath(),
