@@ -272,39 +272,40 @@ class VehicleHandoverProcedureForm
                     'url' => $component->getDisk()->url($file),
                 ];
             })
-            ->saveUploadedFileUsing(static function (BaseFileUpload $component, TemporaryUploadedFile $file): ?string {
-                try {
-                    if (! $file->exists()) {
-                        return null;
-                    }
+            ->saveUploadedFileUsing(self::storeHandoverUpload(...));
+    }
 
-                    if (
-                        $component->shouldMoveFiles()
-                        && ($component->getDiskName() === (fn (): string => $this->disk)->call($file))
-                    ) {
-                        $path = trim($component->getDirectory().'/'.$component->getUploadedFileNameForStorage($file), '/');
+    protected static function storeHandoverUpload(BaseFileUpload $component, TemporaryUploadedFile $file): ?string
+    {
+        try {
+            if (! $file->exists()) {
+                return null;
+            }
 
-                        $component->getDisk()->move((fn (): string => $this->path)->call($file), $path);
+            if (
+                $component->shouldMoveFiles()
+                && ($component->getDiskName() === (fn (): string => $this->disk)->call($file))
+            ) {
+                $path = trim($component->getDirectory().'/'.$component->getUploadedFileNameForStorage($file), '/');
 
-                        return $path;
-                    }
+                $component->getDisk()->move((fn (): string => $this->path)->call($file), $path);
 
-                    $storeMethod = $component->getVisibility() === 'public' ? 'storePubliclyAs' : 'storeAs';
+                return $path;
+            }
 
-                    return $file->{$storeMethod}(
-                        $component->getDirectory(),
-                        $component->getUploadedFileNameForStorage($file),
-                        $component->getDiskName(),
-                    );
-                } catch (Throwable $exception) {
-                    Log::warning('vehicle_handover_upload_failed', [
-                        'field' => $component->getStatePath(),
-                        'file' => $file->getClientOriginalName(),
-                        'error' => $exception->getMessage(),
-                    ]);
+            return $file->storeAs(
+                $component->getDirectory(),
+                $component->getUploadedFileNameForStorage($file),
+                $component->getDiskName(),
+            );
+        } catch (Throwable $exception) {
+            Log::warning('vehicle_handover_upload_failed', [
+                'field' => $component->getStatePath(),
+                'file' => $file->getClientOriginalName(),
+                'error' => $exception->getMessage(),
+            ]);
 
-                    return null;
-                }
-            });
+            return null;
+        }
     }
 }
