@@ -2,7 +2,10 @@
 set -Eeuo pipefail
 
 IMAGE_URI="${1:?Image URI is required}"
-CONTAINERS=(zentrum-web zentrum-worker zentrum-scheduler)
+WEB_CONTAINER="zentrum-tvde-web"
+WORKER_CONTAINER="zentrum-tvde-worker"
+SCHEDULER_CONTAINER="zentrum-tvde-scheduler"
+CONTAINERS=("$WEB_CONTAINER" "$WORKER_CONTAINER" "$SCHEDULER_CONTAINER")
 
 declare -A previous_images
 temporary_directory="$(mktemp -d)"
@@ -19,7 +22,7 @@ start_container() {
     local environment_file="$temporary_directory/${name}.env"
     local arguments=(--detach --name "$name" --restart always --add-host host.docker.internal:host-gateway --env-file "$environment_file")
 
-    if [[ "$name" == "zentrum-web" ]]; then
+    if [[ "$name" == "$WEB_CONTAINER" ]]; then
         arguments+=(--publish 127.0.0.1:8080:80)
     fi
 
@@ -40,9 +43,9 @@ rollback() {
         sudo docker rm --force "$name" >/dev/null 2>&1 || true
     done
 
-    start_container zentrum-web "${previous_images[zentrum-web]}" web
-    start_container zentrum-worker "${previous_images[zentrum-worker]}" worker
-    start_container zentrum-scheduler "${previous_images[zentrum-scheduler]}" scheduler
+    start_container "$WEB_CONTAINER" "${previous_images[$WEB_CONTAINER]}" web
+    start_container "$WORKER_CONTAINER" "${previous_images[$WORKER_CONTAINER]}" worker
+    start_container "$SCHEDULER_CONTAINER" "${previous_images[$SCHEDULER_CONTAINER]}" scheduler
 }
 
 trap rollback ERR
@@ -54,20 +57,24 @@ for name in "${CONTAINERS[@]}"; do
     chmod 600 "$temporary_directory/${name}.env"
 done
 
+for legacy_name in zentrum-web zentrum-worker zentrum-scheduler; do
+    sudo docker rm --force "$legacy_name" >/dev/null 2>&1 || true
+done
+
 sudo docker pull "$IMAGE_URI"
 
 echo "Running database migrations."
 sudo docker run --rm \
     --add-host host.docker.internal:host-gateway \
-    --env-file "$temporary_directory/zentrum-web.env" \
+    --env-file "$temporary_directory/${WEB_CONTAINER}.env" \
     "$IMAGE_URI" php artisan migrate --force
 
 echo "Checking the new image before switching production traffic."
-sudo docker rm --force zentrum-web-candidate >/dev/null 2>&1 || true
+sudo docker rm --force "${WEB_CONTAINER}-candidate" >/dev/null 2>&1 || true
 sudo docker run --detach \
-    --name zentrum-web-candidate \
+    --name "${WEB_CONTAINER}-candidate" \
     --add-host host.docker.internal:host-gateway \
-    --env-file "$temporary_directory/zentrum-web.env" \
+    --env-file "$temporary_directory/${WEB_CONTAINER}.env" \
     --publish 127.0.0.1:8081:80 \
     "$IMAGE_URI" web >/dev/null
 
@@ -80,19 +87,20 @@ for _ in {1..30}; do
 done
 
 curl --fail --silent --show-error http://127.0.0.1:8081/up >/dev/null
-sudo docker rm --force zentrum-web-candidate >/dev/null
+sudo docker rm --force "${WEB_CONTAINER}-candidate" >/dev/null
 
 deployment_started=true
 for name in "${CONTAINERS[@]}"; do
     sudo docker rm --force "$name" >/dev/null
 done
 
-start_container zentrum-web "$IMAGE_URI" web
-start_container zentrum-worker "$IMAGE_URI" worker
-start_container zentrum-scheduler "$IMAGE_URI" scheduler
+start_container "$WEB_CONTAINER" "$IMAGE_URI" web
+start_container "$WORKER_CONTAINER" "$IMAGE_URI" worker
+start_container "$SCHEDULER_CONTAINER" "$IMAGE_URI" scheduler
 
 for _ in {1..30}; do
-    if curl --fail --silent --show-error http://127.0.0.1:8080/up >/dev/null; then
+    if [[ "$(sudo docker inspect "$WEB_CONTAINER" --format '{{.State.Running}}')" == "true" ]] \
+        && curl --fail --silent --show-error http://127.0.0.1:8080/up >/dev/null; then
         deployment_started=false
         echo "Lightsail production deployment completed: $IMAGE_URI"
         exit 0
