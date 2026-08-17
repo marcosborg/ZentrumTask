@@ -6,6 +6,8 @@ WEB_CONTAINER="zentrum-tvde-web"
 WORKER_CONTAINER="zentrum-tvde-worker"
 SCHEDULER_CONTAINER="zentrum-tvde-scheduler"
 CONTAINERS=("$WEB_CONTAINER" "$WORKER_CONTAINER" "$SCHEDULER_CONTAINER")
+DOCKER_NETWORK="zentrum-tvde-net"
+DOCKER_HOST_GATEWAY="172.30.50.1"
 
 declare -A previous_images
 temporary_directory="$(mktemp -d)"
@@ -20,7 +22,7 @@ start_container() {
     local image="$2"
     local command="$3"
     local environment_file="$temporary_directory/${name}.env"
-    local arguments=(--detach --name "$name" --restart always --add-host host.docker.internal:host-gateway --env-file "$environment_file")
+    local arguments=(--detach --name "$name" --restart always --network "$DOCKER_NETWORK" --add-host "host.docker.internal:${DOCKER_HOST_GATEWAY}" --env-file "$environment_file")
 
     if [[ "$name" == "$WEB_CONTAINER" ]]; then
         arguments+=(--publish 127.0.0.1:8080:80)
@@ -65,7 +67,8 @@ sudo docker pull "$IMAGE_URI"
 
 echo "Running database migrations."
 sudo docker run --rm \
-    --add-host host.docker.internal:host-gateway \
+    --network "$DOCKER_NETWORK" \
+    --add-host "host.docker.internal:${DOCKER_HOST_GATEWAY}" \
     --env-file "$temporary_directory/${WEB_CONTAINER}.env" \
     "$IMAGE_URI" php artisan migrate --force
 
@@ -73,7 +76,8 @@ echo "Checking the new image before switching production traffic."
 sudo docker rm --force "${WEB_CONTAINER}-candidate" >/dev/null 2>&1 || true
 sudo docker run --detach \
     --name "${WEB_CONTAINER}-candidate" \
-    --add-host host.docker.internal:host-gateway \
+    --network "$DOCKER_NETWORK" \
+    --add-host "host.docker.internal:${DOCKER_HOST_GATEWAY}" \
     --env-file "$temporary_directory/${WEB_CONTAINER}.env" \
     --publish 127.0.0.1:8081:80 \
     "$IMAGE_URI" web >/dev/null
