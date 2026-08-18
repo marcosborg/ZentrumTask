@@ -52,7 +52,7 @@ class VehicleResource extends Resource
     public static function getEloquentQuery(): Builder
     {
         $today = Carbon::today();
-        $expiring30 = $today->copy()->addDays(30);
+        $expiring60 = $today->copy()->addDays(60);
 
         return parent::getEloquentQuery()
             ->with(['currentAllocation.driver'])
@@ -60,9 +60,9 @@ class VehicleResource extends Resource
                 'documents as expired_documents_count' => fn (Builder $query): Builder => $query
                     ->whereNotNull('expires_at')
                     ->where('expires_at', '<', $today),
-                'documents as expiring_30_documents_count' => fn (Builder $query): Builder => $query
+                'documents as expiring_60_documents_count' => fn (Builder $query): Builder => $query
                     ->whereNotNull('expires_at')
-                    ->whereBetween('expires_at', [$today, $expiring30]),
+                    ->whereBetween('expires_at', [$today, $expiring60]),
             ]);
     }
 

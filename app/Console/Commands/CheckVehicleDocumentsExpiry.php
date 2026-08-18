@@ -111,8 +111,8 @@ class CheckVehicleDocumentsExpiry extends Command
             return 'expiring_7';
         }
 
-        if ($expiresAt->lte($today->copy()->addDays(30))) {
-            return 'expiring_30';
+        if ($expiresAt->lte($today->copy()->addDays(60))) {
+            return 'expiring_60';
         }
 
         return null;
@@ -123,7 +123,7 @@ class CheckVehicleDocumentsExpiry extends Command
         return match ($level) {
             'expired' => 'Documento expirado: '.$title,
             'expiring_7' => 'Documento a expirar em 7 dias: '.$title,
-            'expiring_30' => 'Documento a expirar em 30 dias: '.$title,
+            'expiring_60' => 'Documento a expirar em 60 dias: '.$title,
             default => 'Documento com alerta: '.$title,
         };
     }

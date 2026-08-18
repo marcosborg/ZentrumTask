@@ -66,8 +66,8 @@ class VehicleDocument extends Model implements HasMedia
                 return 'expiring_7';
             }
 
-            if ($expiresAt->lte($today->copy()->addDays(30))) {
-                return 'expiring_30';
+            if ($expiresAt->lte($today->copy()->addDays(60))) {
+                return 'expiring_60';
             }
 
             return 'valid';

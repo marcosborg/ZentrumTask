@@ -33,12 +33,12 @@ class VehicleDocumentAlertsTable
                     ->badge()
                     ->colors([
                         'danger' => 'expired',
-                        'warning' => ['expiring_7', 'expiring_30'],
+                        'warning' => ['expiring_7', 'expiring_60'],
                     ])
                     ->formatStateUsing(fn (string $state): string => match ($state) {
                         'expired' => 'Expirado',
                         'expiring_7' => 'Expira em 7 dias',
-                        'expiring_30' => 'Expira em 30 dias',
+                        'expiring_60' => 'Expira em 60 dias',
                         default => $state,
                     }),
                 TextColumn::make('triggered_on')
@@ -62,7 +62,7 @@ class VehicleDocumentAlertsTable
                     ->options([
                         'expired' => 'Expirado',
                         'expiring_7' => 'Expira em 7 dias',
-                        'expiring_30' => 'Expira em 30 dias',
+                        'expiring_60' => 'Expira em 60 dias',
                     ]),
                 SelectFilter::make('is_resolved')
                     ->label('Resolvido')

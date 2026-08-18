@@ -100,7 +100,7 @@ class VehiclesTable
                     ->label('Docs expirados')
                     ->badge()
                     ->color(fn (int $state): string => $state > 0 ? 'danger' : 'gray'),
-                TextColumn::make('expiring_30_documents_count')
+                TextColumn::make('expiring_60_documents_count')
                     ->label('Docs a expirar')
                     ->badge()
                     ->color(fn (int $state): string => $state > 0 ? 'warning' : 'gray'),
@@ -124,11 +124,11 @@ class VehiclesTable
                                 ->where('expires_at', '<', Carbon::today());
                         });
                     }),
-                Filter::make('expiring_30_documents')
-                    ->label('Com docs a expirar (30d)')
+                Filter::make('expiring_60_documents')
+                    ->label('Com docs a expirar (60d)')
                     ->query(function (Builder $query): Builder {
                         $today = Carbon::today();
-                        $limit = $today->copy()->addDays(30);
+                        $limit = $today->copy()->addDays(60);
 
                         return $query->whereHas('documents', function (Builder $query) use ($today, $limit): void {
                             $query->whereNotNull('expires_at')

@@ -19,7 +19,7 @@ class VehicleDocumentAlertFactory extends Factory
     {
         return [
             'vehicle_document_id' => VehicleDocument::factory(),
-            'level' => $this->faker->randomElement(['expiring_30', 'expiring_7', 'expired']),
+            'level' => $this->faker->randomElement(['expiring_60', 'expiring_7', 'expired']),
             'triggered_on' => $this->faker->date(),
             'message' => $this->faker->sentence(),
             'is_resolved' => $this->faker->boolean(20),

@@ -17,7 +17,7 @@ class VehicleDetailsOverviewTable extends TableWidget
             ->query(function (): Builder {
                 $today = Carbon::today();
                 $expiring7 = $today->copy()->addDays(7);
-                $expiring30 = $today->copy()->addDays(30);
+                $expiring60 = $today->copy()->addDays(60);
 
                 return Vehicle::query()
                     ->with(['currentAllocation.driver'])
@@ -28,9 +28,9 @@ class VehicleDetailsOverviewTable extends TableWidget
                         'documents as expiring_7_documents_count' => fn (Builder $query): Builder => $query
                             ->whereNotNull('expires_at')
                             ->whereBetween('expires_at', [$today, $expiring7]),
-                        'documents as expiring_30_documents_count' => fn (Builder $query): Builder => $query
+                        'documents as expiring_60_documents_count' => fn (Builder $query): Builder => $query
                             ->whereNotNull('expires_at')
-                            ->whereBetween('expires_at', [$today, $expiring30]),
+                            ->whereBetween('expires_at', [$today, $expiring60]),
                     ])
                     ->orderBy('license_plate');
             })
@@ -53,8 +53,8 @@ class VehicleDetailsOverviewTable extends TableWidget
                     ->label('Expira 7d')
                     ->badge()
                     ->color(fn (int $state): string => $state > 0 ? 'warning' : 'gray'),
-                TextColumn::make('expiring_30_documents_count')
-                    ->label('Expira 30d')
+                TextColumn::make('expiring_60_documents_count')
+                    ->label('Expira 60d')
                     ->badge()
                     ->color(fn (int $state): string => $state > 0 ? 'warning' : 'gray'),
             ])

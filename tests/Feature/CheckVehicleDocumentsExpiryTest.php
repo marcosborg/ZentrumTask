@@ -53,3 +53,29 @@ it('emails all daily alerts to Adriano and only TVDE alerts to Marcos', function
 
     Mail::assertSent(VehicleDocumentAlertsSummaryMail::class, 2);
 });
+
+it('creates expiry alerts up to 60 days before expiry', function () {
+    Carbon::setTestNow('2026-07-29 08:00:00');
+    Mail::fake();
+
+    $vehicle = Vehicle::factory()->create();
+
+    $expiringIn60Days = VehicleDocument::factory()->for($vehicle)->create([
+        'title' => 'Documento dentro do prazo de alerta',
+        'expires_at' => now()->addDays(60),
+    ]);
+    $expiringIn61Days = VehicleDocument::factory()->for($vehicle)->create([
+        'title' => 'Documento fora do prazo de alerta',
+        'expires_at' => now()->addDays(61),
+    ]);
+
+    $this->artisan('app:check-vehicle-documents-expiry')->assertSuccessful();
+
+    $alert = VehicleDocumentAlert::query()
+        ->whereBelongsTo($expiringIn60Days, 'document')
+        ->sole();
+
+    expect($alert->level)->toBe('expiring_60')
+        ->and($alert->message)->toBe('Documento a expirar em 60 dias: Documento dentro do prazo de alerta')
+        ->and(VehicleDocumentAlert::query()->whereBelongsTo($expiringIn61Days, 'document')->exists())->toBeFalse();
+});

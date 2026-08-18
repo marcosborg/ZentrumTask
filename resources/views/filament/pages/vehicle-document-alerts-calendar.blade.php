@@ -184,7 +184,7 @@
                                             class="alert-card"
                                             @class([
                                                 'badge-expired' => $alert['level'] === 'expired',
-                                                'badge-warning' => in_array($alert['level'], ['expiring_7', 'expiring_30'], true),
+                                                'badge-warning' => in_array($alert['level'], ['expiring_7', 'expiring_60'], true),
                                                 'badge-ok' => $alert['is_resolved'],
                                             ])
                                         >

@@ -87,14 +87,14 @@ class VehicleDocumentsRelationManager extends RelationManager
                     ->badge()
                     ->colors([
                         'success' => 'valid',
-                        'warning' => ['expiring_7', 'expiring_30'],
+                        'warning' => ['expiring_7', 'expiring_60'],
                         'danger' => 'expired',
                         'gray' => 'no_expiry',
                     ])
                     ->formatStateUsing(fn (string $state): string => match ($state) {
                         'valid' => 'Valido',
                         'expiring_7' => 'Expira em 7 dias',
-                        'expiring_30' => 'Expira em 30 dias',
+                        'expiring_60' => 'Expira em 60 dias',
                         'expired' => 'Expirado',
                         'no_expiry' => 'Sem validade',
                         default => $state,

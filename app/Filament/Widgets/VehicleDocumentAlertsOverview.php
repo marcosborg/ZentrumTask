@@ -13,7 +13,7 @@ class VehicleDocumentAlertsOverview extends StatsOverviewWidget
     {
         $today = Carbon::today();
         $expiring7 = $today->copy()->addDays(7);
-        $expiring30 = $today->copy()->addDays(30);
+        $expiring60 = $today->copy()->addDays(60);
 
         $expiredCount = VehicleDocument::query()
             ->whereNotNull('expires_at')
@@ -25,9 +25,9 @@ class VehicleDocumentAlertsOverview extends StatsOverviewWidget
             ->whereBetween('expires_at', [$today, $expiring7])
             ->count();
 
-        $expiring30Count = VehicleDocument::query()
+        $expiring60Count = VehicleDocument::query()
             ->whereNotNull('expires_at')
-            ->whereBetween('expires_at', [$today, $expiring30])
+            ->whereBetween('expires_at', [$today, $expiring60])
             ->count();
 
         return [
@@ -35,7 +35,7 @@ class VehicleDocumentAlertsOverview extends StatsOverviewWidget
                 ->color('danger'),
             Stat::make('Expiram em 7 dias', $expiring7Count)
                 ->color('warning'),
-            Stat::make('Expiram em 30 dias', $expiring30Count)
+            Stat::make('Expiram em 60 dias', $expiring60Count)
                 ->color('warning'),
         ];
     }

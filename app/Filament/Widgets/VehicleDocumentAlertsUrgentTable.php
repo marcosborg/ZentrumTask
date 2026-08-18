@@ -16,7 +16,7 @@ class VehicleDocumentAlertsUrgentTable extends TableWidget
             ->query(fn (): Builder => VehicleDocumentAlert::query()
                 ->with(['document.vehicle'])
                 ->where('is_resolved', false)
-                ->orderByRaw("case level when 'expired' then 1 when 'expiring_7' then 2 when 'expiring_30' then 3 else 4 end")
+                ->orderByRaw("case level when 'expired' then 1 when 'expiring_7' then 2 when 'expiring_60' then 3 else 4 end")
                 ->orderByRaw('(select expires_at from vehicle_documents where vehicle_documents.id = vehicle_document_alerts.vehicle_document_id) asc')
                 ->limit(20))
             ->columns([
@@ -31,12 +31,12 @@ class VehicleDocumentAlertsUrgentTable extends TableWidget
                     ->badge()
                     ->colors([
                         'danger' => 'expired',
-                        'warning' => ['expiring_7', 'expiring_30'],
+                        'warning' => ['expiring_7', 'expiring_60'],
                     ])
                     ->formatStateUsing(fn (string $state): string => match ($state) {
                         'expired' => 'Expirado',
                         'expiring_7' => 'Expira em 7 dias',
-                        'expiring_30' => 'Expira em 30 dias',
+                        'expiring_60' => 'Expira em 60 dias',
                         default => $state,
                     }),
                 TextColumn::make('document.expires_at')
