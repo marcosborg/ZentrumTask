@@ -100,6 +100,8 @@ class KanbanBoard extends Page
 
     public array $taskTimeline = [];
 
+    public ?string $whatsappInstructionsUrl = null;
+
     public $attachmentUpload = null;
 
     public array $commentForm = [
@@ -531,6 +533,8 @@ class KanbanBoard extends Page
 
     protected function loadTaskMeta(Task $task): void
     {
+        $this->whatsappInstructionsUrl = $this->buildWhatsappInstructionsUrl($task);
+
         $this->taskTimeline = [
             'created_at' => optional($task->created_at)?->format('d/m/Y H:i'),
             'first_interaction_at' => optional($task->first_interaction_at)?->format('d/m/Y H:i'),
@@ -558,6 +562,83 @@ class KanbanBoard extends Page
                 'url' => $a->url,
                 'created_at' => optional($a->created_at)?->format('d/m H:i'),
             ])->values()->all();
+    }
+
+    private function buildWhatsappInstructionsUrl(Task $task): ?string
+    {
+        $meta = $task->meta ?? [];
+        $phone = $this->normalizeWhatsappPhone(
+            data_get($meta, 'phone')
+                ?? data_get($meta, 'telefone')
+                ?? data_get($meta, 'telemovel')
+        );
+
+        if ($phone === null) {
+            return null;
+        }
+
+        $contactName = trim((string) (
+            data_get($meta, 'contact_name')
+                ?? data_get($meta, 'name')
+                ?? data_get($meta, 'nome')
+        ));
+
+        $greeting = $contactName !== '' ? "Olá, {$contactName}! 👋" : 'Olá! 👋';
+        $message = <<<TEXT
+{$greeting}
+
+Obrigado pelo seu interesse em trabalhar com a Zentrum TVDE.
+
+Estas são as condições para o aluguer da viatura:
+
+🚗 Viatura: Tesla Model 3
+💶 Aluguer semanal: 325 €
+📍 Recolha da viatura: Santa Maria da Feira
+🛣️ Quilometragem incluída: 2.500 km por semana
+➕ Quilómetros adicionais: 0,12 € por km
+
+A caução total é de 1.000 €.
+
+Neste momento, temos uma modalidade promocional de pagamento faseado da caução:
+
+- pagamento inicial de 250 €, acrescido de IVA quando legalmente aplicável;
+- pagamento adicional de 25 € por semana durante 30 semanas;
+- permanência mínima contratual de 3 meses.
+
+Para avançarmos com a análise e preparação do processo, deverá enviar para este WhatsApp fotografias ou cópias legíveis dos seguintes documentos:
+
+- Cartão de Cidadão ou título de residência — frente e verso;
+- carta de condução — frente e verso;
+- certificado/cartão de motorista TVDE;
+- comprovativo de residência atualizado.
+
+Depois de recebermos e verificarmos a documentação, será contactado pelo nosso gestor de frota, que explicará os passos seguintes e combinará consigo o processo de contratação e entrega da viatura.
+
+Se tiver alguma questão, estamos disponíveis para ajudar.
+
+Zentrum TVDE
+TEXT;
+
+        return 'whatsapp://send?phone='.$phone.'&text='.rawurlencode($message);
+    }
+
+    private function normalizeWhatsappPhone(mixed $phone): ?string
+    {
+        if (! is_string($phone) && ! is_numeric($phone)) {
+            return null;
+        }
+
+        $digits = preg_replace('/\D+/', '', (string) $phone) ?? '';
+
+        if (str_starts_with($digits, '00')) {
+            $digits = substr($digits, 2);
+        }
+
+        if (strlen($digits) === 9) {
+            $digits = '351'.$digits;
+        }
+
+        return strlen($digits) >= 11 && strlen($digits) <= 15 ? $digits : null;
     }
 
     /**

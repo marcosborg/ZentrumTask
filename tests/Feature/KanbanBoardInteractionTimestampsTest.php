@@ -86,6 +86,36 @@ it('stores the first interaction timestamp when a task is moved for the first ti
         ->and($task->stage_entered_at)->not->toBeNull();
 });
 
+it('builds personalized WhatsApp instructions from the task contact labels', function () {
+    [, , , $task] = createKanbanFixture();
+    $task->update([
+        'meta' => [
+            'contact_name' => 'Frederico',
+            'phone' => '912 345 678',
+        ],
+    ]);
+
+    $page = new KanbanBoard;
+    $page->openTaskDetail($task->id);
+
+    expect($page->whatsappInstructionsUrl)
+        ->toStartWith('whatsapp://send?phone=351912345678&text=')
+        ->and(urldecode((string) parse_url($page->whatsappInstructionsUrl, PHP_URL_QUERY)))
+        ->toContain('Olá, Frederico! 👋')
+        ->toContain('Viatura: Tesla Model 3')
+        ->toContain('pagamento adicional de 25 € por semana durante 30 semanas');
+});
+
+it('does not expose WhatsApp instructions when the task has no valid phone', function () {
+    [, , , $task] = createKanbanFixture();
+    $task->update(['meta' => ['contact_name' => 'Frederico']]);
+
+    $page = new KanbanBoard;
+    $page->openTaskDetail($task->id);
+
+    expect($page->whatsappInstructionsUrl)->toBeNull();
+});
+
 it('stores the first interaction timestamp when the first comment is added and keeps the original value afterwards', function () {
     ensureUsersSoftDeletesColumn();
 

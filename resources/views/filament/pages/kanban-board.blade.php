@@ -272,6 +272,15 @@
                                 @endif
                             </div>
                             <div class="kb-row" style="gap:8px;">
+                                @if($showTaskDetail && $whatsappInstructionsUrl)
+                                    <a
+                                        class="kb-btn kb-btn-primary"
+                                        href="{{ $whatsappInstructionsUrl }}"
+                                        style="background:rgba(34,197,94,0.14);border-color:#22c55e;color:#bbf7d0;"
+                                    >
+                                        Enviar instruções por WhatsApp
+                                    </a>
+                                @endif
                                 <button type="button" class="kb-btn" wire:click="closeForms">Fechar</button>
                             </div>
                         </div>
