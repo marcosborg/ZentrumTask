@@ -9,6 +9,7 @@ use App\Filament\Resources\Drivers\Tables\DriversTable;
 use App\Models\Driver;
 use App\Services\DriverDepositService;
 use BackedEnum;
+use Filament\Forms\Components\BaseFileUpload;
 use Filament\Forms\Components\CheckboxList;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\FileUpload;
@@ -246,7 +247,25 @@ class DriverResource extends Resource
             ->disk('public')
             ->visibility('private')
             ->fetchFileInformation(false)
+            ->getUploadedFileUsing(static fn (BaseFileUpload $component, string $file, string|array|null $storedFileNames): array => self::uploadedDriverDocument(
+                $component,
+                $file,
+                $storedFileNames,
+            ))
             ->previewable(false);
+    }
+
+    /**
+     * @return array{name: string, size: int, type: null, url: string}
+     */
+    protected static function uploadedDriverDocument(BaseFileUpload $component, string $file, string|array|null $storedFileNames): array
+    {
+        return [
+            'name' => ($component->isMultiple() ? ($storedFileNames[$file] ?? null) : $storedFileNames) ?? basename($file),
+            'size' => 0,
+            'type' => null,
+            'url' => $component->getDisk()->url($file),
+        ];
     }
 
     public static function table(Table $table): Table
