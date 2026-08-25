@@ -73,19 +73,15 @@ class DriverResource extends Resource
                 Section::make('Documentos do Contrato')
                     ->columns(2)
                     ->components([
-                        FileUpload::make('contract_file')
+                        self::driverDocumentUpload('contract_file')
                             ->label('Contrato digitalizado')
-                            ->disk('public')
                             ->directory(fn ($record): string => $record ? "drivers/{$record->id}/contract" : 'drivers/contracts')
-                            ->visibility('public')
                             ->downloadable()
                             ->openable()
                             ->preserveFilenames(),
-                        FileUpload::make('other_documents')
+                        self::driverDocumentUpload('other_documents')
                             ->label('Outros documentos')
-                            ->disk('public')
                             ->directory(fn ($record): string => $record ? "drivers/{$record->id}/documents" : 'drivers/documents')
-                            ->visibility('public')
                             ->multiple()
                             ->downloadable()
                             ->openable()
@@ -242,6 +238,15 @@ class DriverResource extends Resource
                             ->native(false),
                     ]),
             ]);
+    }
+
+    protected static function driverDocumentUpload(string $name): FileUpload
+    {
+        return FileUpload::make($name)
+            ->disk('public')
+            ->visibility('private')
+            ->fetchFileInformation(false)
+            ->previewable(false);
     }
 
     public static function table(Table $table): Table
