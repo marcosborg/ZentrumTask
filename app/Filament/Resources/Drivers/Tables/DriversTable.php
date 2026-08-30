@@ -65,6 +65,11 @@ class DriversTable
                             $direction,
                         );
                     }),
+                TextColumn::make('billingProfile.vehicle_rent_value')
+                    ->label('Aluguer')
+                    ->money('EUR')
+                    ->placeholder('-')
+                    ->alignRight(),
                 TextColumn::make('billingProfile.extra_km_limit')
                     ->label('Limite km')
                     ->numeric(decimalPlaces: 2)

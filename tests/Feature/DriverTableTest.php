@@ -15,10 +15,12 @@ it('displays the billing profile kilometre limit for each driver', function (): 
     DriverBillingProfile::factory()->create([
         'driver_id' => $driver->id,
         'extra_km_limit' => 2500,
+        'vehicle_rent_value' => 350,
     ]);
 
     Livewire::actingAs($user)
         ->test(ListDrivers::class)
         ->assertCanSeeTableRecords([$driver])
+        ->assertTableColumnStateSet('billingProfile.vehicle_rent_value', '350.00', $driver)
         ->assertTableColumnStateSet('billingProfile.extra_km_limit', '2500.00', $driver);
 });
