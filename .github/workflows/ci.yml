@@ -75,7 +75,7 @@ jobs:
         run: php artisan migrate --force
 
       - name: Run test suite
-        run: php artisan test
+        run: php -d memory_limit=512M vendor/bin/pest
 
   container:
     runs-on: ubuntu-latest

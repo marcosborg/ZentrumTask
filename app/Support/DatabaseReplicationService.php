@@ -678,14 +678,16 @@ class DatabaseReplicationService
     {
         $systemRoot = $_SERVER['SystemRoot'] ?? getenv('SystemRoot') ?: '';
         $path = $_SERVER['PATH'] ?? getenv('PATH') ?: '';
+        $home = $_SERVER['HOME'] ?? getenv('HOME') ?: $_SERVER['USERPROFILE'] ?? getenv('USERPROFILE') ?: '';
         $temp = sys_get_temp_dir();
         $env = [
             'SystemRoot' => $systemRoot,
             'WINDIR' => $_SERVER['WINDIR'] ?? getenv('WINDIR') ?: $systemRoot,
             'PATH' => $path,
+            'HOME' => $home,
             'TEMP' => $temp,
             'TMP' => $temp,
-            'USERPROFILE' => $_SERVER['USERPROFILE'] ?? getenv('USERPROFILE') ?: '',
+            'USERPROFILE' => $_SERVER['USERPROFILE'] ?? getenv('USERPROFILE') ?: $home,
             'APPDATA' => $_SERVER['APPDATA'] ?? getenv('APPDATA') ?: '',
             'LOCALAPPDATA' => $_SERVER['LOCALAPPDATA'] ?? getenv('LOCALAPPDATA') ?: '',
             'AWS_PROFILE' => $_SERVER['AWS_PROFILE'] ?? getenv('AWS_PROFILE') ?: '',

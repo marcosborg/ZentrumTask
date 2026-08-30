@@ -58,5 +58,6 @@ it('passes aws profile directories to child processes', function () {
 
     expect($environment)
         ->toHaveKey('MYSQL_PWD', 'database-password')
+        ->toHaveKey('HOME')
         ->toHaveKey('USERPROFILE');
 });

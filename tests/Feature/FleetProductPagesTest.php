@@ -7,6 +7,7 @@ use App\Models\Vehicle;
 use App\Models\VehicleWebsitePhoto;
 use App\Services\AndroidPushNotificationService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Storage;
 
 uses(RefreshDatabase::class);
 
@@ -150,7 +151,7 @@ it('prefers website gallery photos over operational vehicle photos on public pag
 
     $this->get(route('vehicle.show', ['vehicle' => $vehicle, 'slug' => $vehicle->publicSlug()]))
         ->assertSuccessful()
-        ->assertSee(asset('storage/vehicle-website-photos/site-leaf.jpg'), false);
+        ->assertSee(Storage::disk('public')->url('vehicle-website-photos/site-leaf.jpg'), false);
 });
 
 it('creates a kanban task with the vehicle name and contact name when submitting the vehicle form', function () {
