@@ -58,6 +58,11 @@ class Driver extends Model
         return $this->hasMany(DriverBillingProfile::class);
     }
 
+    public function billingProfile(): HasOne
+    {
+        return $this->hasOne(DriverBillingProfile::class);
+    }
+
     public function allocations(): HasMany
     {
         return $this->hasMany(VehicleAllocation::class);

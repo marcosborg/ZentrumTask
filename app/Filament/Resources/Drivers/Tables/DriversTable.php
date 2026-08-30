@@ -18,7 +18,7 @@ class DriversTable
     {
         return $table
             ->modifyQueryUsing(fn ($query) => $query
-                ->with(['currentAllocation.vehicle'])
+                ->with(['billingProfile', 'currentAllocation.vehicle'])
                 ->withExists([
                     'billingProfiles as has_active_billing_profile' => fn ($q) => $q->active(),
                 ]))
@@ -65,6 +65,11 @@ class DriversTable
                             $direction,
                         );
                     }),
+                TextColumn::make('billingProfile.extra_km_limit')
+                    ->label('Limite km')
+                    ->numeric(decimalPlaces: 2)
+                    ->placeholder('-')
+                    ->alignRight(),
                 IconColumn::make('has_active_billing_profile')
                     ->label('Perfil ativo')
                     ->boolean()
