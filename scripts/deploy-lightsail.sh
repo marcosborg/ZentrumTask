@@ -2,8 +2,6 @@
 set -Eeuo pipefail
 
 IMAGE_URI="${1:?Image URI is required}"
-MEDIA_BUCKET="${2:?Media bucket is required}"
-MEDIA_URL="${3:?Media URL is required}"
 WEB_CONTAINER="zentrum-tvde-web"
 WORKER_CONTAINER="zentrum-tvde-worker"
 SCHEDULER_CONTAINER="zentrum-tvde-scheduler"
@@ -17,18 +15,6 @@ deployment_started=false
 
 cleanup() {
     sudo rm -rf "$temporary_directory"
-}
-
-set_environment_value() {
-    local file="$1"
-    local name="$2"
-    local value="$3"
-
-    if grep -q "^${name}=" "$file"; then
-        sed -i "s|^${name}=.*|${name}=${value}|" "$file"
-    else
-        printf '%s=%s\n' "$name" "$value" >> "$file"
-    fi
 }
 
 start_container() {
@@ -70,10 +56,6 @@ trap cleanup EXIT
 for name in "${CONTAINERS[@]}"; do
     previous_images["$name"]="$(sudo docker inspect "$name" --format '{{.Config.Image}}')"
     sudo docker inspect "$name" --format '{{range .Config.Env}}{{println .}}{{end}}' > "$temporary_directory/${name}.env"
-    set_environment_value "$temporary_directory/${name}.env" "PUBLIC_FILESYSTEM_DRIVER" "s3"
-    set_environment_value "$temporary_directory/${name}.env" "AWS_DEFAULT_REGION" "eu-west-3"
-    set_environment_value "$temporary_directory/${name}.env" "AWS_BUCKET" "$MEDIA_BUCKET"
-    set_environment_value "$temporary_directory/${name}.env" "MEDIA_URL" "$MEDIA_URL"
     chmod 600 "$temporary_directory/${name}.env"
 done
 
