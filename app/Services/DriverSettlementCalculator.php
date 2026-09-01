@@ -10,6 +10,7 @@ use App\Models\DriverBillingProfile;
 use App\Models\DriverSettlement;
 use App\Models\PlatformDriverBalance;
 use App\Models\PrioTransaction;
+use App\Models\TeslaChargingEvent;
 use App\Models\VehicleAllocation;
 use App\Models\VehicleWeeklyMileage;
 use App\Models\ViaVerdeTransaction;
@@ -111,12 +112,13 @@ class DriverSettlementCalculator
             $prioTotal = $this->sumPrioExpensesForDriver((int) $driverId, $start, $end);
             $viaVerdeTotal = $this->sumViaVerdeExpensesForDriver((int) $driverId, $start, $end);
             $extraKmTotal = $this->sumExtraKmChargesForDriver((int) $driverId, $profile, $start, $end);
+            $teslaChargingTotal = $this->sumTeslaChargingExpensesForDriver((int) $driverId, $start, $end);
             $adjustmentsTotal = $this->sumAdjustmentsForPeriod(
                 $adjustmentExpenses[$driverId] ?? collect(),
                 $start,
                 $end
             );
-            $expensesTotal = round($prioTotal + $viaVerdeTotal + $extraKmTotal + $adjustmentsTotal, 2);
+            $expensesTotal = round($prioTotal + $viaVerdeTotal + $extraKmTotal + $teslaChargingTotal + $adjustmentsTotal, 2);
 
             $percentCompany = (float) $profile->percent_company;
             $percentDriver = (float) $profile->percent_driver;
@@ -168,6 +170,7 @@ class DriverSettlementCalculator
                 'net_total' => $netTotal,
                 'tips_total' => $tipsTotal,
                 'expenses_total' => $expensesTotal,
+                'tesla_charging_total' => $teslaChargingTotal,
                 'carry_over_balance' => $carryOverBalance,
                 'company_share' => $companyShare,
                 'driver_share' => $driverShare,
@@ -189,6 +192,7 @@ class DriverSettlementCalculator
                     'vat_refund_mode' => $profile->vat_refund_mode?->value ?? null,
                     'vat_multiplier' => $vatMultiplier,
                     'extra_km_total' => $extraKmTotal,
+                    'tesla_charging_total' => $teslaChargingTotal,
                     'extra_km_limit' => (float) ($profile->extra_km_limit ?? 0),
                     'extra_km_rate' => (float) ($profile->extra_km_rate ?? 0),
                     'amount_due' => $amountDue,
@@ -352,6 +356,39 @@ class DriverSettlementCalculator
                     });
             })
             ->sum('amount');
+
+        return round((float) $total, 2);
+    }
+
+    private function sumTeslaChargingExpensesForDriver(int $driverId, Carbon $start, Carbon $end): float
+    {
+        $chargingStartsAt = Carbon::parse((string) config('services.tesla.settlement_charging_starts_at', '2026-09-07'))->startOfDay();
+
+        if ($end->lt($chargingStartsAt)) {
+            return 0.0;
+        }
+
+        $effectiveStart = $start->greaterThan($chargingStartsAt) ? $start : $chargingStartsAt;
+
+        $total = TeslaChargingEvent::query()
+            ->join('tesla_vehicles', 'tesla_vehicles.id', '=', 'tesla_charging_events.tesla_vehicle_id')
+            ->whereNotNull('tesla_vehicles.vehicle_id')
+            ->whereNotNull('tesla_charging_events.cost')
+            ->whereBetween('tesla_charging_events.started_at', [$effectiveStart, $end])
+            ->whereExists(function ($allocationQuery) use ($driverId): void {
+                $allocationQuery
+                    ->selectRaw('1')
+                    ->from('vehicle_allocations')
+                    ->where('vehicle_allocations.driver_id', $driverId)
+                    ->whereColumn('vehicle_allocations.vehicle_id', 'tesla_vehicles.vehicle_id')
+                    ->whereRaw('DATE(tesla_charging_events.started_at) >= DATE(vehicle_allocations.starts_at)')
+                    ->where(function ($dateOverlapQuery): void {
+                        $dateOverlapQuery
+                            ->whereNull('vehicle_allocations.ends_at')
+                            ->orWhereRaw('DATE(tesla_charging_events.started_at) <= DATE(vehicle_allocations.ends_at)');
+                    });
+            })
+            ->sum('tesla_charging_events.cost');
 
         return round((float) $total, 2);
     }

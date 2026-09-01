@@ -11,6 +11,7 @@ use App\Models\DriverBillingProfile;
 use App\Models\DriverSettlement;
 use App\Models\PlatformDriverBalance;
 use App\Models\SettlementEmailLog;
+use App\Models\TeslaChargingEvent;
 use App\Models\VehicleAllocation;
 use App\Models\VehicleWeeklyMileage;
 use App\Services\DriverDepositService;
@@ -378,6 +379,10 @@ class DriverSettlementsReport extends Page implements HasTable
                     ->alignRight()
                     ->state(fn (DriverSettlement $record): float => $this->adjustmentsForSettlement($record)['total'])
                     ->formatStateUsing(fn ($state): string => $this->formatEffectMoney(-1 * (float) $state, 'signed')),
+                TextColumn::make('tesla_charging_total')
+                    ->label('Carreg. Tesla')
+                    ->alignRight()
+                    ->formatStateUsing(fn ($state): string => $this->formatEffectMoney($state, 'subtract')),
                 TextColumn::make('extra_km_expenses')
                     ->label('Km extra')
                     ->alignRight()
@@ -901,6 +906,7 @@ class DriverSettlementsReport extends Page implements HasTable
                 $driverIdentity = $this->driverIdentity((int) $record->driver_id);
                 $prioExpenses = $this->prioExpensesForSettlement($record);
                 $viaVerdeExpenses = $this->viaVerdeExpensesForSettlement($record);
+                $teslaChargingExpenses = $this->teslaChargingExpensesForSettlement($record);
                 $adjustments = $this->adjustmentsForSettlement($record);
                 $depositSummary = $this->depositSummaryForDriver((int) $record->driver_id);
                 $depositHistory = $this->depositHistoryForDriver((int) $record->driver_id);
@@ -915,6 +921,7 @@ class DriverSettlementsReport extends Page implements HasTable
                     'billing' => $billing,
                     'prioExpenses' => $prioExpenses,
                     'viaVerdeExpenses' => $viaVerdeExpenses,
+                    'teslaChargingExpenses' => $teslaChargingExpenses,
                     'adjustments' => $adjustments,
                     'depositSummary' => $depositSummary,
                     'depositHistory' => $depositHistory,
@@ -987,6 +994,7 @@ class DriverSettlementsReport extends Page implements HasTable
         $balanceMovements = $this->balanceMovementsForSettlement($record);
         $prioExpenses = $this->prioExpensesForSettlement($record);
         $viaVerdeExpenses = $this->viaVerdeExpensesForSettlement($record);
+        $teslaChargingExpenses = $this->teslaChargingExpensesForSettlement($record);
         $adjustments = $this->adjustmentsForSettlement($record);
         $uberNet = collect($balances)->where('platform', 'uber')->sum('net_amount');
         $boltNet = collect($balances)->where('platform', 'bolt')->sum('net_amount');
@@ -1045,6 +1053,7 @@ class DriverSettlementsReport extends Page implements HasTable
             'expenses' => [
                 'prio_total' => $this->formatMoney($prioExpenses['total'] ?? 0),
                 'via_verde_total' => $this->formatMoney($viaVerdeExpenses['total'] ?? 0),
+                'tesla_charging_total' => $this->formatMoney($record->tesla_charging_total ?? 0),
                 'adjustments_total' => $this->formatMoney($adjustments['total'] ?? 0),
                 'extra_km_total' => $this->formatMoney($this->effectiveExtraKmTotal($record)),
                 'total' => $this->formatMoney($expensesTotal),
@@ -1059,6 +1068,13 @@ class DriverSettlementsReport extends Page implements HasTable
                     'vehicle_plate' => (string) ($row['vehicle_plate'] ?? '-'),
                     'location' => (string) ($row['location'] ?? '-'),
                     'amount' => $this->formatMoney($row['amount'] ?? 0),
+                ])->values()->all(),
+                'tesla_charging_rows' => collect($teslaChargingExpenses['rows'] ?? [])->map(fn (array $row): array => [
+                    'started_at' => $row['started_at'] instanceof Carbon ? $row['started_at']->format('d/m/Y H:i') : '-',
+                    'vehicle_plate' => (string) ($row['vehicle_plate'] ?? '-'),
+                    'location' => (string) ($row['location'] ?? '-'),
+                    'energy_kwh' => isset($row['energy_kwh']) ? number_format((float) $row['energy_kwh'], 3, ',', ' ') : '-',
+                    'amount' => $this->formatMoney($row['cost'] ?? 0),
                 ])->values()->all(),
                 'adjustment_rows' => collect($adjustments['rows'] ?? [])->map(fn (array $row): array => [
                     'occurred_at' => $row['occurred_at'] instanceof Carbon ? $row['occurred_at']->format('d/m/Y') : '-',
@@ -1837,6 +1853,53 @@ class DriverSettlementsReport extends Page implements HasTable
     /**
      * @return array{total: float, count: int, rows: array<int, array<string, mixed>>}
      */
+    private function teslaChargingExpensesForSettlement(DriverSettlement $settlement): array
+    {
+        $rows = TeslaChargingEvent::query()
+            ->join('tesla_vehicles', 'tesla_vehicles.id', '=', 'tesla_charging_events.tesla_vehicle_id')
+            ->join('vehicles', 'vehicles.id', '=', 'tesla_vehicles.vehicle_id')
+            ->whereNotNull('tesla_charging_events.cost')
+            ->whereBetween('tesla_charging_events.started_at', [
+                $settlement->period_start->copy()->startOfDay(),
+                $settlement->period_end->copy()->endOfDay(),
+            ])
+            ->whereExists(function (QueryBuilder $allocationQuery) use ($settlement): void {
+                $allocationQuery
+                    ->selectRaw('1')
+                    ->from('vehicle_allocations')
+                    ->where('vehicle_allocations.driver_id', $settlement->driver_id)
+                    ->whereColumn('vehicle_allocations.vehicle_id', 'tesla_vehicles.vehicle_id')
+                    ->whereRaw('DATE(tesla_charging_events.started_at) >= DATE(vehicle_allocations.starts_at)')
+                    ->where(function (QueryBuilder $dateOverlapQuery): void {
+                        $dateOverlapQuery
+                            ->whereNull('vehicle_allocations.ends_at')
+                            ->orWhereRaw('DATE(tesla_charging_events.started_at) <= DATE(vehicle_allocations.ends_at)');
+                    });
+            })
+            ->orderBy('tesla_charging_events.started_at')
+            ->get([
+                'tesla_charging_events.started_at',
+                'tesla_charging_events.energy_kwh',
+                'tesla_charging_events.cost',
+                'tesla_charging_events.location_name',
+                'vehicles.license_plate as vehicle_plate',
+            ])
+            ->map(fn (TeslaChargingEvent $event): array => [
+                'started_at' => $event->started_at,
+                'vehicle_plate' => $event->getAttribute('vehicle_plate'),
+                'location' => $event->location_name,
+                'energy_kwh' => $event->energy_kwh,
+                'cost' => (float) $event->cost,
+            ])
+            ->all();
+
+        return [
+            'total' => round((float) $settlement->tesla_charging_total, 2),
+            'count' => count($rows),
+            'rows' => $rows,
+        ];
+    }
+
     private function adjustmentsForSettlement(DriverSettlement $settlement): array
     {
         $adjustments = DriverAdjustment::query()

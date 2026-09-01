@@ -34,7 +34,7 @@
                         <td style="padding:8px; border:1px solid #e5e7eb; text-align:right;">{{ $payload['calculation']['tips_total'] ?? '-' }}</td>
                     </tr>
                     <tr style="background:#f9fafb;">
-                        <td style="padding:8px; border:1px solid #e5e7eb;">- Despesas (PRIO + Via Verde + Ajustes + Km extra)</td>
+                        <td style="padding:8px; border:1px solid #e5e7eb;">- Despesas (PRIO + Via Verde + Tesla + Ajustes + Km extra)</td>
                         <td style="padding:8px; border:1px solid #e5e7eb; text-align:right;">{{ $payload['calculation']['expenses_total'] ?? '-' }}</td>
                     </tr>
                     <tr>
@@ -97,6 +97,7 @@
                     <tr>
                         <td style="padding:8px; border:1px solid #e5e7eb;"><strong>PRIO</strong><br>{{ $payload['expenses']['prio_total'] ?? '-' }}</td>
                         <td style="padding:8px; border:1px solid #e5e7eb;"><strong>Via Verde</strong><br>{{ $payload['expenses']['via_verde_total'] ?? '-' }}</td>
+                        <td style="padding:8px; border:1px solid #e5e7eb;"><strong>Tesla</strong><br>{{ $payload['expenses']['tesla_charging_total'] ?? '-' }}</td>
                         <td style="padding:8px; border:1px solid #e5e7eb;"><strong>Ajustes</strong><br>{{ $payload['expenses']['adjustments_total'] ?? '-' }}</td>
                         <td style="padding:8px; border:1px solid #e5e7eb;"><strong>Km extra</strong><br>{{ $payload['expenses']['extra_km_total'] ?? '-' }}</td>
                         <td style="padding:8px; border:1px solid #e5e7eb;"><strong>Total</strong><br>{{ $payload['expenses']['total'] ?? '-' }}</td>
@@ -177,6 +178,32 @@
                         <tr>
                             <td colspan="4" style="padding:8px; border:1px solid #e5e7eb; color:#6b7280;">Sem despesas Via Verde no periodo.</td>
                         </tr>
+                    @endforelse
+                    </tbody>
+                </table>
+
+                <h2 style="font-size:16px; margin:0 0 10px;">Carregamentos Tesla</h2>
+                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse; margin-bottom:20px;">
+                    <thead>
+                    <tr style="background:#f9fafb;">
+                        <th style="padding:8px; border:1px solid #e5e7eb; text-align:left;">Data/Hora</th>
+                        <th style="padding:8px; border:1px solid #e5e7eb; text-align:left;">Matricula</th>
+                        <th style="padding:8px; border:1px solid #e5e7eb; text-align:left;">Local</th>
+                        <th style="padding:8px; border:1px solid #e5e7eb; text-align:right;">kWh</th>
+                        <th style="padding:8px; border:1px solid #e5e7eb; text-align:right;">Valor</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    @forelse (($payload['expenses']['tesla_charging_rows'] ?? []) as $row)
+                        <tr>
+                            <td style="padding:8px; border:1px solid #e5e7eb;">{{ $row['started_at'] ?? '-' }}</td>
+                            <td style="padding:8px; border:1px solid #e5e7eb;">{{ $row['vehicle_plate'] ?? '-' }}</td>
+                            <td style="padding:8px; border:1px solid #e5e7eb;">{{ $row['location'] ?? '-' }}</td>
+                            <td style="padding:8px; border:1px solid #e5e7eb; text-align:right;">{{ $row['energy_kwh'] ?? '-' }}</td>
+                            <td style="padding:8px; border:1px solid #e5e7eb; text-align:right;">{{ $row['amount'] ?? '-' }}</td>
+                        </tr>
+                    @empty
+                        <tr><td colspan="5" style="padding:8px; border:1px solid #e5e7eb; color:#6b7280;">Sem carregamentos Tesla no periodo.</td></tr>
                     @endforelse
                     </tbody>
                 </table>

@@ -92,6 +92,7 @@ return [
         'token_url' => env('TESLA_TOKEN_URL', 'https://auth.tesla.com/oauth2/v3/token'),
         'base_url' => env('TESLA_API_BASE_URL', 'https://fleet-api.prd.eu.vn.cloud.tesla.com'),
         'scopes' => env('TESLA_SCOPES', 'openid offline_access vehicle_device_data vehicle_location vehicle_charging_cmds'),
+        'settlement_charging_starts_at' => env('TESLA_SETTLEMENT_CHARGING_STARTS_AT', '2026-09-07'),
     ],
 
     'google' => [

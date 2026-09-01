@@ -340,6 +340,50 @@
         @endif
     </x-filament::section>
 
+    <x-filament::section heading="Carregamentos Tesla">
+        <div class="grid gap-4 sm:grid-cols-2">
+            <div>
+                <div class="text-xs uppercase text-gray-400">Total Tesla</div>
+                <div class="text-sm font-semibold text-gray-100">
+                    {{ number_format((float) ($teslaChargingExpenses['total'] ?? 0), 2, ',', ' ') }} &euro;
+                </div>
+            </div>
+            <div>
+                <div class="text-xs uppercase text-gray-400">Carregamentos</div>
+                <div class="text-sm font-semibold text-gray-100">{{ $teslaChargingExpenses['count'] ?? 0 }}</div>
+            </div>
+        </div>
+
+        @if (($teslaChargingExpenses['rows'] ?? []) !== [])
+            <div class="{{ $tableContainerClasses }}">
+                <div class="{{ $tableScrollClasses }}">
+                <table class="{{ $tableClasses }}">
+                    <thead class="{{ $theadClasses }}">
+                        <tr>
+                            <th class="{{ $thClasses }} whitespace-nowrap">Data/Hora</th>
+                            <th class="{{ $thClasses }} whitespace-nowrap">Matricula</th>
+                            <th class="{{ $thClasses }}">Local</th>
+                            <th class="{{ $thClasses }} whitespace-nowrap text-right">kWh</th>
+                            <th class="{{ $thClasses }} whitespace-nowrap text-right">Total</th>
+                        </tr>
+                    </thead>
+                    <tbody class="{{ $tbodyClasses }}">
+                        @foreach ($teslaChargingExpenses['rows'] as $row)
+                            <tr class="odd:bg-white/[0.02]">
+                                <td class="{{ $tdClasses }} whitespace-nowrap">{{ $row['started_at']?->format('d/m/Y H:i') ?? '-' }}</td>
+                                <td class="{{ $tdClasses }} whitespace-nowrap">{{ $row['vehicle_plate'] ?? '-' }}</td>
+                                <td class="{{ $tdClasses }} break-words">{{ $row['location'] ?? '-' }}</td>
+                                <td class="{{ $tdClasses }} whitespace-nowrap text-right">{{ isset($row['energy_kwh']) ? number_format((float) $row['energy_kwh'], 3, ',', ' ') : '-' }}</td>
+                                <td class="{{ $tdClasses }} whitespace-nowrap text-right">{{ number_format((float) ($row['cost'] ?? 0), 2, ',', ' ') }} &euro;</td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+                </div>
+            </div>
+        @endif
+    </x-filament::section>
+
     <x-filament::section heading="Ajustes (Caucao / Acertos)">
         <div class="grid gap-4 sm:grid-cols-2">
             <div>

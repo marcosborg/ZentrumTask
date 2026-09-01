@@ -5,6 +5,8 @@ use App\Models\Driver;
 use App\Models\DriverBillingProfile;
 use App\Models\DriverSettlement;
 use App\Models\PrioTransaction;
+use App\Models\TeslaChargingEvent;
+use App\Models\TeslaVehicle;
 use App\Models\Vehicle;
 use App\Models\VehicleAllocation;
 use App\Models\VehicleWeeklyMileage;
@@ -14,6 +16,117 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 
 uses(RefreshDatabase::class);
+
+it('adds Tesla charging costs to settlements from the configured start week', function () {
+    $driver = Driver::factory()->create();
+    $vehicle = Vehicle::factory()->create();
+
+    DriverBillingProfile::factory()->create([
+        'driver_id' => $driver->id,
+        'valid_from' => '2026-01-01',
+        'percent_company' => 0,
+        'percent_driver' => 100,
+        'vat_percent' => 0,
+    ]);
+
+    VehicleAllocation::factory()->create([
+        'vehicle_id' => $vehicle->id,
+        'driver_id' => $driver->id,
+        'starts_at' => '2026-09-01 00:00:00',
+        'ends_at' => null,
+        'status' => 'active',
+    ]);
+
+    $teslaVehicle = TeslaVehicle::factory()->create(['vehicle_id' => $vehicle->id]);
+
+    TeslaChargingEvent::query()->create([
+        'tesla_vehicle_id' => $teslaVehicle->id,
+        'source' => 'charging_history',
+        'external_id' => 'charge-after-cutoff',
+        'started_at' => '2026-09-08 12:00:00',
+        'cost' => 25.50,
+        'currency' => 'EUR',
+        'raw_payload' => [],
+    ]);
+
+    DB::table('platform_driver_balances')->insert([
+        'platform' => 'uber',
+        'driver_code' => 'tesla-driver-after-cutoff',
+        'driver_id' => $driver->id,
+        'period_start' => '2026-09-07',
+        'period_end' => '2026-09-13',
+        'net_amount' => 100,
+        'tips_amount' => 0,
+        'source_file' => 'test.csv',
+        'imported_at' => now(),
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    app(DriverSettlementCalculator::class)->calculate('2026-09-07', '2026-09-13', $driver->id);
+
+    $settlement = DriverSettlement::query()->where('driver_id', $driver->id)->firstOrFail();
+
+    expect($settlement->tesla_charging_total)->toBe('25.50')
+        ->and($settlement->expenses_total)->toBe('25.50')
+        ->and($settlement->amount_payable)->toBe('74.50')
+        ->and(data_get($settlement->rules_snapshot, 'tesla_charging_total'))->toBe(25.5);
+});
+
+it('does not add Tesla charging costs before the configured start week', function () {
+    $driver = Driver::factory()->create();
+    $vehicle = Vehicle::factory()->create();
+
+    DriverBillingProfile::factory()->create([
+        'driver_id' => $driver->id,
+        'valid_from' => '2026-01-01',
+        'percent_company' => 0,
+        'percent_driver' => 100,
+        'vat_percent' => 0,
+    ]);
+
+    VehicleAllocation::factory()->create([
+        'vehicle_id' => $vehicle->id,
+        'driver_id' => $driver->id,
+        'starts_at' => '2026-08-01 00:00:00',
+        'ends_at' => null,
+        'status' => 'active',
+    ]);
+
+    $teslaVehicle = TeslaVehicle::factory()->create(['vehicle_id' => $vehicle->id]);
+
+    TeslaChargingEvent::query()->create([
+        'tesla_vehicle_id' => $teslaVehicle->id,
+        'source' => 'charging_history',
+        'external_id' => 'charge-before-cutoff',
+        'started_at' => '2026-08-25 12:00:00',
+        'cost' => 20,
+        'currency' => 'EUR',
+        'raw_payload' => [],
+    ]);
+
+    DB::table('platform_driver_balances')->insert([
+        'platform' => 'uber',
+        'driver_code' => 'tesla-driver-before-cutoff',
+        'driver_id' => $driver->id,
+        'period_start' => '2026-08-24',
+        'period_end' => '2026-08-30',
+        'net_amount' => 100,
+        'tips_amount' => 0,
+        'source_file' => 'test.csv',
+        'imported_at' => now(),
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    app(DriverSettlementCalculator::class)->calculate('2026-08-24', '2026-08-30', $driver->id);
+
+    $settlement = DriverSettlement::query()->where('driver_id', $driver->id)->firstOrFail();
+
+    expect($settlement->tesla_charging_total)->toBe('0.00')
+        ->and($settlement->expenses_total)->toBe('0.00')
+        ->and($settlement->amount_payable)->toBe('100.00');
+});
 
 it('calculates settlement with tips excluded from percentage and added at the end', function () {
     $driver = Driver::factory()->create();
