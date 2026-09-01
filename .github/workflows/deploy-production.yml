@@ -30,6 +30,8 @@ jobs:
       AWS_REGION: eu-west-3
       ECR_REPOSITORY: zentrum-production
       LIGHTSAIL_HOST: 13.38.206.137
+      MEDIA_BUCKET: zentrum-production-media-20260729161107313600000003
+      MEDIA_URL: https://d2vpteljxogwsf.cloudfront.net
 
     steps:
       - name: Resolve release
@@ -98,5 +100,5 @@ jobs:
             -o StrictHostKeyChecking=accept-new \
             -i lightsail.pem \
             "ubuntu@${LIGHTSAIL_HOST}" \
-            "bash -s -- '$IMAGE_URI'" \
+            "bash -s -- '$IMAGE_URI' '$MEDIA_BUCKET' '$MEDIA_URL'" \
             < scripts/deploy-lightsail.sh
