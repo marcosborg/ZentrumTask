@@ -360,11 +360,6 @@ class DriverSettlementsReport extends Page implements HasTable
                     ->state(fn (DriverSettlement $record): float => (float) $record->uber_net + (float) $record->bolt_net)
                     ->formatStateUsing(fn ($state): string => $this->formatMoney($state))
                     ->toggleable(isToggledHiddenByDefault: true),
-                TextColumn::make('tips_total_balance')
-                    ->label('Tips')
-                    ->alignRight()
-                    ->formatStateUsing(fn ($state): string => $this->formatEffectMoney($state, 'add'))
-                    ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('prio_expenses')
                     ->label('PRIO')
                     ->alignRight()
