@@ -337,6 +337,10 @@ class DriverSettlementsReport extends Page implements HasTable
         return $table
             ->query(fn (): Builder => $this->buildSettlementsQuery())
             ->columns([
+                TextColumn::make('period_label')
+                    ->label('Semana')
+                    ->state(fn (DriverSettlement $record): string => ($record->period_start?->format('d/m/Y') ?? '-').' - '.($record->period_end?->format('d/m/Y') ?? '-'))
+                    ->sortable(query: fn (Builder $query, string $direction): Builder => $query->orderBy('driver_settlements.period_start', $direction)),
                 TextColumn::make('driver_name')
                     ->label('Motorista')
                     ->state(fn (DriverSettlement $record): string => $this->driverIdentity((int) $record->driver_id)['name'])
