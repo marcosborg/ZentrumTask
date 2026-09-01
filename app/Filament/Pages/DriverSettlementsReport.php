@@ -363,7 +363,8 @@ class DriverSettlementsReport extends Page implements HasTable
                 TextColumn::make('tips_total_balance')
                     ->label('Tips')
                     ->alignRight()
-                    ->formatStateUsing(fn ($state): string => $this->formatEffectMoney($state, 'add')),
+                    ->formatStateUsing(fn ($state): string => $this->formatEffectMoney($state, 'add'))
+                    ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('prio_expenses')
                     ->label('PRIO')
                     ->alignRight()
