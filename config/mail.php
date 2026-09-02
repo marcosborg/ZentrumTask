@@ -112,7 +112,9 @@ return [
 
     'from' => [
         'address' => env('MAIL_FROM_ADDRESS', 'hello@example.com'),
-        'name' => env('MAIL_FROM_NAME', 'Example'),
+        'name' => env('MAIL_FROM_NAME') === '${APP_NAME}'
+            ? env('APP_NAME', 'Laravel')
+            : env('MAIL_FROM_NAME', env('APP_NAME', 'Laravel')),
     ],
 
     'settlement_test_recipient' => env('SETTLEMENT_TEST_EMAIL', env('MAIL_FROM_ADDRESS')),
