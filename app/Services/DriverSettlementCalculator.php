@@ -362,7 +362,7 @@ class DriverSettlementCalculator
 
     private function sumTeslaChargingExpensesForDriver(int $driverId, Carbon $start, Carbon $end): float
     {
-        $chargingStartsAt = Carbon::parse((string) config('services.tesla.settlement_charging_starts_at', '2026-09-07'))->startOfDay();
+        $chargingStartsAt = Carbon::parse((string) config('services.tesla.settlement_charging_starts_at', '2026-08-31'))->startOfDay();
 
         if ($end->lt($chargingStartsAt)) {
             return 0.0;

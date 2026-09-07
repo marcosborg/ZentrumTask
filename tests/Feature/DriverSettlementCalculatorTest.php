@@ -32,7 +32,7 @@ it('adds Tesla charging costs to settlements from the configured start week', fu
     VehicleAllocation::factory()->create([
         'vehicle_id' => $vehicle->id,
         'driver_id' => $driver->id,
-        'starts_at' => '2026-09-01 00:00:00',
+        'starts_at' => '2026-08-31 00:00:00',
         'ends_at' => null,
         'status' => 'active',
     ]);
@@ -43,7 +43,7 @@ it('adds Tesla charging costs to settlements from the configured start week', fu
         'tesla_vehicle_id' => $teslaVehicle->id,
         'source' => 'charging_history',
         'external_id' => 'charge-after-cutoff',
-        'started_at' => '2026-09-08 12:00:00',
+        'started_at' => '2026-08-31 00:00:00',
         'cost' => 25.50,
         'currency' => 'EUR',
         'raw_payload' => [],
@@ -53,8 +53,8 @@ it('adds Tesla charging costs to settlements from the configured start week', fu
         'platform' => 'uber',
         'driver_code' => 'tesla-driver-after-cutoff',
         'driver_id' => $driver->id,
-        'period_start' => '2026-09-07',
-        'period_end' => '2026-09-13',
+        'period_start' => '2026-08-31',
+        'period_end' => '2026-09-06',
         'net_amount' => 100,
         'tips_amount' => 0,
         'source_file' => 'test.csv',
@@ -63,7 +63,7 @@ it('adds Tesla charging costs to settlements from the configured start week', fu
         'updated_at' => now(),
     ]);
 
-    app(DriverSettlementCalculator::class)->calculate('2026-09-07', '2026-09-13', $driver->id);
+    app(DriverSettlementCalculator::class)->calculate('2026-08-31', '2026-09-06', $driver->id);
 
     $settlement = DriverSettlement::query()->where('driver_id', $driver->id)->firstOrFail();
 
@@ -99,7 +99,7 @@ it('does not add Tesla charging costs before the configured start week', functio
         'tesla_vehicle_id' => $teslaVehicle->id,
         'source' => 'charging_history',
         'external_id' => 'charge-before-cutoff',
-        'started_at' => '2026-08-25 12:00:00',
+        'started_at' => '2026-08-30 23:59:59',
         'cost' => 20,
         'currency' => 'EUR',
         'raw_payload' => [],
