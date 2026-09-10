@@ -12,6 +12,8 @@ export default defineConfig({
         laravel({
             input: [
                 'resources/css/app.css',
+                'resources/css/van-rentals.css',
+                'resources/js/van-rentals.js',
                 'resources/css/filament/admin/theme.css',
                 'resources/js/app.js',
             ],

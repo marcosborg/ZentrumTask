@@ -81,6 +81,9 @@
             <a class="nav-link nav-link-custom" href="#contactos">Contactos</a>
           </li>
         @endforelse
+        @unless ($menuItems->contains(fn ($item) => rtrim(parse_url($item->url ?? '', PHP_URL_PATH) ?? '', '/') === '/aluguer-carrinhas' || $item->children->contains(fn ($child) => rtrim(parse_url($child->url ?? '', PHP_URL_PATH) ?? '', '/') === '/aluguer-carrinhas')))
+          <li class="nav-item"><a class="nav-link nav-link-custom" href="{{ route('van-rentals.index') }}">Aluguer de carrinhas</a></li>
+        @endunless
         @guest
         <li class="nav-item">
           <a class="nav-link nav-link-custom d-flex align-items-center gap-2" href="{{ $loginUrl }}">

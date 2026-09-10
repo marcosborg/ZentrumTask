@@ -16,6 +16,8 @@
 
     <x-fleet-faqs />
 
+    <x-van-highlights />
+
     <x-blog-news />
 
     <x-contact /> 

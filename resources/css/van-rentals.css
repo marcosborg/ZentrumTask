@@ -1,0 +1,50 @@
+@layer theme, utilities;
+@import "tailwindcss/theme.css" layer(theme) prefix(vr);
+@import "tailwindcss/utilities.css" layer(utilities) prefix(vr);
+@source "../views/website/vans";
+@source "../views/filament/pages/van-rental-calendar.blade.php";
+@custom-variant dark (&:where(.dark, .dark *));
+@source "../views/components/van-*.blade.php";
+
+.van-area { --van-ink:#142d38; --van-accent:#17796e; color:var(--van-ink); }
+.van-hero { background:#eaf2ef; padding:64px 0; }
+.van-hero h1 { font-size:clamp(2.2rem,5vw,4.4rem); letter-spacing:-.045em; line-height:1.08; max-width:850px; margin:16px 0 24px; font-weight:750; }
+.van-kicker { text-transform:uppercase; letter-spacing:.14em; font-size:.72rem; font-weight:750; color:#17796e; }
+.van-hero p { max-width:690px; font-size:1.08rem; line-height:1.7; }
+.van-section { padding:56px 0; }
+.van-section h2 { font-size:clamp(1.6rem,3vw,2.4rem); letter-spacing:-.035em; font-weight:700; }
+.van-card { overflow:hidden; border:1px solid #dce5e1; border-radius:18px; background:white; height:100%; display:flex; flex-direction:column; }
+.van-card img { width:100%; aspect-ratio:4/3; object-fit:cover; background:#eef2ef; }
+.van-card-body { padding:24px; display:flex; flex:1; flex-direction:column; gap:14px; }
+.van-card h3 { font-size:1.25rem; font-weight:700; margin:0; }
+.van-tags { display:flex; flex-wrap:wrap; gap:8px; }
+.van-tag { font-size:.75rem; padding:5px 10px; background:#edf5f1; border-radius:99px; color:#285b50; }
+.van-price { font-size:1.7rem; letter-spacing:-.03em; font-weight:750; }
+.van-button { border:1px solid #17796e; color:white; background:#17796e; padding:12px 18px; border-radius:9px; font-weight:650; display:inline-flex; align-items:center; justify-content:center; gap:8px; text-decoration:none; cursor:pointer; }
+.van-button:hover { background:#105d55; color:white; }
+.van-button.secondary { background:white; color:#142d38; border-color:#cbd9d3; }
+.van-button:disabled { opacity:.6; cursor:wait; }
+.van-area :focus-visible { outline:3px solid #b57412; outline-offset:3px; }
+.van-panel { border:1px solid #dce5e1; background:white; border-radius:18px; padding:28px; }
+.van-area label { font-size:.88rem; font-weight:600; }
+.van-area input:not([type=checkbox]), .van-area select, .van-area textarea { display:block; width:100%; border:1px solid #bacbc3; border-radius:8px; padding:10px 12px; background:white; color:#142d38; min-height:44px; }
+.van-field { display:flex; flex-direction:column; gap:7px; }
+.van-error { color:#9f2424; font-size:.86rem; }
+.van-notice { background:#f0f5f2; padding:18px; border-radius:12px; line-height:1.6; }
+.van-small { font-size:.82rem; color:#526b61; line-height:1.6; }
+.van-calendar { display:grid; grid-template-columns:repeat(7,minmax(0,1fr)); gap:5px; }
+.van-calendar button { min-height:48px; padding:5px; border:1px solid #dae3de; border-radius:8px; background:white; color:#173e33; }
+.van-calendar button[data-busy=true] { background:#fff1da; border-color:#dfb876; }
+.van-calendar button:disabled { color:#aaa; background:#f6f7f6; }
+.van-calendar button[aria-pressed=true] { outline:2px solid #17796e; background:#e2f2ec; }
+.van-calendar small { font-size:.6rem; display:block; }
+.van-gallery-main { width:100%; aspect-ratio:4/3; object-fit:cover; border-radius:16px; background:#eef2ef; }
+.van-gallery-thumbs { display:flex; gap:10px; overflow:auto; padding:12px 0; }
+.van-gallery-thumbs button { border:0; padding:0; background:none; flex:0 0 90px; }
+.van-gallery-thumbs img { width:90px; height:65px; object-fit:cover; border-radius:8px; }
+.van-spec { padding:16px 0; border-bottom:1px solid #e0e7e3; }
+.van-spec dt { font-size:.8rem; font-weight:400; color:#526b61; }
+.van-spec dd { margin:4px 0 0; font-weight:650; }
+.van-empty { padding:50px 28px; background:#f5f7f4; border-radius:18px; text-align:center; }
+.van-area [hidden] { display:none !important; }
+@media(max-width:700px) { .van-hero { padding:36px 0; } .van-panel { padding:18px; } .van-section { padding:34px 0; } }

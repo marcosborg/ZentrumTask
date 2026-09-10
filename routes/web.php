@@ -257,3 +257,11 @@ Route::get('/api/tesla/connect', [TeslaController::class, 'redirectToTesla'])
     ->middleware('auth')
     ->name('tesla.connect');
 Route::get('/api/tesla/callback', [TeslaController::class, 'callback'])->name('tesla.callback');
+
+Route::prefix('aluguer-carrinhas')->name('van-rentals.')->group(function (): void {
+    Route::get('/', [\App\Http\Controllers\VanRentalController::class, 'index'])->name('index');
+    Route::get('/{van}/disponibilidade', [\App\Http\Controllers\VanRentalController::class, 'availability'])->middleware('throttle:120,1')->name('availability');
+    Route::get('/{van}/estimativa', [\App\Http\Controllers\VanRentalController::class, 'quote'])->middleware('throttle:60,1')->name('quote');
+    Route::post('/{van}/pedidos', [\App\Http\Controllers\VanRentalController::class, 'store'])->middleware('throttle:10,1')->name('store');
+    Route::get('/{van}/{slug?}', [\App\Http\Controllers\VanRentalController::class, 'show'])->name('show');
+});
