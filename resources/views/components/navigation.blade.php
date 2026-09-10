@@ -1,4 +1,4 @@
-<nav class="navbar navbar-expand-lg py-3 navbar-website bg-white" aria-label="Main navigation">
+<nav class="navbar navbar-expand-xxl py-3 navbar-website bg-white" aria-label="Main navigation">
   <div class="container">
     @php
         $adminPanel = filament()->getPanel('admin');
@@ -40,7 +40,7 @@
     </button>
 
     <div class="collapse navbar-collapse justify-content-end" id="navbarNav">
-      <ul class="navbar-nav align-items-lg-center gap-lg-3">
+      <ul class="navbar-nav align-items-xxl-center gap-xxl-3">
         @forelse ($menuItems as $item)
           @if ($item->children->isNotEmpty())
             <li class="nav-item dropdown">
