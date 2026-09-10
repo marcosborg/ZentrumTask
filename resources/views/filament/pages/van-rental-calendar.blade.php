@@ -17,7 +17,7 @@
         <x-filament::button wire:click="move(1)" color="gray">Seguinte</x-filament::button>
         <span wire:loading role="status">A atualizar…</span>
     </div>
-    <p class="vr:text-sm vr:text-gray-600 vr:dark:text-gray-400">Horários de Lisboa · Pedidos pendentes não bloqueiam a agenda. Confirme também a disponibilidade do motorista antes de aceitar o pedido.</p>
+    <p class="vr:text-sm vr:text-gray-600 vr:dark:text-gray-400">Horários locais (Portugal continental) · Pedidos pendentes não bloqueiam a agenda. Confirme também a disponibilidade do motorista antes de aceitar o pedido.</p>
     <div class="vr:grid vr:grid-cols-1 vr:gap-3 vr:md:grid-cols-7">
         @foreach ($this->calendar as $day)
             <section wire:key="day-{{ $day['date']->format('Y-m-d') }}" class="vr:min-h-32 vr:rounded-xl vr:border vr:border-gray-200 vr:bg-white vr:p-3 vr:dark:border-gray-700 vr:dark:bg-gray-900">

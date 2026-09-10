@@ -86,8 +86,8 @@ class VanRentalCalendar extends Page
         return [
             Action::make('block')->label('Bloquear período')->schema([
                 Select::make('van_id')->label('Carrinha')->options(fn () => RentalVan::query()->orderBy('name')->pluck('name', 'id'))->searchable()->required(),
-                TextInput::make('starts_at')->type('datetime-local')->label('Início — Lisboa')->required(),
-                TextInput::make('ends_at')->type('datetime-local')->label('Fim — Lisboa')->required(),
+                TextInput::make('starts_at')->type('datetime-local')->label('Início — hora local')->required(),
+                TextInput::make('ends_at')->type('datetime-local')->label('Fim — hora local')->required(),
                 Textarea::make('reason')->label('Motivo interno')->required()->maxLength(255),
             ])->action(function (array $data): void {
                 app(VanRentalService::class)->block(RentalVan::query()->findOrFail($data['van_id']), $data['starts_at'], $data['ends_at'], $data['reason'], auth()->user());

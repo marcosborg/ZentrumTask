@@ -30,7 +30,7 @@
             </div>
             <div class="van-panel">
                 <span class="van-kicker">O seu próximo transporte</span><h2 class="vr:mt-3">Planeie o aluguer</h2>
-                <p class="van-small">Valores finais com IVA incluído. Mínimo {{ $van->minimum_hours }} h, faturado por hora iniciada. Antecedência mínima: {{ $van->lead_hours }} h. Levantamento/devolução: {{ substr($van->opens_at, 0, 5) }}–{{ substr($van->closes_at, 0, 5) }}, hora de Lisboa. Duração máxima: 30 dias.</p>
+                <p class="van-small">Valores finais com IVA incluído. Mínimo {{ $van->minimum_hours }} h, faturado por hora iniciada. Antecedência mínima: {{ $van->lead_hours }} h. Levantamento/devolução: {{ substr($van->opens_at, 0, 5) }}–{{ substr($van->closes_at, 0, 5) }}, hora local. Duração máxima: 30 dias.</p>
                 <div class="vr:my-5">
                     <label for="van-month">Calendário de disponibilidade</label><input type="month" id="van-month" data-calendar-month value="{{ now('Europe/Lisbon')->format('Y-m') }}" class="vr:my-3">
                     <div class="van-calendar van-small vr:mb-2" aria-hidden="true">@foreach(['Seg','Ter','Qua','Qui','Sex','Sáb','Dom'] as $day)<span>{{ $day }}</span>@endforeach</div>
@@ -48,7 +48,7 @@
                         @if($van->with_driver)<option value="with_driver" @selected(old('mode') === 'with_driver')>Com motorista — {{ number_format($van->with_driver_rate / 100, 2, ',', ' ') }} €/h</option>@endif
                     </select><span class="van-error" data-error="mode">@error('mode'){{ $message }}@enderror</span></div>
                     <div class="vr:grid vr:md:grid-cols-2 vr:gap-4">
-                        @foreach(['starts_at' => 'Início — Lisboa', 'ends_at' => 'Fim — Lisboa'] as $name => $label)<div class="van-field"><label for="van-{{ $name }}">{{ $label }}</label><input type="datetime-local" step="1800" name="{{ $name }}" id="van-{{ $name }}" value="{{ old($name) }}" required><span class="van-error" data-error="{{ $name }}">@error($name){{ $message }}@enderror</span></div>@endforeach
+                        @foreach(['starts_at' => 'Início — hora local', 'ends_at' => 'Fim — hora local'] as $name => $label)<div class="van-field"><label for="van-{{ $name }}">{{ $label }}</label><input type="datetime-local" step="1800" name="{{ $name }}" id="van-{{ $name }}" value="{{ old($name) }}" required><span class="van-error" data-error="{{ $name }}">@error($name){{ $message }}@enderror</span></div>@endforeach
                     </div>
                     <div class="van-notice" data-estimate aria-live="polite">Escolha as datas para calcular a estimativa.</div>
                     <div class="vr:grid vr:md:grid-cols-2 vr:gap-4">

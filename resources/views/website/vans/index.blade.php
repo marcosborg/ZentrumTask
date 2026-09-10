@@ -5,7 +5,7 @@
 @section('content')
 <main class="van-area">
     <section class="van-hero"><div class="container">
-        <span class="van-kicker">Zentrum · Aluguer de carrinhas</span>
+        <span class="van-kicker">Zentrum · Santa Maria da Feira</span>
         <h1>O espaço que precisa.<br>O tempo que quiser.</h1>
         <p>Para transportar mercadorias ou mudar de casa. Alugue uma carrinha à hora e escolha se prefere conduzir ou contar com um motorista.</p>
         <div class="van-tags"><span class="van-tag">Preços por hora</span><span class="van-tag">Com ou sem motorista</span><span class="van-tag">Reserva confirmada pela equipa</span></div>
@@ -13,8 +13,8 @@
     <section class="van-section"><div class="container">
         <form method="get" class="van-panel vr:grid vr:grid-cols-1 vr:gap-4 vr:md:grid-cols-2 vr:lg:grid-cols-5 vr:mb-8">
             <div class="van-field"><label for="filter-mode">Modalidade</label><select name="mode" id="filter-mode"><option value="">Todas</option><option value="self_drive" @selected(request('mode') === 'self_drive')>Sem motorista</option><option value="with_driver" @selected(request('mode') === 'with_driver')>Com motorista</option></select></div>
-            <div class="van-field"><label for="filter-start">Início — Lisboa</label><input type="datetime-local" step="1800" id="filter-start" name="starts_at" value="{{ request('starts_at') }}">@error('starts_at')<span class="van-error">{{ $message }}</span>@enderror</div>
-            <div class="van-field"><label for="filter-end">Fim — Lisboa</label><input type="datetime-local" step="1800" id="filter-end" name="ends_at" value="{{ request('ends_at') }}">@error('ends_at')<span class="van-error">{{ $message }}</span>@enderror</div>
+            <div class="van-field"><label for="filter-start">Início — hora local</label><input type="datetime-local" step="1800" id="filter-start" name="starts_at" value="{{ request('starts_at') }}">@error('starts_at')<span class="van-error">{{ $message }}</span>@enderror</div>
+            <div class="van-field"><label for="filter-end">Fim — hora local</label><input type="datetime-local" step="1800" id="filter-end" name="ends_at" value="{{ request('ends_at') }}">@error('ends_at')<span class="van-error">{{ $message }}</span>@enderror</div>
             <div class="van-field"><label for="filter-capacity">Volume mínimo (m³)</label><input type="number" min="0" max="100" step="0.1" id="filter-capacity" name="capacity" value="{{ request('capacity') }}">@error('capacity')<span class="van-error">{{ $message }}</span>@enderror</div>
             <div class="vr:flex vr:items-end"><button class="van-button vr:w-full">Encontrar carrinha</button></div>
         </form>

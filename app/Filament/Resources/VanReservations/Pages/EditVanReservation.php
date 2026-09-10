@@ -45,8 +45,8 @@ class EditVanReservation extends EditRecord
                 });
         }
         $actions[] = Action::make('reschedule')->label('Reagendar')->visible(fn () => in_array($this->record->status, ['pending', 'confirmed'], true))->schema([
-            TextInput::make('starts_at')->label('Início — Lisboa')->type('datetime-local')->required()->default(fn () => $this->record->starts_at->timezone('Europe/Lisbon')->format('Y-m-d\TH:i')),
-            TextInput::make('ends_at')->label('Fim — Lisboa')->type('datetime-local')->required()->default(fn () => $this->record->ends_at->timezone('Europe/Lisbon')->format('Y-m-d\TH:i')),
+            TextInput::make('starts_at')->label('Início — hora local')->type('datetime-local')->required()->default(fn () => $this->record->starts_at->timezone('Europe/Lisbon')->format('Y-m-d\TH:i')),
+            TextInput::make('ends_at')->label('Fim — hora local')->type('datetime-local')->required()->default(fn () => $this->record->ends_at->timezone('Europe/Lisbon')->format('Y-m-d\TH:i')),
             Textarea::make('reason')->label('Motivo')->required()->maxLength(2000),
             TextInput::make('driver_name')->label('Motorista no novo horário')->maxLength(255)->visible(fn () => $this->record->status === 'confirmed' && $this->record->mode === 'with_driver')->default(fn () => $this->record->driver_name),
             Toggle::make('driver_verified')->label('Verifiquei a disponibilidade para o novo horário')->visible(fn () => $this->record->status === 'confirmed' && $this->record->mode === 'with_driver'),
