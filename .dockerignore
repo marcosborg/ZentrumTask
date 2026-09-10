@@ -1,6 +1,7 @@
 .git
 .github
 .env
+public/hot
 node_modules
 vendor
 storage/logs/*
