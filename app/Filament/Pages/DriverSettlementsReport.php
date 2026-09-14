@@ -19,6 +19,7 @@ use App\Services\DriverSettlementCalculator;
 use App\Services\SettlementBillingResolver;
 use BackedEnum;
 use Filament\Actions\Action;
+use Filament\Forms\Components\Checkbox;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Select;
@@ -214,6 +215,12 @@ class DriverSettlementsReport extends Page implements HasTable
                 ->searchable()
                 ->native(false)
                 ->nullable(),
+            Checkbox::make('with_receipt')
+                ->label('Com recibo')
+                ->default(false),
+            Checkbox::make('unpaid')
+                ->label('Não pago')
+                ->default(false),
         ];
     }
 
@@ -351,9 +358,6 @@ class DriverSettlementsReport extends Page implements HasTable
                     ->sortable(query: function (Builder $query, string $direction): Builder {
                         return $query->orderBy('drivers.name', $direction);
                     }),
-                ViewColumn::make('green_receipt_path')
-                    ->label('Recibo verde')
-                    ->view('components.settlement-green-receipt'),
                 TextColumn::make('uber_net')
                     ->label('Uber')
                     ->alignRight()
@@ -484,6 +488,9 @@ class DriverSettlementsReport extends Page implements HasTable
                     ->alignRight()
                     ->state(fn (DriverSettlement $record): float => (float) ($record->amount_transferred ?? 0))
                     ->formatStateUsing(fn ($state): string => $this->formatMoney($state)),
+                ViewColumn::make('green_receipt_path')
+                    ->label('Recibo verde')
+                    ->view('components.settlement-green-receipt'),
                 TextColumn::make('is_paid')
                     ->label('Pago')
                     ->badge()
@@ -790,7 +797,7 @@ class DriverSettlementsReport extends Page implements HasTable
     }
 
     /**
-     * @return array{period_start: string|null, period_end: string|null, driver_id: int|null, platform: string|null}
+     * @return array{period_start: string|null, period_end: string|null, driver_id: int|null, platform: string|null, with_receipt: bool, unpaid: bool}
      */
     private function filtersState(): array
     {
@@ -801,6 +808,8 @@ class DriverSettlementsReport extends Page implements HasTable
             'period_start' => $this->normalizeDate($state['period_start'] ?? null),
             'period_end' => $this->normalizeDate($state['period_end'] ?? null),
             'driver_id' => $state['driver_id'] ?? null,
+            'with_receipt' => (bool) ($state['with_receipt'] ?? false),
+            'unpaid' => (bool) ($state['unpaid'] ?? false),
         ];
     }
 
@@ -878,6 +887,15 @@ class DriverSettlementsReport extends Page implements HasTable
 
         if ($driverId) {
             $query->where('driver_settlements.driver_id', $driverId);
+        }
+
+        if ($filters['with_receipt']) {
+            $query->whereNotNull('driver_settlements.green_receipt_path')
+                ->where('driver_settlements.green_receipt_path', '!=', '');
+        }
+
+        if ($filters['unpaid']) {
+            $query->where('driver_settlements.is_paid', false);
         }
 
         if ($platform) {

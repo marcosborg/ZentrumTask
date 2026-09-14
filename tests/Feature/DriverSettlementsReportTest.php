@@ -149,6 +149,36 @@ it('uploads a green receipt through the table action', function () {
     Storage::disk('local')->assertExists($settlement->green_receipt_path);
 });
 
+it('filters settlements by receipt and unpaid status', function (bool $withReceipt, bool $unpaid) {
+    $this->actingAs(\App\Models\User::factory()->create());
+    $settlements = collect([
+        createReportSettlement(['green_receipt_path' => 'receipts/one.pdf', 'is_paid' => false]),
+        createReportSettlement(['green_receipt_path' => 'receipts/two.pdf', 'is_paid' => true]),
+        createReportSettlement(['green_receipt_path' => null, 'is_paid' => false]),
+        createReportSettlement(['green_receipt_path' => '', 'is_paid' => true]),
+    ]);
+    $expected = $settlements->filter(fn (DriverSettlement $settlement): bool => (! $withReceipt || filled($settlement->green_receipt_path)) && (! $unpaid || ! $settlement->is_paid)
+    );
+
+    Livewire::test(DriverSettlementsReport::class, [
+        'filtersForm' => ['period_start' => '2026-05-04', 'period_end' => '2026-05-10'],
+    ])
+        ->set('filtersForm.with_receipt', $withReceipt)
+        ->set('filtersForm.unpaid', $unpaid)
+        ->call('applyFilters')
+        ->assertCanSeeTableRecords($expected)
+        ->assertCanNotSeeTableRecords($settlements->diff($expected))
+        ->set('filtersForm.with_receipt', false)
+        ->set('filtersForm.unpaid', false)
+        ->call('applyFilters')
+        ->assertCanSeeTableRecords($settlements);
+})->with([
+    'no filters' => [false, false],
+    'with receipt' => [true, false],
+    'unpaid' => [false, true],
+    'with receipt and unpaid' => [true, true],
+]);
+
 it('shows upload and open receipt controls in the settlement column', function () {
     $this->actingAs(\App\Models\User::factory()->create());
     $settlement = createReportSettlement();

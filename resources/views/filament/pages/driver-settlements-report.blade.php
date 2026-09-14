@@ -1,7 +1,7 @@
 <x-filament-panels::page>
-    <div class="space-y-6">
+    <div class="flex flex-col gap-6">
         <x-filament::section heading="Filtros">
-            <form wire:submit.prevent="applyFilters" class="space-y-4">
+            <form wire:submit.prevent="applyFilters" class="flex flex-col gap-6">
                 <div>
                     {{ $this->getFiltersForm() }}
                 </div>
