@@ -217,6 +217,13 @@ Route::middleware(['auth'])->get('/admin/driver-settlements/{driverSettlement}/r
 
     abort_if(! $path || ! Storage::disk('local')->exists($path), 404);
 
+    if (request()->boolean('preview')) {
+        return response()->file(Storage::disk('local')->path($path), [
+            'Cache-Control' => 'private, no-store',
+            'X-Content-Type-Options' => 'nosniff',
+        ]);
+    }
+
     return Storage::disk('local')->download($path, basename($path));
 })->name('driver-settlements.green-receipt.download');
 

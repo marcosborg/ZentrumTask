@@ -132,6 +132,7 @@ it('replaces the previous green receipt file on upload', function () {
 
 it('uploads a green receipt through the table action', function () {
     Storage::fake('local');
+    $this->actingAs(\App\Models\User::factory()->create());
 
     $settlement = createReportSettlement();
 
@@ -146,6 +147,42 @@ it('uploads a green receipt through the table action', function () {
         ->and($settlement->green_receipt_uploaded_at)->not->toBeNull();
 
     Storage::disk('local')->assertExists($settlement->green_receipt_path);
+});
+
+it('shows upload and open receipt controls in the settlement column', function () {
+    $this->actingAs(\App\Models\User::factory()->create());
+    $settlement = createReportSettlement();
+
+    $page = Livewire::test(DriverSettlementsReport::class, [
+        'filtersForm' => ['period_start' => '2026-05-04', 'period_end' => '2026-05-10'],
+    ])->assertSee('Carregar PDF')->assertDontSee('Abrir recibo');
+
+    $settlement->update(['green_receipt_path' => 'driver-settlement-receipts/'.$settlement->id.'/receipt.pdf']);
+
+    $page->call('$refresh')->assertSee('Abrir recibo')->assertSee('Substituir PDF');
+});
+
+it('opens a green receipt inline while keeping downloads available', function () {
+    Storage::fake('local');
+    $this->actingAs(\App\Models\User::factory()->create());
+    $settlement = createReportSettlement(['green_receipt_path' => 'driver-settlement-receipts/receipt.pdf']);
+    Storage::disk('local')->put($settlement->green_receipt_path, "%PDF-1.4\n%%EOF");
+
+    $this->get(route('driver-settlements.green-receipt.download', [$settlement, 'preview' => 1]))
+        ->assertSuccessful()
+        ->assertHeader('Content-Type', 'application/pdf');
+
+    $this->get(route('driver-settlements.green-receipt.download', $settlement))
+        ->assertDownload('receipt.pdf');
+});
+
+it('protects receipt previews and handles missing files', function () {
+    Storage::fake('local');
+    $settlement = createReportSettlement(['green_receipt_path' => 'driver-settlement-receipts/missing.pdf']);
+    $url = route('driver-settlements.green-receipt.download', [$settlement, 'preview' => 1]);
+
+    $this->get($url)->assertRedirect(route('login'));
+    $this->actingAs(\App\Models\User::factory()->create())->get($url)->assertNotFound();
 });
 
 it('derives the weekly workflow checklist from email receipt and payment state', function () {

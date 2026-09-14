@@ -30,6 +30,7 @@ use Filament\Pages\Page;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Columns\ViewColumn;
 use Filament\Tables\Concerns\InteractsWithTable;
 use Filament\Tables\Contracts\HasTable;
 use Filament\Tables\Table;
@@ -350,6 +351,9 @@ class DriverSettlementsReport extends Page implements HasTable
                     ->sortable(query: function (Builder $query, string $direction): Builder {
                         return $query->orderBy('drivers.name', $direction);
                     }),
+                ViewColumn::make('green_receipt_path')
+                    ->label('Recibo verde')
+                    ->view('components.settlement-green-receipt'),
                 TextColumn::make('uber_net')
                     ->label('Uber')
                     ->alignRight()
