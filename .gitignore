@@ -1,5 +1,6 @@
 .env
 .vscode
+/.codex-tmp/
 node_modules/
 .terraform/
 *.tfstate
