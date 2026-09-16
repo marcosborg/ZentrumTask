@@ -85,4 +85,18 @@ class RentalVan extends Model
 
         return $rates ? min($rates) : 0;
     }
+
+    public function startingPricingUnit(): string
+    {
+        $rates = [];
+        foreach (['self_drive', 'with_driver'] as $mode) {
+            if ($this->$mode && $this->{$mode.'_rate'} > 0) {
+                $rates[$mode] = (int) $this->{$mode.'_rate'};
+            }
+        }
+        asort($rates);
+        $mode = array_key_first($rates);
+
+        return $mode ? ($this->{$mode.'_pricing_unit'} ?? 'hour') : 'hour';
+    }
 }

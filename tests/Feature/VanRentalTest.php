@@ -61,6 +61,26 @@ it('calculates hours begun minimum hours driver tariff and separate deposit', fu
     expect($quote['estimated_total'])->toBe(12000);
 });
 
+it('calculates exact two day packages without converting them to hourly prices', function (): void {
+    $this->van->update([
+        'self_drive_rate' => 29823,
+        'self_drive_pricing_unit' => 'two_days',
+        'deposit' => 50000,
+    ]);
+
+    $quote = $this->service->quote($this->van, [
+        ...$this->data,
+        'starts_at' => '2026-09-12T08:00',
+        'ends_at' => '2026-09-14T08:00',
+    ]);
+
+    expect($quote)
+        ->pricing_unit->toBe('two_days')
+        ->billable_hours->toBe(1)
+        ->estimated_total->toBe(29823)
+        ->deposit->toBe(50000);
+});
+
 it('validates dates and operating windows', function (string $start, string $end): void {
     expect(fn () => $this->service->quote($this->van, [...$this->data, 'starts_at' => $start, 'ends_at' => $end]))->toThrow(ValidationException::class);
 })->with([

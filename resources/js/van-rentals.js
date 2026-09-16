@@ -29,7 +29,8 @@ if (root) {
                 estimate.textContent = response.status === 422 ? 'Reveja a modalidade e os horários selecionados.' : 'Não foi possível consultar a disponibilidade. Tente novamente.';
                 return;
             }
-            estimate.textContent = `${data.billable_hours} h × ${money(data.hourly_rate)} = ${money(data.estimated_total)} (IVA incluído). Caução separada: ${money(data.deposit)}. Extras sob orçamento. Sujeito a confirmação.`;
+            const units = data.pricing_unit === 'two_days' ? `${data.billable_hours} pacote${data.billable_hours === 1 ? '' : 's'} de 2 dias` : `${data.billable_hours} h`;
+            estimate.textContent = `${units} × ${money(data.hourly_rate)} = ${money(data.estimated_total)} (IVA incluído). Caução separada: ${money(data.deposit)}. Extras sob orçamento. Sujeito a confirmação.`;
             submit.disabled = false;
         } catch (exception) {
             if (exception.name !== 'AbortError') estimate.textContent = 'Sem ligação. Volte a selecionar o horário para tentar novamente.';
@@ -76,9 +77,10 @@ if (root) {
             end.value = '';
             details.textContent = `Levantamento selecionado para ${value.split('-').reverse().join('/')}. Selecione agora o dia de entrega.`;
         } else {
-            end.value = `${value}T${root.dataset.closes}`;
+            const returnTime = value === pickupDay ? root.dataset.closes : root.dataset.opens;
+            end.value = `${value}T${returnTime}`;
             const occupancy = busy.length ? ` Existem períodos ocupados nesse dia: ${busy.map((period) => `${localTime(period.start)} → ${localTime(period.end)}`).join('; ')}.` : '';
-            details.textContent = `Entrega selecionada para ${value.split('-').reverse().join('/')} às ${root.dataset.closes}.${occupancy}`;
+            details.textContent = `Entrega selecionada para ${value.split('-').reverse().join('/')} às ${returnTime}.${occupancy}`;
         }
 
         details.hidden = false;

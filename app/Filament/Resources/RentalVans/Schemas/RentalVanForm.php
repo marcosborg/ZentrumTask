@@ -43,8 +43,10 @@ class RentalVanForm
             Section::make('Modalidades e preços')->columns(2)->columnSpanFull()->schema([
                 Toggle::make('self_drive')->label('Sem motorista')->default(true),
                 Toggle::make('with_driver')->label('Com motorista'),
-                self::money('self_drive_rate', 'Sem motorista / hora'),
-                self::money('with_driver_rate', 'Com motorista / hora'),
+                self::money('self_drive_rate', 'Preço sem motorista'),
+                Select::make('self_drive_pricing_unit')->label('Unidade sem motorista')->options(['hour' => 'Por hora', 'two_days' => 'Pacote de 2 dias'])->default('hour')->required(),
+                self::money('with_driver_rate', 'Preço com motorista'),
+                Select::make('with_driver_pricing_unit')->label('Unidade com motorista')->options(['hour' => 'Por hora', 'two_days' => 'Pacote de 2 dias'])->default('hour')->required(),
                 self::money('deposit', 'Caução (separada do aluguer)')->default(0)->required(),
                 TextInput::make('minimum_hours')->label('Mínimo de horas')->integer()->minValue(1)->maxValue(720)->default(1)->required(),
                 TextInput::make('buffer_minutes')->label('Preparação entre reservas (minutos)')->integer()->minValue(0)->maxValue(1440)->default(30)->required(),

@@ -77,14 +77,22 @@ class VanRentalService
         if ($rate <= 0) {
             throw ValidationException::withMessages(['mode' => 'Tarifa indisponível. Contacte a equipa.']);
         }
-        $hours = max($reservation?->terms['minimum_hours'] ?? $van->minimum_hours, (int) ceil($start->diffInSeconds($end) / 3600));
+        $pricingUnit = $reservation?->terms['pricing_unit'] ?? ($van->{$data['mode'].'_pricing_unit'} ?? 'hour');
+        $duration = $start->diffInSeconds($end);
+        $billableUnits = $pricingUnit === 'two_days'
+            ? max(1, (int) ceil($duration / (48 * 3600)))
+            : max($reservation?->terms['minimum_hours'] ?? $van->minimum_hours, (int) ceil($duration / 3600));
+        $terms = $reservation?->terms ?? [
+            ...$van->only(['minimum_hours', 'pickup_location', 'mileage_terms', 'fuel_terms', 'cancellation_terms', 'rental_terms']),
+            'pricing_unit' => $pricingUnit,
+        ];
 
         return [
             'starts_at' => $start, 'ends_at' => $end,
-            'hourly_rate' => $rate, 'billable_hours' => $hours,
-            'estimated_total' => $rate * $hours, 'deposit' => $reservation?->deposit ?? $van->deposit,
+            'hourly_rate' => $rate, 'billable_hours' => $billableUnits, 'pricing_unit' => $pricingUnit,
+            'estimated_total' => $rate * $billableUnits, 'deposit' => $reservation?->deposit ?? $van->deposit,
             'buffer_minutes' => $reservation?->buffer_minutes ?? $van->buffer_minutes,
-            'terms' => $reservation?->terms ?? $van->only(['minimum_hours', 'pickup_location', 'mileage_terms', 'fuel_terms', 'cancellation_terms', 'rental_terms']),
+            'terms' => $terms,
         ];
     }
 

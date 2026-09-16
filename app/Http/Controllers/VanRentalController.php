@@ -78,7 +78,7 @@ class VanRentalController extends Controller
         abort_unless($van->status === 'published', 404);
         $quote = $service->quote($van, $request->validated());
 
-        return response()->json(collect($quote)->only(['hourly_rate', 'billable_hours', 'estimated_total', 'deposit'])->all());
+        return response()->json(collect($quote)->only(['hourly_rate', 'billable_hours', 'pricing_unit', 'estimated_total', 'deposit'])->all());
     }
 
     public function store(StoreVanReservationRequest $request, RentalVan $van, VanRentalService $service, VanRentalKanbanService $kanban): RedirectResponse
