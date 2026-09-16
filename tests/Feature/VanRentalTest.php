@@ -34,6 +34,13 @@ it('isolates the van catalogue and hides unpublished vehicles and private detail
     $this->get(route('van-rentals.quote', $this->van))->assertNotFound();
 });
 
+it('presents the availability calendar as a pickup and return date selector', function (): void {
+    $this->get($this->van->publicUrl())
+        ->assertSuccessful()
+        ->assertSee('Selecione primeiro o dia de levantamento e depois o dia de entrega.')
+        ->assertSee('data-closes=', false);
+});
+
 it('shows up to four featured vans and does not duplicate a configured menu entry', function (): void {
     $this->van->update(['featured' => true]);
     WebsiteMenuItem::factory()->create(['label' => 'Aluguer de carrinhas', 'url' => '/aluguer-carrinhas']);

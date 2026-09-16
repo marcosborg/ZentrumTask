@@ -13,6 +13,7 @@ if (root) {
     const localTime = (date) => new Intl.DateTimeFormat('pt-PT', { timeZone: 'Europe/Lisbon', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }).format(new Date(date));
     const localDay = (date) => new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Lisbon', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(date));
     const error = (field, value) => { const target = form.querySelector(`[data-error="${field}"]`); if (target) target.textContent = value; };
+    const selectedDay = (input) => input.value ? input.value.slice(0, 10) : '';
     async function quote() {
         quoteController?.abort();
         quoteController = new AbortController();
@@ -43,7 +44,7 @@ if (root) {
         quote();
     }
     mode.addEventListener('change', updateMode);
-    [start, end].forEach((input) => input.addEventListener('change', quote));
+    [start, end].forEach((input) => input.addEventListener('change', () => { updateCalendarSelection(); quote(); }));
     form.addEventListener('submit', () => { submit.disabled = true; submit.textContent = 'A enviar pedido…'; });
     window.addEventListener('pageshow', () => { submit.textContent = 'Enviar pedido de reserva ↗'; quote(); });
     root.querySelectorAll('[data-gallery-photo]').forEach((button) => button.addEventListener('click', () => { root.querySelector('[data-main-photo]').src = button.dataset.galleryPhoto; }));
@@ -51,6 +52,39 @@ if (root) {
     const calendar = root.querySelector('[data-calendar]');
     const status = root.querySelector('[data-calendar-status]');
     const details = root.querySelector('[data-day-details]');
+    function updateCalendarSelection() {
+        const pickupDay = selectedDay(start);
+        const returnDay = selectedDay(end);
+        calendar.querySelectorAll('button[data-date]').forEach((button) => {
+            const day = button.dataset.date;
+            let selection = '';
+            if (day === pickupDay) selection = 'start';
+            if (day === returnDay) selection = day === pickupDay ? 'start' : 'end';
+            if (pickupDay && returnDay && day > pickupDay && day < returnDay) selection = 'range';
+            if (selection) button.dataset.selection = selection;
+            else delete button.dataset.selection;
+            button.setAttribute('aria-pressed', selection === 'start' || selection === 'end' ? 'true' : 'false');
+        });
+    }
+    function selectRentalDay(value, busy) {
+        const pickupDay = selectedDay(start);
+        const returnDay = selectedDay(end);
+        const isChoosingPickup = !pickupDay || Boolean(returnDay) || value < pickupDay;
+
+        if (isChoosingPickup) {
+            start.value = `${value}T${root.dataset.opens}`;
+            end.value = '';
+            details.textContent = `Levantamento selecionado para ${value.split('-').reverse().join('/')}. Selecione agora o dia de entrega.`;
+        } else {
+            end.value = `${value}T${root.dataset.closes}`;
+            const occupancy = busy.length ? ` Existem períodos ocupados nesse dia: ${busy.map((period) => `${localTime(period.start)} → ${localTime(period.end)}`).join('; ')}.` : '';
+            details.textContent = `Entrega selecionada para ${value.split('-').reverse().join('/')} às ${root.dataset.closes}.${occupancy}`;
+        }
+
+        details.hidden = false;
+        updateCalendarSelection();
+        quote();
+    }
     async function loadCalendar() {
         calendarController?.abort();
         calendarController = new AbortController();
@@ -71,22 +105,16 @@ if (root) {
                 const button = document.createElement('button');
                 button.type = 'button';
                 button.textContent = String(day);
+                button.dataset.date = value;
                 button.dataset.busy = busy.length > 0;
                 button.disabled = value < root.dataset.today;
                 button.setAttribute('aria-label', `${day}/${m}/${year}${busy.length ? ', com períodos ocupados' : ', consultar horários'}`);
                 button.setAttribute('aria-pressed', 'false');
                 if (busy.length) { const label = document.createElement('small'); label.textContent = 'Ocupação'; button.append(label); }
-                button.addEventListener('click', () => {
-                    calendar.querySelectorAll('button').forEach((item) => item.setAttribute('aria-pressed', 'false'));
-                    button.setAttribute('aria-pressed', 'true');
-                    details.hidden = false;
-                    details.textContent = busy.length ? `Períodos indisponíveis: ${busy.map((p) => `${localTime(p.start)} → ${localTime(p.end)}`).join('; ')}. Consulte uma estimativa para validar o horário.` : 'Sem reservas confirmadas neste dia. Escolha o início e o fim para verificar o horário exato.';
-                    start.value = `${value}T${root.dataset.opens}`;
-                    if (!end.value || end.value <= start.value) end.value = '';
-                    quote();
-                });
+                button.addEventListener('click', () => selectRentalDay(value, busy));
                 calendar.append(button);
             }
+            updateCalendarSelection();
             status.textContent = 'Disponibilidade sujeita a confirmação. Os dados dos clientes são privados.';
         } catch (exception) { if (exception.name !== 'AbortError') status.textContent = 'Não foi possível carregar o calendário. Pode consultar o horário através da estimativa.'; }
     }

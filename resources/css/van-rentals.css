@@ -36,7 +36,8 @@
 .van-calendar button { min-height:48px; padding:5px; border:1px solid #dae3de; border-radius:8px; background:white; color:#173e33; }
 .van-calendar button[data-busy=true] { background:#fff1da; border-color:#dfb876; }
 .van-calendar button:disabled { color:#aaa; background:#f6f7f6; }
-.van-calendar button[aria-pressed=true] { outline:2px solid #17796e; background:#e2f2ec; }
+.van-calendar button[data-selection=range] { background:#edf7f3; border-color:#8dbeb2; }
+.van-calendar button[data-selection=start], .van-calendar button[data-selection=end] { outline:2px solid #17796e; background:#d5eee5; font-weight:700; }
 .van-calendar small { font-size:.6rem; display:block; }
 .van-gallery-main { width:100%; aspect-ratio:4/3; object-fit:cover; border-radius:16px; background:#eef2ef; }
 .van-gallery-thumbs { display:flex; gap:10px; overflow:auto; padding:12px 0; }

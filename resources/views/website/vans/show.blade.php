@@ -4,7 +4,7 @@
 @push('styles') @vite('resources/css/van-rentals.css') @endpush
 @push('scripts') @vite('resources/js/van-rentals.js') @endpush
 @section('content')
-<main class="van-area" data-van-rental data-availability="{{ route('van-rentals.availability', $van) }}" data-quote="{{ route('van-rentals.quote', $van) }}" data-opens="{{ substr($van->opens_at, 0, 5) }}" data-today="{{ now('Europe/Lisbon')->format('Y-m-d') }}">
+<main class="van-area" data-van-rental data-availability="{{ route('van-rentals.availability', $van) }}" data-quote="{{ route('van-rentals.quote', $van) }}" data-opens="{{ substr($van->opens_at, 0, 5) }}" data-closes="{{ substr($van->closes_at, 0, 5) }}" data-today="{{ now('Europe/Lisbon')->format('Y-m-d') }}">
     <section class="van-section"><div class="container">
         <a href="{{ route('van-rentals.index') }}" class="van-small">← Todas as carrinhas</a>
         <div class="vr:mt-5 vr:mb-8"><span class="van-kicker">Mercadorias & mudanças</span><h1 class="vr:mt-3">{{ $van->name }}</h1><div class="van-tags">@if($van->self_drive)<span class="van-tag">Sem motorista</span>@endif @if($van->with_driver)<span class="van-tag">Com motorista</span>@endif</div></div>
@@ -35,7 +35,7 @@
                     <label for="van-month">Calendário de disponibilidade</label><input type="month" id="van-month" data-calendar-month value="{{ now('Europe/Lisbon')->format('Y-m') }}" class="vr:my-3">
                     <div class="van-calendar van-small vr:mb-2" aria-hidden="true">@foreach(['Seg','Ter','Qua','Qui','Sex','Sáb','Dom'] as $day)<span>{{ $day }}</span>@endforeach</div>
                     <div class="van-calendar" data-calendar aria-label="Dias do mês"></div>
-                    <p class="van-small vr:mt-3">Dias a âmbar têm períodos ocupados, incluindo preparação. Selecione um dia para consultar os horários.</p>
+                    <p class="van-small vr:mt-3">Selecione primeiro o dia de levantamento e depois o dia de entrega. Dias a âmbar têm períodos ocupados, incluindo preparação.</p>
                     <p data-calendar-status role="status" class="van-small"></p><div data-day-details class="van-notice van-small" hidden></div>
                 </div>
                 <form method="post" action="{{ route('van-rentals.store', $van) }}" data-reservation-form class="vr:grid vr:gap-5">
