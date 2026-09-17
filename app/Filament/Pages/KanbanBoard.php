@@ -597,13 +597,7 @@ Estas são as condições para o aluguer da viatura:
 🛣️ Quilometragem incluída: 2.500 km por semana
 ➕ Quilómetros adicionais: 0,12 € por km
 
-A caução total é de 1.000 €.
-
-Neste momento, temos uma modalidade promocional de pagamento faseado da caução:
-
-- pagamento inicial de 250 €, acrescido de IVA quando legalmente aplicável;
-- pagamento adicional de 25 € por semana durante 30 semanas;
-- permanência mínima contratual de 3 meses.
+As restantes condições do aluguer são explicadas pela nossa equipa durante o contacto.
 
 Para avançarmos com a análise e preparação do processo, deverá enviar para este WhatsApp fotografias ou cópias legíveis dos seguintes documentos:
 

@@ -5,7 +5,6 @@ namespace App\Filament\Resources\CandidateApplications\Pages;
 use App\Filament\Resources\CandidateApplications\CandidateApplicationResource;
 use App\Filament\Resources\Drivers\DriverResource;
 use App\Models\Driver;
-use App\Services\IfthenpayMultibancoService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Filament\Actions\Action;
 use Filament\Forms\Components\DateTimePicker;
@@ -42,20 +41,6 @@ class ViewCandidateApplication extends ViewRecord
                         fn () => print ($pdf->output()),
                         'reserva-'.$record->id.'.pdf'
                     );
-                }),
-            Action::make('refreshPaymentReference')
-                ->label('Gerar / atualizar referência')
-                ->icon('heroicon-o-credit-card')
-                ->color('gray')
-                ->action(function (IfthenpayMultibancoService $paymentService): void {
-                    $paymentService->ensureReference($this->record);
-                    $this->record->refresh();
-
-                    Notification::make()
-                        ->success()
-                        ->title('Referência atualizada')
-                        ->body('Os dados de pagamento da reserva foram atualizados.')
-                        ->send();
                 }),
             Action::make('markPaymentAsPaid')
                 ->label('Marcar pagamento manual')

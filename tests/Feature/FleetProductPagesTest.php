@@ -76,6 +76,9 @@ it('shows tvde vehicles on the homepage and links to the product page', function
         ->assertSee('Pedir contacto')
         ->assertSee('Aluguer semanal')
         ->assertSee('325,50&euro;', false)
+        ->assertDontSee('Caução')
+        ->assertDontSee('Reserva imediata')
+        ->assertDontSee('Iniciar reserva')
         ->assertSee('Autonomia alargada e conforto para TVDE.')
         ->assertSee('application/ld+json', false);
 });
@@ -92,6 +95,19 @@ it('does not show non tvde vehicles publicly', function () {
 
     $this->get(route('vehicle.show', ['vehicle' => $vehicle, 'slug' => $vehicle->publicSlug()]))->assertNotFound();
     $this->get('/')->assertDontSee('BYD Seal');
+});
+
+it('uses the application form only to request contact without payment details', function () {
+    $this->get(route('reserva.show'))
+        ->assertSuccessful()
+        ->assertSee('Pedido de contacto')
+        ->assertSee('Aluguer semanal')
+        ->assertSee('As condições são explicadas diretamente no contacto')
+        ->assertDontSee('caução', false)
+        ->assertDontSee('Multibanco')
+        ->assertDontSee('Continuar para pagamento');
+
+    $this->post('/reserva/payment')->assertNotFound();
 });
 
 it('shows all tvde vehicles on the full fleet page including unavailable ones', function () {

@@ -187,7 +187,6 @@ Route::get('/reserva', [CandidateApplicationController::class, 'show'])->name('r
 Route::post('/reserva/save', [CandidateApplicationController::class, 'save'])->name('reserva.save');
 Route::post('/reserva/submit', [CandidateApplicationController::class, 'submit'])->name('reserva.submit');
 Route::post('/reserva/upload', [CandidateApplicationController::class, 'upload'])->name('reserva.upload');
-Route::post('/reserva/payment', [CandidateApplicationController::class, 'payment'])->name('reserva.payment');
 Route::get('/payments/ifthenpay/reserva/callback', [CandidateApplicationController::class, 'paymentCallback'])
     ->withoutMiddleware([VerifyCsrfToken::class])
     ->name('payments.ifthenpay.reserva.callback');

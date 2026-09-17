@@ -80,8 +80,6 @@ return [
         'sub_entity' => env('IFTHENPAY_SUB_ENTITY', '054'),
         'anti_phishing_key' => env('IFTHENPAY_ANTI_PHISHING_KEY'),
         'expiry_days' => env('IFTHENPAY_EXPIRY_DAYS'),
-        'initial_deposit_amount' => env('IFTHENPAY_INITIAL_DEPOSIT_AMOUNT', 250),
-        'initial_deposit_vat_rate' => env('IFTHENPAY_INITIAL_DEPOSIT_VAT_RATE', 23),
     ],
 
     'tesla' => [

@@ -33,15 +33,10 @@
 
 @section('content')
   @php
-      $reservationOffer = \App\Support\ReservationOfferContent::data();
       $galleryImages = $vehicle->galleryImageUrls();
       $heroImage = $galleryImages[0] ?? asset('website/assets/car_sedan.png');
       $secondaryImages = collect($galleryImages)->slice(1, 4)->values();
       $contactModalId = 'vehicle-contact-modal-'.$vehicle->getKey();
-      $reservationCtaId = 'reservation-cta-'.$vehicle->getKey();
-      $isVehicleAvailable = $vehicle->status === 'available';
-      $reservationUnavailableMessage = 'A viatura já não está disponível. Se desejar saber quais as viaturas disponiveis, queira entrar em contacto nos botões Ligar agora ou Pedir contacto';
-      $reservationTaxMessage = $reservationOffer['tax_message'];
   @endphp
 
   <section class="fleet-product-hero">
@@ -116,105 +111,10 @@
               <button type="button" class="btn btn-primary btn-lg fleet-detail-primary" data-bs-toggle="modal" data-bs-target="#{{ $contactModalId }}">
                 Pedir contacto
               </button>
-              <a
-                href="{{ $isVehicleAvailable ? '#'.$reservationCtaId : '#' }}"
-                class="btn btn-outline-primary btn-lg fleet-detail-reserve @unless($isVehicleAvailable) is-disabled @endunless"
-                @unless($isVehicleAvailable) data-unavailable-alert="true" aria-disabled="true" @endunless
-              >
-                Reserva imediata
-              </a>
             </div>
 
-            <div class="fleet-unavailable-notice" id="fleet-unavailable-notice" hidden aria-live="polite">
-              <div class="fleet-unavailable-notice__icon" aria-hidden="true">!</div>
-              <div class="fleet-unavailable-notice__copy">
-                <strong>Viatura indisponível neste momento</strong>
-                <p>{{ $reservationUnavailableMessage }}</p>
-              </div>
-            </div>
           </div>
 
-          <div class="fleet-reservation-card mt-4">
-            <div class="fleet-reservation-head">
-              <span class="fleet-reservation-kicker">Reserva imediata</span>
-              <h2>Reserve esta viatura com 250€
-                <span class="fleet-tax-popover">
-                  <button type="button" class="fleet-tax-link" aria-label="Informação sobre IVA">*</button>
-                  <span class="fleet-tax-popover__bubble" role="tooltip">{{ $reservationTaxMessage }}</span>
-                </span>
-                de caução inicial
-              </h2>
-              <p>
-                Garanta já a viatura, avance com a reserva e finalize o processo assim que liquidar a referência
-                multibanco dos 250€
-                <span class="fleet-tax-popover">
-                  <button type="button" class="fleet-tax-link" aria-label="Informação sobre IVA">*</button>
-                  <span class="fleet-tax-popover__bubble" role="tooltip">{{ $reservationTaxMessage }}</span>
-                </span>
-                iniciais.
-              </p>
-            </div>
-
-            <div class="fleet-reservation-highlight">
-              @if ($vehicle->hasWeeklyRentalPrice())
-                <div class="fleet-reservation-highlight-item">
-                  <span>Aluguer semanal</span>
-                  <strong>{{ $vehicle->weeklyRentalPriceFormatted() }}&euro;</strong>
-                </div>
-              @endif
-              <div class="fleet-reservation-highlight-item">
-                <span>Caução inicial</span>
-                <div class="fleet-highlight-value">
-                  <strong>{{ $reservationOffer['formatted_base_amount'] }}</strong>
-                  <span class="fleet-tax-popover fleet-tax-popover--inline">
-                    <button type="button" class="fleet-tax-link fleet-tax-link--inline" aria-label="Informação sobre IVA">*</button>
-                    <span class="fleet-tax-popover__bubble" role="tooltip">{{ $reservationTaxMessage }}</span>
-                  </span>
-                </div>
-              </div>
-              <div class="fleet-reservation-highlight-item">
-                <span>Km incluídos</span>
-                <strong>{{ $reservationOffer['included_km'] }}</strong>
-              </div>
-              <div class="fleet-reservation-highlight-item">
-                <span>Extrato semanal</span>
-                <strong>{{ $reservationOffer['statement_deadline'] }}</strong>
-              </div>
-            </div>
-
-            @foreach ($reservationOffer['sections'] as $section)
-              <div class="fleet-reservation-section">
-                <h3>{{ $section['title'] }}</h3>
-                <ul class="fleet-reservation-list">
-                  @foreach ($section['items'] as $item)
-                    <li>
-                      {!! str_replace($reservationOffer['formatted_base_amount'], $reservationOffer['formatted_base_amount'].'<span class="fleet-tax-popover fleet-tax-popover--inline"><button type="button" class="fleet-tax-link fleet-tax-link--inline" aria-label="Informação sobre IVA">*</button><span class="fleet-tax-popover__bubble" role="tooltip">'.$reservationTaxMessage.'</span></span>', e($item)) !!}
-                    </li>
-                  @endforeach
-                </ul>
-              </div>
-            @endforeach
-
-            @if ($isVehicleAvailable)
-              <div class="fleet-reservation-cta">
-                <p>
-                  Se esta viatura faz sentido para si, avance já com a reserva e prepare o pagamento dos {{ $reservationOffer['formatted_base_amount'] }}
-                  <span class="fleet-tax-popover">
-                    <button type="button" class="fleet-tax-link" aria-label="Informação sobre IVA">*</button>
-                    <span class="fleet-tax-popover__bubble" role="tooltip">{{ $reservationTaxMessage }}</span>
-                  </span>
-                  iniciais para garantir a reserva.
-                </p>
-                <a
-                  href="{{ route('reserva.show', ['vehicle' => $vehicle->getKey()]) }}"
-                  class="btn btn-primary btn-lg"
-                  id="{{ $reservationCtaId }}"
-                >
-                  Iniciar reserva
-                </a>
-              </div>
-            @endif
-          </div>
         </div>
       </div>
     </div>
@@ -738,25 +638,6 @@
 @endpushOnce
 
 @pushOnce('scripts')
-  <script>
-    document.addEventListener('DOMContentLoaded', function () {
-      var unavailableNotice = document.getElementById('fleet-unavailable-notice');
-
-      document.querySelectorAll('[data-unavailable-alert="true"]').forEach(function (element) {
-        element.addEventListener('click', function (event) {
-          event.preventDefault();
-
-          if (! unavailableNotice) {
-            return;
-          }
-
-          unavailableNotice.hidden = false;
-          unavailableNotice.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-        });
-      });
-    });
-  </script>
-
   @if ($errors->any() || session('contact_success'))
     <script>
       document.addEventListener('DOMContentLoaded', function () {
