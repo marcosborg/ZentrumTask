@@ -1,6 +1,8 @@
 .env
 .vscode
 /.codex-tmp/
+/output/imagegen/
+/tmp/
 node_modules/
 .terraform/
 *.tfstate
@@ -8,3 +10,4 @@ node_modules/
 tfplan
 public/build/
 /storage/app/private/firebase-service-account.json
+/vendor/pestphp/pest/.temp/test-results
