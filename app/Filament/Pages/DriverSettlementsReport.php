@@ -272,7 +272,7 @@ class DriverSettlementsReport extends Page implements HasTable
     public function hasGreenReceiptFile(DriverSettlement $record): bool
     {
         return $this->hasGreenReceipt($record)
-            && Storage::disk('local')->exists((string) $record->green_receipt_path);
+            && Storage::disk($this->greenReceiptDiskName())->exists((string) $record->green_receipt_path);
     }
 
     public function saveGreenReceipt(DriverSettlement $record, string $path): void
@@ -280,7 +280,7 @@ class DriverSettlementsReport extends Page implements HasTable
         $previousPath = $record->green_receipt_path;
 
         if ($previousPath && $previousPath !== $path) {
-            Storage::disk('local')->delete($previousPath);
+            Storage::disk($this->greenReceiptDiskName())->delete($previousPath);
         }
 
         $record->forceFill([
@@ -295,7 +295,9 @@ class DriverSettlementsReport extends Page implements HasTable
         $record->refresh();
         $path = $record->green_receipt_path;
 
-        if (! $path || ! Storage::disk('local')->exists($path)) {
+        $disk = Storage::disk($this->greenReceiptDiskName());
+
+        if (! $path || ! $disk->exists($path)) {
             Notification::make()
                 ->danger()
                 ->title('Recibo verde indisponivel')
@@ -305,7 +307,7 @@ class DriverSettlementsReport extends Page implements HasTable
             return null;
         }
 
-        return Storage::disk('local')->download($path, basename($path));
+        return $disk->download($path, basename($path));
     }
 
     public function markSettlementPaid(DriverSettlement $record): bool
@@ -1371,7 +1373,8 @@ class DriverSettlementsReport extends Page implements HasTable
             ->form([
                 FileUpload::make('green_receipt_file')
                     ->label('Ficheiro')
-                    ->disk('local')
+                    ->disk($this->greenReceiptDiskName())
+                    ->visibility('private')
                     ->directory(fn (?DriverSettlement $record = null): string => 'driver-settlement-receipts/'.($record?->getKey() ?? Str::uuid()->toString()))
                     ->acceptedFileTypes([
                         'application/pdf',
@@ -1427,7 +1430,7 @@ class DriverSettlementsReport extends Page implements HasTable
         if ($state instanceof TemporaryUploadedFile) {
             return $state->store(
                 'driver-settlement-receipts/'.($record?->getKey() ?? Str::uuid()->toString()),
-                ['disk' => 'local']
+                ['disk' => $this->greenReceiptDiskName()]
             );
         }
 
@@ -1442,6 +1445,11 @@ class DriverSettlementsReport extends Page implements HasTable
         }
 
         return null;
+    }
+
+    private function greenReceiptDiskName(): string
+    {
+        return (string) config('filesystems.settlement_receipts_disk', 'local');
     }
 
     private function manageAdjustmentsAction(): Action

@@ -37,6 +37,11 @@ return [
 
     'default' => env('FILESYSTEM_DISK', 'local'),
 
+    'settlement_receipts_disk' => env(
+        'SETTLEMENT_RECEIPTS_DISK',
+        env('APP_ENV') === 'production' ? 's3' : 'local',
+    ),
+
     /*
     |--------------------------------------------------------------------------
     | Filesystem Disks

@@ -221,6 +221,31 @@ it('opens a green receipt inline while keeping downloads available', function ()
         ->assertDownload('receipt.pdf');
 });
 
+it('stores and serves green receipts from the configured private disk', function () {
+    config()->set('filesystems.settlement_receipts_disk', 's3');
+    Storage::fake('s3');
+    $this->actingAs(\App\Models\User::factory()->create());
+
+    $settlement = createReportSettlement([
+        'green_receipt_path' => 'driver-settlement-receipts/1/old.pdf',
+    ]);
+    Storage::disk('s3')->put('driver-settlement-receipts/1/old.pdf', 'old');
+    Storage::disk('s3')->put('driver-settlement-receipts/1/new.pdf', "%PDF-1.4\n%%EOF");
+
+    $page = new DriverSettlementsReport;
+    $page->saveGreenReceipt($settlement, 'driver-settlement-receipts/1/new.pdf');
+
+    Storage::disk('s3')->assertMissing('driver-settlement-receipts/1/old.pdf');
+    Storage::disk('s3')->assertExists('driver-settlement-receipts/1/new.pdf');
+
+    $this->get(route('driver-settlements.green-receipt.download', [$settlement, 'preview' => 1]))
+        ->assertSuccessful()
+        ->assertHeader('Content-Type', 'application/pdf');
+
+    $this->get(route('driver-settlements.green-receipt.download', $settlement))
+        ->assertDownload('new.pdf');
+});
+
 it('protects receipt previews and handles missing files', function () {
     Storage::fake('local');
     $settlement = createReportSettlement(['green_receipt_path' => 'driver-settlement-receipts/missing.pdf']);

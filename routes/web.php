@@ -213,17 +213,18 @@ Route::get('/media-proxy/{uuid}/{conversion?}', [MediaProxyController::class, 's
 
 Route::middleware(['auth'])->get('/admin/driver-settlements/{driverSettlement}/recibo-verde', function (DriverSettlement $driverSettlement) {
     $path = $driverSettlement->green_receipt_path;
+    $disk = Storage::disk(config('filesystems.settlement_receipts_disk', 'local'));
 
-    abort_if(! $path || ! Storage::disk('local')->exists($path), 404);
+    abort_if(! $path || ! $disk->exists($path), 404);
 
     if (request()->boolean('preview')) {
-        return response()->file(Storage::disk('local')->path($path), [
+        return $disk->response($path, basename($path), [
             'Cache-Control' => 'private, no-store',
             'X-Content-Type-Options' => 'nosniff',
-        ]);
+        ], 'inline');
     }
 
-    return Storage::disk('local')->download($path, basename($path));
+    return $disk->download($path, basename($path));
 })->name('driver-settlements.green-receipt.download');
 
 Route::middleware(['auth'])->get('/admin/ajustes/exemplo.csv', function () {
