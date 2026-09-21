@@ -137,6 +137,11 @@ it('uploads a green receipt through the table action', function () {
     $settlement = createReportSettlement();
 
     Livewire::test(DriverSettlementsReport::class)
+        ->assertTableActionExists(
+            'manageGreenReceipt',
+            fn (\Filament\Actions\Action $action): bool => $action->getExtraAttributes()['class'] === 'hidden',
+            $settlement,
+        )
         ->callTableAction('manageGreenReceipt', $settlement, [
             'green_receipt_file' => UploadedFile::fake()->create('recibo-verde.pdf', 64, 'application/pdf'),
         ]);
@@ -149,7 +154,7 @@ it('uploads a green receipt through the table action', function () {
     Storage::disk('local')->assertExists($settlement->green_receipt_path);
 });
 
-it('filters settlements by receipt and unpaid status', function (bool $withReceipt, bool $unpaid) {
+it('filters settlements by receipt and payment status', function (bool $withReceipt, bool $withoutReceipt, bool $unpaid, bool $paid) {
     $this->actingAs(\App\Models\User::factory()->create());
     $settlements = collect([
         createReportSettlement(['green_receipt_path' => 'receipts/one.pdf', 'is_paid' => false]),
@@ -157,26 +162,36 @@ it('filters settlements by receipt and unpaid status', function (bool $withRecei
         createReportSettlement(['green_receipt_path' => null, 'is_paid' => false]),
         createReportSettlement(['green_receipt_path' => '', 'is_paid' => true]),
     ]);
-    $expected = $settlements->filter(fn (DriverSettlement $settlement): bool => (! $withReceipt || filled($settlement->green_receipt_path)) && (! $unpaid || ! $settlement->is_paid)
+    $expected = $settlements->filter(fn (DriverSettlement $settlement): bool => (! $withReceipt || filled($settlement->green_receipt_path))
+        && (! $withoutReceipt || blank($settlement->green_receipt_path))
+        && (! $unpaid || ! $settlement->is_paid)
+        && (! $paid || $settlement->is_paid)
     );
 
     Livewire::test(DriverSettlementsReport::class, [
         'filtersForm' => ['period_start' => '2026-05-04', 'period_end' => '2026-05-10'],
     ])
         ->set('filtersForm.with_receipt', $withReceipt)
+        ->set('filtersForm.without_receipt', $withoutReceipt)
         ->set('filtersForm.unpaid', $unpaid)
+        ->set('filtersForm.paid', $paid)
         ->call('applyFilters')
         ->assertCanSeeTableRecords($expected)
         ->assertCanNotSeeTableRecords($settlements->diff($expected))
         ->set('filtersForm.with_receipt', false)
+        ->set('filtersForm.without_receipt', false)
         ->set('filtersForm.unpaid', false)
+        ->set('filtersForm.paid', false)
         ->call('applyFilters')
         ->assertCanSeeTableRecords($settlements);
 })->with([
-    'no filters' => [false, false],
-    'with receipt' => [true, false],
-    'unpaid' => [false, true],
-    'with receipt and unpaid' => [true, true],
+    'no filters' => [false, false, false, false],
+    'with receipt' => [true, false, false, false],
+    'without receipt' => [false, true, false, false],
+    'unpaid' => [false, false, true, false],
+    'paid' => [false, false, false, true],
+    'with receipt and unpaid' => [true, false, true, false],
+    'without receipt and paid' => [false, true, false, true],
 ]);
 
 it('shows upload and open receipt controls in the settlement column', function () {

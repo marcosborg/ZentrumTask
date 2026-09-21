@@ -218,8 +218,14 @@ class DriverSettlementsReport extends Page implements HasTable
             Checkbox::make('with_receipt')
                 ->label('Com recibo')
                 ->default(false),
+            Checkbox::make('without_receipt')
+                ->label('Sem recibo')
+                ->default(false),
             Checkbox::make('unpaid')
                 ->label('Não pago')
+                ->default(false),
+            Checkbox::make('paid')
+                ->label('Pago')
                 ->default(false),
         ];
     }
@@ -797,7 +803,7 @@ class DriverSettlementsReport extends Page implements HasTable
     }
 
     /**
-     * @return array{period_start: string|null, period_end: string|null, driver_id: int|null, platform: string|null, with_receipt: bool, unpaid: bool}
+     * @return array{period_start: string|null, period_end: string|null, driver_id: int|null, platform: string|null, with_receipt: bool, without_receipt: bool, unpaid: bool, paid: bool}
      */
     private function filtersState(): array
     {
@@ -809,7 +815,9 @@ class DriverSettlementsReport extends Page implements HasTable
             'period_end' => $this->normalizeDate($state['period_end'] ?? null),
             'driver_id' => $state['driver_id'] ?? null,
             'with_receipt' => (bool) ($state['with_receipt'] ?? false),
+            'without_receipt' => (bool) ($state['without_receipt'] ?? false),
             'unpaid' => (bool) ($state['unpaid'] ?? false),
+            'paid' => (bool) ($state['paid'] ?? false),
         ];
     }
 
@@ -894,8 +902,19 @@ class DriverSettlementsReport extends Page implements HasTable
                 ->where('driver_settlements.green_receipt_path', '!=', '');
         }
 
+        if ($filters['without_receipt']) {
+            $query->where(function (Builder $query): void {
+                $query->whereNull('driver_settlements.green_receipt_path')
+                    ->orWhere('driver_settlements.green_receipt_path', '');
+            });
+        }
+
         if ($filters['unpaid']) {
             $query->where('driver_settlements.is_paid', false);
+        }
+
+        if ($filters['paid']) {
+            $query->where('driver_settlements.is_paid', true);
         }
 
         if ($platform) {
@@ -1343,6 +1362,7 @@ class DriverSettlementsReport extends Page implements HasTable
         return Action::make('manageGreenReceipt')
             ->label('Recibo verde')
             ->icon(Heroicon::OutlinedDocumentArrowUp)
+            ->extraAttributes(['class' => 'hidden'])
             ->color(fn (?DriverSettlement $record = null): string => ($record && $this->hasGreenReceipt($record)) ? 'success' : 'warning')
             ->modalHeading('Recibo verde')
             ->modalDescription(fn (?DriverSettlement $record = null): string => ($record && $this->hasGreenReceipt($record))
