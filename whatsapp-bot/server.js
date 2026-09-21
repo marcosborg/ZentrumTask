@@ -19,6 +19,8 @@ const laravelBaseUrl = (process.env.LARAVEL_CHAT_BASE_URL || 'https://zentrum-tv
 const sessionStorePath = resolve(process.env.SESSION_STORE_PATH || './storage/sessions.json');
 const whatsappSessionPath = resolve(process.env.WHATSAPP_SESSION_PATH || './storage/whatsapp-session');
 const ignoreGroups = process.env.IGNORE_GROUPS !== 'false';
+const maxMessageAgeSeconds = Math.max(0, Number(process.env.MAX_MESSAGE_AGE_SECONDS || 60));
+const processStartedAtSeconds = Math.floor(Date.now() / 1000);
 
 let isWhatsappReady = false;
 let lastWhatsappState = 'starting';
@@ -251,6 +253,20 @@ function scheduleReconnect() {
 }
 
 client.on('message', async (message) => {
+  const messageTimestamp = Number(message.timestamp || 0);
+
+  if (
+    messageTimestamp > 0
+    && messageTimestamp < processStartedAtSeconds - maxMessageAgeSeconds
+  ) {
+    log('info', 'stale_message_ignored', {
+      from: message.from,
+      timestamp: messageTimestamp,
+    });
+
+    return;
+  }
+
   if (!isWhatsappReady) {
     isWhatsappReady = true;
     lastWhatsappState = 'message_received';
