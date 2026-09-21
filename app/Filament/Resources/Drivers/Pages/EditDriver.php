@@ -3,10 +3,9 @@
 namespace App\Filament\Resources\Drivers\Pages;
 
 use App\Filament\Resources\Drivers\DriverResource;
-use App\Models\Company;
 use App\Models\DocumentTemplate;
-use App\Models\VehicleAllocation;
 use App\Services\DriverDepositService;
+use App\Services\DriverDocumentTemplateRenderer;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Filament\Actions\Action;
 use Filament\Actions\DeleteAction;
@@ -152,7 +151,7 @@ class EditDriver extends EditRecord
                         return;
                     }
 
-                    $html = $this->renderTemplate($template);
+                    $html = app(DriverDocumentTemplateRenderer::class)->render($template, $this->record);
 
                     $pdf = Pdf::loadHTML($html)
                         ->setPaper('a4')
@@ -164,138 +163,6 @@ class EditDriver extends EditRecord
                     );
                 }),
         ];
-    }
-
-    private function renderTemplate(DocumentTemplate $template): string
-    {
-        $driver = $this->record->loadMissing('company', 'candidateApplication');
-        $data = $driver->toArray();
-
-        $driverDateFields = [
-            'date_of_birth',
-            'identity_document_expires_at',
-            'license_issued_at',
-            'license_expires_at',
-            'tvde_certificate_expires_at',
-            'deposit_paid_at',
-            'created_at',
-            'updated_at',
-        ];
-
-        foreach ($driverDateFields as $field) {
-            $data[$field] = $this->formatDate($driver->{$field});
-        }
-
-        $candidateData = $driver->candidateApplication?->toArray() ?? [];
-
-        $candidateDateFields = [
-            'submitted_at',
-            'last_saved_at',
-            'rental_terms_accepted_at',
-            'legal_confirmed_at',
-        ];
-
-        foreach ($candidateDateFields as $field) {
-            $candidateData[$field] = $this->formatDate($driver->candidateApplication?->{$field});
-        }
-
-        $allocation = VehicleAllocation::query()
-            ->with('vehicle')
-            ->where('driver_id', $driver->id)
-            ->where('status', 'active')
-            ->whereNull('ends_at')
-            ->latest('starts_at')
-            ->first();
-
-        $vehicleData = $allocation?->vehicle?->toArray() ?? [];
-
-        $vehicleDateFields = [
-            'acquisition_date',
-            'created_at',
-            'updated_at',
-        ];
-
-        foreach ($vehicleDateFields as $field) {
-            $vehicleData[$field] = $this->formatDate($vehicleData[$field] ?? null);
-        }
-
-        $allocationData = $allocation?->toArray() ?? [];
-
-        $allocationDateFields = [
-            'starts_at',
-            'ends_at',
-            'created_at',
-            'updated_at',
-        ];
-
-        foreach ($allocationDateFields as $field) {
-            $allocationData[$field] = $this->formatDate($allocationData[$field] ?? null);
-        }
-
-        $company = $driver->company ?: Company::query()->first();
-        $companyData = $company?->toArray() ?? [];
-
-        $data['company'] = $companyData;
-        $data['candidate_application'] = $candidateData;
-        $data['candidateApplication'] = $candidateData;
-        $data['vehicle'] = $vehicleData;
-        $data['vehicle_allocation'] = $allocationData;
-        $data['vehicleAllocation'] = $allocationData;
-        $content = $template->content;
-
-        $rendered = preg_replace_callback('/{{\s*(.+?)\s*}}/s', function (array $matches) use ($data): string {
-            $key = $matches[1];
-            $key = str_replace(["\u{00A0}", "\n", "\r"], ' ', $key);
-            $key = strip_tags($key);
-            $key = html_entity_decode($key, ENT_QUOTES | ENT_HTML5);
-            $key = trim(preg_replace('/\s+/', ' ', $key));
-
-            $value = data_get($data, $key, '');
-
-            return e((string) $value);
-        }, $content);
-
-        $title = e($template->name);
-
-        return <<<HTML
-<!doctype html>
-<html lang="pt">
-<head>
-    <meta charset="UTF-8">
-    <style>
-        body { font-family: "Times New Roman", serif; color: #000; margin: 20px; line-height: 1.35; font-size: 13px; }
-        h1 { margin: 0 0 14px; font-weight: bold; font-size: 16px; }
-        h2 { margin: 0 0 12px; font-weight: bold; font-size: 14px; }
-        h3 { margin: 0 0 12px; font-weight: bold; font-size: 13px; }
-        p { margin: 0 0 14px; }
-        ul, ol { margin: 0 0 14px 20px; }
-        li { margin: 0 0 8px; }
-        .header { margin-bottom: 12px; }
-        .header img { height: 42px; }
-    </style>
-</head>
-<body>
-    <div class="header">
-        <img src="https://zentrum-tvde.com/website/assets/logo.svg" alt="Zentrum TVDE">
-    </div>
-    <h1>{$title}</h1>
-    {$rendered}
-</body>
-    </html>
-HTML;
-    }
-
-    private function formatDate($value): ?string
-    {
-        if (! $value) {
-            return null;
-        }
-
-        try {
-            return \Illuminate\Support\Carbon::parse($value)->format('d-m-Y');
-        } catch (\Throwable $e) {
-            return (string) $value;
-        }
     }
 
     private function parseLocalizedDecimal(mixed $value): ?float

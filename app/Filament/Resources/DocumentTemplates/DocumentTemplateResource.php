@@ -6,6 +6,7 @@ use App\Filament\Resources\DocumentTemplates\Pages\CreateDocumentTemplate;
 use App\Filament\Resources\DocumentTemplates\Pages\EditDocumentTemplate;
 use App\Filament\Resources\DocumentTemplates\Pages\ListDocumentTemplates;
 use App\Models\DocumentTemplate;
+use App\Services\DriverDocumentTemplateRenderer;
 use BackedEnum;
 use Filament\Forms\Components\RichEditor;
 use Filament\Forms\Components\TextInput;
@@ -68,78 +69,7 @@ class DocumentTemplateResource extends Resource
                             ->components([
                                 Html::make('tokens_list')
                                     ->content(static function (): string {
-                                        $tokens = [
-                                            'name',
-                                            'email',
-                                            'phone',
-                                            'nif',
-                                            'iban',
-                                            'license_number',
-                                            'notes',
-                                            'date_of_birth',
-                                            'nationality',
-                                            'marital_status',
-                                            'address',
-                                            'identity_document_type',
-                                            'identity_document_number',
-                                            'identity_document_expires_at',
-                                            'emergency_contact_name',
-                                            'emergency_contact_phone',
-                                            'sns_number',
-                                            'niss_number',
-                                            'license_issued_at',
-                                            'license_expires_at',
-                                            'license_category',
-                                            'tvde_certificate_number',
-                                            'tvde_certificate_expires_at',
-                                            'tvde_platforms',
-                                            'bank_account_holder',
-                                            'deposit_amount',
-                                            'deposit_paid_at',
-                                            'deposit_payment_method',
-                                            'candidate_application_id',
-                                            'company.name',
-                                            'company.email',
-                                            'company.phone',
-                                            'company.nif',
-                                            'company.address',
-                                            'company.city',
-                                            'company.postal_code',
-                                            'company.country',
-                                            'company.iban',
-                                            'id',
-                                            'candidate_application.full_name',
-                                            'candidate_application.email',
-                                            'candidate_application.phone',
-                                            'candidate_application.nif',
-                                            'candidate_application.iban',
-                                            'candidate_application.experience',
-                                            'candidate_application.platforms',
-                                            'vehicle.license_plate',
-                                            'vehicle.vin',
-                                            'vehicle.make',
-                                            'vehicle.model',
-                                            'vehicle.trim',
-                                            'vehicle.year',
-                                            'vehicle.fuel_type',
-                                            'vehicle.transmission',
-                                            'vehicle.color',
-                                            'vehicle.seats',
-                                            'vehicle.engine_cc',
-                                            'vehicle.power_kw',
-                                            'vehicle.current_odometer',
-                                            'vehicle.status',
-                                            'vehicle.acquisition_date',
-                                            'vehicle.acquisition_cost',
-                                            'vehicle.notes',
-                                            'vehicle_allocation.starts_at',
-                                            'vehicle_allocation.ends_at',
-                                            'vehicle_allocation.start_odometer',
-                                            'vehicle_allocation.end_odometer',
-                                            'vehicle_allocation.status',
-                                            'vehicle_allocation.handover_location',
-                                            'vehicle_allocation.notes',
-                                        ];
+                                        $tokens = DriverDocumentTemplateRenderer::availableTokens();
 
                                         $items = collect($tokens)
                                             ->map(function (string $token): string {
