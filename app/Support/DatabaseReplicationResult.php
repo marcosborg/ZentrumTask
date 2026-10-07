@@ -4,10 +4,12 @@ namespace App\Support;
 
 class DatabaseReplicationResult
 {
+    /** @param array{disk: string, path: string}|null $backup */
     public function __construct(
         public readonly bool $successful,
         public readonly string $message,
         public readonly string $title,
+        public readonly ?array $backup = null,
     ) {}
 
     public static function success(string $message, string $title = 'Copia concluida'): self

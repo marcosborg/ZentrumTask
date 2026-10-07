@@ -2,137 +2,404 @@
 
 namespace App\Support;
 
-use Illuminate\Support\Facades\Config;
-use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 use RuntimeException;
 use Symfony\Component\Process\Process;
 use Throwable;
 
 class DatabaseReplicationService
 {
-    public function replicate(string $sourceMode, string $targetMode): DatabaseReplicationResult
+    public function __construct(protected AwsDatabaseService $aws = new AwsDatabaseService) {}
+
+    public function replicate(string $sourceMode, string $targetMode, ?\Closure $checkpoint = null): DatabaseReplicationResult
     {
-        $sourceProfile = $this->databaseProfile($sourceMode);
-        $targetProfile = $this->databaseProfile($targetMode);
-
-        if ($sourceProfile === null || $targetProfile === null) {
-            return DatabaseReplicationResult::failure(
-                "Nao encontrei perfis para {$sourceMode} ou {$targetMode}. Atualize o .env."
-            );
-        }
-
-        if (! in_array($sourceProfile['driver'], ['mysql', 'mariadb'], true) || ! in_array($targetProfile['driver'], ['mysql', 'mariadb'], true)) {
-            return DatabaseReplicationResult::failure('A copia so suporta MySQL/MariaDB.');
-        }
+        $backup = null;
+        $temporaryPaths = [];
+        $access = null;
 
         try {
-            $dumpBinary = $this->usesLightsailDump($sourceMode)
-                ? null
-                : $this->resolveDumpBinary($sourceProfile['driver']);
-            $importBinary = $this->resolveImportBinary($targetProfile['driver']);
-        } catch (RuntimeException $exception) {
-            return DatabaseReplicationResult::failure(
-                $exception->getMessage(),
-                'Binario nao encontrado'
-            );
-        }
+            if (! config('database-management.local')) {
+                throw new RuntimeException('A copia entre ambientes so pode ser executada no computador local.');
+            }
 
-        $targetDatabaseExists = $this->databaseExists($targetProfile, $importBinary);
+            if (! in_array($sourceMode, ['sandbox', 'production'], true) || ! in_array($targetMode, ['sandbox', 'production'], true)
+                || $sourceMode === $targetMode) {
+                throw new RuntimeException('Escolha ambientes de origem e destino distintos.');
+            }
 
-        if ($targetDatabaseExists === null) {
-            return DatabaseReplicationResult::failure(
-                'Nao consegui verificar se a base de dados de destino ja existe.',
-                'Erro a verificar base de dados'
-            );
-        }
+            $source = $this->profile($sourceMode);
+            $target = $this->profile($targetMode);
 
-        $dumpResult = $this->dumpDatabase(
-            $sourceMode,
-            $sourceProfile,
-            $dumpBinary,
-            $targetDatabaseExists
-        );
+            if ($source['host'] === $target['host'] && (string) $source['port'] === (string) $target['port']
+                && $source['database'] === $target['database']) {
+                throw new RuntimeException('A origem e o destino apontam para a mesma base de dados.');
+            }
 
-        if (! $dumpResult['successful']) {
-            return DatabaseReplicationResult::failure($dumpResult['message'], 'Erro a exportar base de dados');
-        }
+            $access = $this->aws->access();
+            $exists = $this->databaseExists($targetMode, $access);
 
-        $dumpContents = $this->sanitizeDumpContents($dumpResult['contents']);
+            if ($exists) {
+                $backup = $this->backup($targetMode, $access);
+                $checkpoint?->__invoke($backup);
+            }
 
-        if ($dumpContents === '') {
-            return DatabaseReplicationResult::failure(
-                'A exportacao nao devolveu dados. Verifique a ligacao de origem.',
-                'Backup vazio'
-            );
-        }
+            $dump = $this->temporaryPath();
+            $temporaryPaths[] = $dump;
+            $this->export($sourceMode, $dump, $exists, $access);
+            $sql = $this->prepareImport($dump);
+            $temporaryPaths[] = $sql;
+            $this->import($targetMode, $sql, $access);
 
-        $prepared = $this->ensureDatabaseExists($targetProfile, $importBinary);
-
-        if (! $prepared->successful) {
-            return $prepared;
-        }
-
-        $importProcess = $this->buildImportProcess($targetProfile, $importBinary);
-        $importProcess->setInput($dumpContents);
-
-        try {
-            $importProcess->run();
+            return new DatabaseReplicationResult(true, "Dados copiados de {$sourceMode} para {$targetMode}.", 'Copia concluida', $backup);
         } catch (Throwable $exception) {
-            Log::error('Database import crashed', [
-                'target' => $targetMode,
-                'command' => $importProcess->getCommandLine(),
-                'exception' => $exception->getMessage(),
-            ]);
+            return new DatabaseReplicationResult(false, $this->safeError($exception), 'Falha na copia', $backup);
+        } finally {
+            foreach ($temporaryPaths as $path) {
+                if (is_file($path)) {
+                    unlink($path);
+                }
+            }
 
-            return DatabaseReplicationResult::failure(
-                "A importacao foi interrompida: {$exception->getMessage()}",
-                'Erro a importar base de dados'
-            );
+            if ($access !== null) {
+                $this->aws->deleteKey($access['key']);
+            }
         }
-
-        if (! $importProcess->isSuccessful()) {
-            Log::error('Database import failed', [
-                'target' => $targetMode,
-                'command' => $importProcess->getCommandLine(),
-                'exit_code' => $importProcess->getExitCode(),
-                'error_output' => $importProcess->getErrorOutput(),
-                'output' => $importProcess->getOutput(),
-            ]);
-
-            return DatabaseReplicationResult::failure(
-                trim($importProcess->getErrorOutput() ?: $importProcess->getOutput()),
-                'Erro a importar base de dados'
-            );
-        }
-
-        return DatabaseReplicationResult::success("Dados copiados de {$sourceMode} para {$targetMode}.");
     }
 
-    /**
-     * @param  array{
-     *     driver: string,
-     *     host: string,
-     *     port: string|int,
-     *     database: string,
-     *     username: string,
-     *     password: string|null
-     * }  $configuration
+    public function safeError(Throwable $exception): string
+    {
+        $message = $exception instanceof RuntimeException && ! $exception instanceof \Symfony\Component\Process\Exception\ProcessFailedException
+            ? $exception->getMessage() : 'A operacao falhou. Verifique as ligacoes, permissoes e disponibilidade dos servicos.';
+
+        foreach (['sandbox', 'production'] as $mode) {
+            $password = (string) config("database.profiles.{$mode}.password", '');
+
+            if ($password !== '') {
+                $message = str_replace($password, '[oculto]', $message);
+            }
+        }
+
+        return mb_substr($message, 0, 500);
+    }
+
+    /** @return array<string, mixed> */
+    protected function profile(string $mode): array
+    {
+        $profile = config("database.profiles.{$mode}");
+
+        if (! is_array($profile) || ! in_array($profile['driver'], ['mysql', 'mariadb'], true)
+            || preg_match('/^[A-Za-z0-9_-]+$/D', (string) $profile['database']) !== 1) {
+            throw new RuntimeException('Perfil MySQL/MariaDB invalido.');
+        }
+
+        return $profile;
+    }
+
+    public function probe(string $mode): void
+    {
+        if ($mode === 'production' && config('database-management.local')) {
+            $this->aws->ensureTunnel();
+        }
+
+        $profile = $this->profile($mode);
+        $process = $this->localQueryProcess($profile, 'SELECT 1', true);
+        $this->runChecked($process);
+    }
+
+    public function createDump(string $mode, string $path): void
+    {
+        $this->profile($mode);
+        $access = $mode === 'production' && config('database-management.local') ? $this->aws->access() : null;
+
+        try {
+            $this->export($mode, $path, false, $access, true);
+        } finally {
+            if ($access !== null) {
+                $this->aws->deleteKey($access['key']);
+            }
+        }
+    }
+
+    /** @param array{host: string, user: string, key: string}|null $access
+     * @return array{disk: string, path: string}
      */
+    public function backup(string $mode, ?array $access = null): array
+    {
+        $this->profile($mode);
+
+        if (! config('database-management.local') && $mode !== 'production') {
+            throw new RuntimeException('Neste servidor so pode criar backups de producao.');
+        }
+
+        $path = $this->temporaryPath();
+        $ownAccess = $mode === 'production' && config('database-management.local') && $access === null;
+
+        try {
+            if ($ownAccess) {
+                $access = $this->aws->access();
+            }
+
+            $this->export($mode, $path, false, $access, true);
+            $disk = (string) config('database.backup.disk');
+
+            if (config('app.env') === 'production' && $disk !== 's3') {
+                throw new RuntimeException('Configure DB_BACKUP_DISK=s3 para guardar backups AWS de forma persistente.');
+            }
+
+            $relativePath = trim((string) config('database.backup.path'), '/').'/'.$mode.'-'.now()->format('Ymd-His').'-'.\Illuminate\Support\Str::uuid().'.sql.gz';
+            $stream = fopen($path, 'rb');
+
+            if ($stream === false) {
+                throw new RuntimeException('Nao foi possivel abrir o backup.');
+            }
+
+            try {
+                $saved = Storage::disk($disk)->put($relativePath, $stream, ['visibility' => 'private']);
+            } finally {
+                fclose($stream);
+            }
+
+            if (! $saved) {
+                throw new RuntimeException('Nao foi possivel guardar o backup privado. A copia foi cancelada.');
+            }
+
+            return ['disk' => $disk, 'path' => $relativePath];
+        } finally {
+            if (is_file($path)) {
+                unlink($path);
+            }
+
+            if ($ownAccess && $access !== null) {
+                $this->aws->deleteKey($access['key']);
+            }
+        }
+    }
+
+    /** @param array{host: string, user: string, key: string}|null $access */
+    protected function export(string $mode, string $path, bool $ignoreTransientTables, ?array $access, bool $complete = false): void
+    {
+        $profile = $this->profile($mode);
+
+        if ($mode === 'production' && config('database-management.local')) {
+            if ($access === null) {
+                throw new RuntimeException('Acesso SSH indisponivel.');
+            }
+
+            $arguments = '--protocol=TCP --host="$db_host" --port="$db_port" --user="$db_user" '
+                .'--no-tablespaces --single-transaction --routines --events --add-drop-table ';
+
+            if (! $complete) {
+                foreach ($this->ignoredReplicationTables($profile['database']) as $table) {
+                    $arguments .= '--ignore-table='.$table.' ';
+                }
+            }
+
+            $script = $this->aws->credentialsScript().'mysqldump '.$arguments.$profile['database'];
+
+            if (! $complete && ! $ignoreTransientTables) {
+                $script .= '; mysqldump --protocol=TCP --host="$db_host" --port="$db_port" --user="$db_user" '
+                    .'--no-tablespaces --no-data '.$profile['database'].' sessions cache cache_locks jobs job_batches failed_jobs';
+            }
+
+            $process = $this->aws->remote($access, $this->aws->dockerScript('set -e; '.$script));
+        } else {
+            $process = $this->buildDumpProcess($profile, $this->resolveDumpBinary($profile['driver']), ! $complete);
+        }
+
+        $output = gzopen($path, 'wb6');
+        $bytes = 0;
+
+        if ($output === false) {
+            throw new RuntimeException('Nao foi possivel criar o backup comprimido.');
+        }
+
+        try {
+            $process->run(function (string $type, string $buffer) use ($output, &$bytes, $process): void {
+                if ($type === Process::OUT) {
+                    $written = gzwrite($output, $buffer);
+
+                    if ($written !== strlen($buffer)) {
+                        throw new RuntimeException('Falha ao gravar o backup comprimido.');
+                    }
+
+                    $bytes += $written;
+                    $process->clearOutput();
+                } else {
+                    $process->clearErrorOutput();
+                }
+            });
+
+            if ($process->isSuccessful() && $mode === 'sandbox' && ! $complete && ! $ignoreTransientTables) {
+                $schema = $this->localProcess([$this->resolveDumpBinary($profile['driver']), '--protocol=TCP', '--host='.$profile['host'],
+                    '--port='.(string) $profile['port'], '--user='.$profile['username'], '--no-tablespaces', '--no-data',
+                    $profile['database'], 'sessions', 'cache', 'cache_locks', 'jobs', 'job_batches', 'failed_jobs'], $profile);
+                $schema->run(function (string $type, string $buffer) use ($output, $schema): void {
+                    if ($type === Process::OUT && gzwrite($output, $buffer) !== strlen($buffer)) {
+                        throw new RuntimeException('Falha ao guardar as estruturas operacionais.');
+                    }
+
+                    $schema->clearOutput();
+                    $schema->clearErrorOutput();
+                });
+
+                if (! $schema->isSuccessful()) {
+                    throw new RuntimeException('Falha ao exportar as estruturas operacionais.');
+                }
+            }
+        } finally {
+            $closed = gzclose($output);
+        }
+
+        if (! $process->isSuccessful() || ! $closed || $bytes === 0) {
+            throw new RuntimeException('Exportacao da base de dados falhou ou devolveu um backup vazio. O destino nao foi alterado.');
+        }
+    }
+
+    protected function prepareImport(string $dump): string
+    {
+        $path = $this->temporaryPath();
+        $source = gzopen($dump, 'rb');
+        $target = fopen($path, 'wb');
+
+        if ($source === false || $target === false) {
+            if (is_resource($source)) {
+                gzclose($source);
+            }
+
+            if (is_resource($target)) {
+                fclose($target);
+            }
+
+            unlink($path);
+            throw new RuntimeException('Nao foi possivel preparar o ficheiro de importacao.');
+        }
+
+        $successful = false;
+
+        try {
+            $firstLine = gzgets($source);
+
+            if ($firstLine === false) {
+                throw new RuntimeException('O backup esta vazio.');
+            }
+
+            $firstLine = $this->sanitizeDumpContents($firstLine);
+
+            if (fwrite($target, $firstLine) !== strlen($firstLine)) {
+                throw new RuntimeException('Falha ao preparar a importacao.');
+            }
+
+            while (! gzeof($source)) {
+                $buffer = gzread($source, 65536);
+
+                if ($buffer === false || fwrite($target, $buffer) !== strlen($buffer)) {
+                    throw new RuntimeException('Falha ao preparar a importacao.');
+                }
+            }
+            $successful = true;
+        } finally {
+            gzclose($source);
+            fclose($target);
+
+            if (! $successful) {
+                unlink($path);
+            }
+        }
+
+        return $path;
+    }
+
+    /** @param array{host: string, user: string, key: string} $access */
+    protected function import(string $mode, string $path, array $access): void
+    {
+        $profile = $this->profile($mode);
+        $create = 'CREATE DATABASE IF NOT EXISTS `'.$profile['database'].'` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci';
+
+        if ($mode === 'production') {
+            $script = $this->aws->credentialsScript()
+                .'mysql --protocol=TCP --host="$db_host" --port="$db_port" --user="$db_user" --execute='.$this->quotePosix($create).'; '
+                .'exec mysql --protocol=TCP --host="$db_host" --port="$db_port" --user="$db_user" '.$profile['database'];
+            $process = $this->aws->remote($access, $this->productionImportScript($this->aws->dockerScript('set -e; '.$script)));
+        } else {
+            $this->runChecked($this->localQueryProcess($profile, $create));
+            $process = $this->buildImportProcess($profile, $this->resolveImportBinary($profile['driver']));
+        }
+
+        $stream = fopen($path, 'rb');
+
+        if ($stream === false) {
+            throw new RuntimeException('Ficheiro de importacao indisponivel.');
+        }
+
+        try {
+            $process->setInput($stream);
+            $this->runChecked($process);
+        } finally {
+            fclose($stream);
+        }
+    }
+
+    protected function productionImportScript(string $import): string
+    {
+        $web = $this->aws->container();
+        $worker = (string) config('database-management.worker_container');
+        $scheduler = (string) config('database-management.scheduler_container');
+
+        foreach ([$worker, $scheduler] as $container) {
+            if (preg_match('/^[A-Za-z0-9_.-]+$/D', $container) !== 1) {
+                throw new RuntimeException('Contentor de producao invalido.');
+            }
+        }
+
+        return 'set -Eeuo pipefail; exec 9>/tmp/zentrum-db-management.lock; flock -n 9; stopped=""; raised=0; '
+            .'restore() { result=$?; trap - EXIT; restore_failed=0; for name in $stopped; do sudo docker start "$name" >/dev/null || restore_failed=1; done; '
+            .'if [ "$raised" = 1 ]; then sudo docker exec '.$web.' php artisan up --no-interaction >/dev/null || restore_failed=1; fi; '
+            .'if [ "$restore_failed" = 1 ]; then exit 70; fi; exit "$result"; }; trap restore EXIT; '
+            .'if ! sudo docker exec '.$web.' test -f storage/framework/down; then raised=1; '
+            .'sudo docker exec '.$web.' php artisan down --retry=60 --no-interaction >/dev/null; fi; '
+            .'for name in '.$worker.' '.$scheduler.'; do '
+            .'state=$(sudo docker inspect --format "{{.State.Running}} {{.State.Paused}}" "$name"); '
+            .'if [ "$state" = "true true" ]; then exit 73; fi; '
+            .'if [ "$state" = "true false" ]; then stopped="$stopped $name"; sudo docker stop --time=180 "$name" >/dev/null; fi; done; '
+            .'sleep 125; '.$import;
+    }
+
+    /** @param array{host: string, user: string, key: string} $access */
+    protected function databaseExists(string $mode, array $access): bool
+    {
+        $profile = $this->profile($mode);
+        $query = "SELECT SCHEMA_NAME FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME = '".$profile['database']."'";
+
+        if ($mode === 'production') {
+            $process = $this->aws->remote($access, $this->aws->dockerScript($this->aws->credentialsScript()
+                .'exec mysql --protocol=TCP --host="$db_host" --port="$db_port" --user="$db_user" --batch --skip-column-names --execute='.$this->quotePosix($query)));
+        } else {
+            $process = $this->localQueryProcess($profile, $query);
+        }
+
+        $this->runChecked($process);
+
+        return trim($process->getOutput()) !== '';
+    }
+
+    /** @param array<string, mixed> $profile */
+    protected function localQueryProcess(array $profile, string $query, bool $useDatabase = false): Process
+    {
+        $command = [$this->resolveImportBinary($profile['driver']), '--protocol=TCP', '--host='.$profile['host'],
+            '--port='.(string) $profile['port'], '--user='.$profile['username'], '--batch', '--skip-column-names', '--execute='.$query];
+
+        if ($useDatabase) {
+            $command[] = '--database='.$profile['database'];
+        }
+
+        return $this->localProcess($command, $profile);
+    }
+
+    /** @param array<string, mixed> $configuration */
     protected function buildDumpProcess(array $configuration, string $binary, bool $ignoreTransientTables): Process
     {
-        $command = [
-            $binary,
-            '--protocol=TCP',
-            '--host='.$configuration['host'],
-            '--port='.(string) $configuration['port'],
-            '--user='.$configuration['username'],
-            '--no-tablespaces',
-            '--single-transaction',
-            '--routines',
-            '--events',
-            '--add-drop-table',
-            $configuration['database'],
-        ];
+        $command = [$binary, '--protocol=TCP', '--host='.$configuration['host'], '--port='.(string) $configuration['port'],
+            '--user='.$configuration['username'], '--no-tablespaces', '--single-transaction', '--routines', '--events', '--add-drop-table'];
 
         if ($ignoreTransientTables) {
             foreach ($this->ignoredReplicationTables($configuration['database']) as $table) {
@@ -140,478 +407,48 @@ class DatabaseReplicationService
             }
         }
 
-        $process = new Process($command, base_path());
-        $process->setEnv($this->processEnvironment((string) ($configuration['password'] ?? '')));
-        $process->setTimeout(300);
+        $command[] = $configuration['database'];
 
-        return $process;
+        return $this->localProcess($command, $configuration);
     }
 
-    /**
-     * @param  array{
-     *     driver: string,
-     *     host: string,
-     *     port: string|int,
-     *     database: string,
-     *     username: string,
-     *     password: string|null
-     * }  $configuration
-     */
+    /** @param array<string, mixed> $configuration */
     protected function buildImportProcess(array $configuration, string $binary): Process
     {
-        $command = [
-            $binary,
-            '--protocol=TCP',
-            '--host='.$configuration['host'],
-            '--port='.(string) $configuration['port'],
-            '--user='.$configuration['username'],
-            '--database='.$configuration['database'],
-        ];
+        return $this->localProcess([$binary, '--protocol=TCP', '--host='.$configuration['host'],
+            '--port='.(string) $configuration['port'], '--user='.$configuration['username'], '--database='.$configuration['database']], $configuration);
+    }
 
+    /** @param list<string> $command
+     * @param  array<string, mixed>  $profile
+     */
+    protected function localProcess(array $command, array $profile): Process
+    {
         $process = new Process($command, base_path());
-        $process->setEnv($this->processEnvironment((string) ($configuration['password'] ?? '')));
-        $process->setTimeout(300);
+        $process->setEnv($this->processEnvironment((string) ($profile['password'] ?? '')));
+        $process->setTimeout(1500);
 
         return $process;
     }
 
-    /**
-     * @param  array{
-     *     driver: string,
-     *     host: string,
-     *     port: string|int,
-     *     database: string,
-     *     username: string,
-     *     password: string|null
-     * }  $configuration
-     */
-    protected function ensureDatabaseExists(array $configuration, string $binary): DatabaseReplicationResult
+    protected function runChecked(Process $process): void
     {
-        $command = [
-            $binary,
-            '--protocol=TCP',
-            '--host='.$configuration['host'],
-            '--port='.(string) $configuration['port'],
-            '--user='.$configuration['username'],
-            '--execute=CREATE DATABASE IF NOT EXISTS `'.$configuration['database'].'` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci',
-        ];
-
-        $process = new Process($command, base_path());
-        $process->setEnv($this->processEnvironment((string) ($configuration['password'] ?? '')));
-        $process->setTimeout(60);
-        $process->run();
-
-        if ($process->isSuccessful()) {
-            return DatabaseReplicationResult::success('Database preparada.');
-        }
-
-        Log::error('Database create failed', [
-            'database' => $configuration['database'],
-            'command' => $process->getCommandLine(),
-            'exit_code' => $process->getExitCode(),
-            'error_output' => $process->getErrorOutput(),
-            'output' => $process->getOutput(),
-        ]);
-
-        return DatabaseReplicationResult::failure(
-            'Nao consegui preparar a base de dados de destino: '.trim($process->getErrorOutput() ?: $process->getOutput()),
-            'Erro a preparar base de dados'
-        );
-    }
-
-    /**
-     * @param  array{
-     *     driver: string,
-     *     host: string,
-     *     port: string|int,
-     *     database: string,
-     *     username: string,
-     *     password: string|null
-     * }  $configuration
-     */
-    protected function databaseExists(array $configuration, string $binary): ?bool
-    {
-        $command = [
-            $binary,
-            '--protocol=TCP',
-            '--host='.$configuration['host'],
-            '--port='.(string) $configuration['port'],
-            '--user='.$configuration['username'],
-            '--batch',
-            '--skip-column-names',
-            '--execute=SELECT SCHEMA_NAME FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME = \''.$this->escapeSqlString($configuration['database']).'\'',
-        ];
-
-        $process = new Process($command, base_path());
-        $process->setEnv($this->processEnvironment((string) ($configuration['password'] ?? '')));
-        $process->setTimeout(30);
         $process->run();
 
         if (! $process->isSuccessful()) {
-            Log::error('Database existence check failed', [
-                'database' => $configuration['database'],
-                'command' => $process->getCommandLine(),
-                'exit_code' => $process->getExitCode(),
-                'error_output' => $process->getErrorOutput(),
-                'output' => $process->getOutput(),
-            ]);
-
-            return null;
+            throw new RuntimeException('Falha na operacao MySQL/SSH. Verifique ligacao, permissoes e disponibilidade. Se a importacao ja iniciou, utilize o backup do destino para recuperar.');
         }
-
-        return trim($process->getOutput()) !== '';
     }
 
-    /**
-     * @return array{
-     *     driver: string,
-     *     host: string,
-     *     port: string|int,
-     *     database: string,
-     *     username: string,
-     *     password: string|null
-     * }|null
-     */
-    protected function databaseProfile(string $mode): ?array
+    protected function temporaryPath(): string
     {
-        $profiles = Config::get('database.profiles', []);
+        $path = tempnam(sys_get_temp_dir(), 'zentrum-db-');
 
-        return $profiles[$mode] ?? null;
-    }
-
-    /**
-     * @param  array{
-     *     driver: string,
-     *     host: string,
-     *     port: string|int,
-     *     database: string,
-     *     username: string,
-     *     password: string|null
-     * }  $configuration
-     * @return array{successful: bool, contents: string, message: string}
-     */
-    protected function dumpDatabase(
-        string $sourceMode,
-        array $configuration,
-        ?string $binary,
-        bool $ignoreTransientTables
-    ): array {
-        if ($this->usesLightsailDump($sourceMode)) {
-            return $this->dumpFromLightsail($configuration['database'], $ignoreTransientTables);
+        if ($path === false) {
+            throw new RuntimeException('Nao foi possivel criar um ficheiro temporario.');
         }
 
-        if ($binary === null) {
-            return [
-                'successful' => false,
-                'contents' => '',
-                'message' => 'Nao encontrei o binario de exportacao.',
-            ];
-        }
-
-        $process = $this->buildDumpProcess($configuration, $binary, $ignoreTransientTables);
-        $process->run();
-
-        return $this->dumpProcessResult($process, $sourceMode);
-    }
-
-    /**
-     * @return array{successful: bool, contents: string, message: string}
-     */
-    protected function dumpFromLightsail(string $database, bool $ignoreTransientTables): array
-    {
-        $configuration = Config::get('database.replication.production_dump', []);
-        $region = (string) ($configuration['aws_region'] ?? '');
-        $instance = (string) ($configuration['lightsail_instance'] ?? '');
-        $container = (string) ($configuration['container'] ?? '');
-
-        if ($region === '' || $instance === '' || $container === '') {
-            return [
-                'successful' => false,
-                'contents' => '',
-                'message' => 'Configure a regiao AWS, a instancia Lightsail e o contentor da producao no .env.',
-            ];
-        }
-
-        $keyPath = null;
-
-        try {
-            $host = $this->resolveLightsailHost($configuration, $region, $instance);
-            $keyPath = $this->downloadLightsailKey($configuration, $region);
-            $process = $this->buildLightsailDumpProcess(
-                $configuration,
-                $host,
-                $keyPath,
-                $container,
-                $database,
-                $ignoreTransientTables
-            );
-            $process->run();
-
-            $result = $this->dumpProcessResult($process, 'production');
-
-            if (! $result['successful']) {
-                return $result;
-            }
-
-            $contents = gzdecode($result['contents']);
-
-            if ($contents === false) {
-                return [
-                    'successful' => false,
-                    'contents' => '',
-                    'message' => 'A exportacao recebida da producao nao e um arquivo gzip valido.',
-                ];
-            }
-
-            return [
-                'successful' => true,
-                'contents' => $contents,
-                'message' => '',
-            ];
-        } catch (Throwable $exception) {
-            Log::error('Lightsail database dump crashed', [
-                'exception' => $exception->getMessage(),
-            ]);
-
-            return [
-                'successful' => false,
-                'contents' => '',
-                'message' => $exception->getMessage(),
-            ];
-        } finally {
-            if ($keyPath !== null && is_file($keyPath)) {
-                $this->deletePrivateKey($keyPath);
-            }
-        }
-    }
-
-    /**
-     * @param  array<string, mixed>  $configuration
-     */
-    protected function resolveLightsailHost(array $configuration, string $region, string $instance): string
-    {
-        $configuredHost = (string) ($configuration['host'] ?? '');
-
-        if ($configuredHost !== '') {
-            return $configuredHost;
-        }
-
-        $process = new Process([
-            (string) ($configuration['aws_binary'] ?? 'aws'),
-            'lightsail',
-            'get-instance',
-            '--instance-name',
-            $instance,
-            '--region',
-            $region,
-            '--query',
-            'instance.publicIpAddress',
-            '--output',
-            'text',
-        ], base_path());
-        $process->setEnv($this->processEnvironment(null));
-        $process->setTimeout(60);
-        $process->mustRun();
-
-        $host = trim($process->getOutput());
-
-        if (filter_var($host, FILTER_VALIDATE_IP) === false) {
-            throw new RuntimeException('A AWS nao devolveu um endereco valido para a instancia Lightsail.');
-        }
-
-        return $host;
-    }
-
-    /**
-     * @param  array<string, mixed>  $configuration
-     */
-    protected function downloadLightsailKey(array $configuration, string $region): string
-    {
-        $process = new Process([
-            (string) ($configuration['aws_binary'] ?? 'aws'),
-            'lightsail',
-            'download-default-key-pair',
-            '--region',
-            $region,
-            '--query',
-            'privateKeyBase64',
-            '--output',
-            'text',
-        ], base_path());
-        $process->setEnv($this->processEnvironment(null));
-        $process->setTimeout(60);
-        $process->mustRun();
-
-        $privateKey = trim($process->getOutput());
-
-        if (! str_contains($privateKey, 'BEGIN RSA PRIVATE KEY')) {
-            $decoded = base64_decode($privateKey, true);
-
-            if ($decoded !== false) {
-                $privateKey = $decoded;
-            }
-        }
-
-        if (! str_contains($privateKey, 'BEGIN RSA PRIVATE KEY')) {
-            throw new RuntimeException('A AWS nao devolveu uma chave privada Lightsail valida.');
-        }
-
-        $keyPath = tempnam(sys_get_temp_dir(), 'zentrum-lightsail-');
-
-        if ($keyPath === false || file_put_contents($keyPath, $privateKey.PHP_EOL) === false) {
-            throw new RuntimeException('Nao consegui preparar a chave temporaria de acesso a producao.');
-        }
-
-        $this->securePrivateKey($keyPath);
-
-        return $keyPath;
-    }
-
-    protected function securePrivateKey(string $keyPath): void
-    {
-        if (DIRECTORY_SEPARATOR !== '\\') {
-            chmod($keyPath, 0600);
-
-            return;
-        }
-
-        $username = $_SERVER['USERNAME'] ?? getenv('USERNAME') ?: '';
-
-        if ($username === '') {
-            throw new RuntimeException('Nao consegui identificar o utilizador Windows para proteger a chave SSH.');
-        }
-
-        $process = new Process([
-            'icacls',
-            $keyPath,
-            '/inheritance:r',
-            '/grant:r',
-            $username.':(R)',
-        ]);
-        $process->setTimeout(30);
-        $process->mustRun();
-    }
-
-    protected function deletePrivateKey(string $keyPath): void
-    {
-        if (DIRECTORY_SEPARATOR === '\\') {
-            $username = $_SERVER['USERNAME'] ?? getenv('USERNAME') ?: '';
-
-            if ($username !== '') {
-                $process = new Process([
-                    'icacls',
-                    $keyPath,
-                    '/grant:r',
-                    $username.':(F)',
-                ]);
-                $process->setTimeout(30);
-                $process->run();
-            }
-        }
-
-        if (! unlink($keyPath)) {
-            Log::warning('Temporary Lightsail key could not be deleted', [
-                'path' => $keyPath,
-            ]);
-        }
-    }
-
-    /**
-     * @param  array<string, mixed>  $configuration
-     */
-    protected function buildLightsailDumpProcess(
-        array $configuration,
-        string $host,
-        string $keyPath,
-        string $container,
-        string $database,
-        bool $ignoreTransientTables
-    ): Process {
-        foreach ([$container, $database] as $identifier) {
-            if (preg_match('/^[A-Za-z0-9_.-]+$/', $identifier) !== 1) {
-                throw new RuntimeException('A configuracao remota contem um identificador invalido.');
-            }
-        }
-
-        $dumpArguments = [
-            'mysqldump',
-            '--host="$DB_HOST_PRODUCTION"',
-            '--port="$DB_PORT_PRODUCTION"',
-            '--user="$DB_USERNAME_PRODUCTION"',
-            '--no-tablespaces',
-            '--single-transaction',
-            '--routines',
-            '--events',
-            '--add-drop-table',
-            $database,
-        ];
-
-        if ($ignoreTransientTables) {
-            foreach ($this->ignoredReplicationTables($database) as $table) {
-                $dumpArguments[] = '--ignore-table='.$table;
-            }
-        }
-
-        $script = 'MYSQL_PWD="$DB_PASSWORD_PRODUCTION" '.implode(' ', $dumpArguments).' | gzip -c';
-        $remoteCommand = 'sudo docker exec '.$container.' sh -lc '.$this->quotePosix($script);
-        $sshUser = (string) ($configuration['ssh_user'] ?? 'ubuntu');
-
-        if (preg_match('/^[A-Za-z0-9_.-]+$/', $sshUser) !== 1) {
-            throw new RuntimeException('O utilizador SSH configurado e invalido.');
-        }
-
-        $process = new Process([
-            (string) ($configuration['ssh_binary'] ?? 'ssh'),
-            '-n',
-            '-i',
-            $keyPath,
-            '-o',
-            'BatchMode=yes',
-            '-o',
-            'ConnectTimeout=20',
-            '-o',
-            'StrictHostKeyChecking=accept-new',
-            $sshUser.'@'.$host,
-            $remoteCommand,
-        ], base_path());
-        $process->setEnv($this->processEnvironment(null));
-        $process->setTimeout(300);
-
-        return $process;
-    }
-
-    /**
-     * @return array{successful: bool, contents: string, message: string}
-     */
-    protected function dumpProcessResult(Process $process, string $sourceMode): array
-    {
-        if ($process->isSuccessful()) {
-            return [
-                'successful' => true,
-                'contents' => $process->getOutput(),
-                'message' => '',
-            ];
-        }
-
-        Log::error('Database dump failed', [
-            'source' => $sourceMode,
-            'command' => $process->getCommandLine(),
-            'exit_code' => $process->getExitCode(),
-            'error_output' => $process->getErrorOutput(),
-            'output_bytes' => strlen($process->getOutput()),
-        ]);
-
-        return [
-            'successful' => false,
-            'contents' => '',
-            'message' => trim($process->getErrorOutput() ?: $process->getOutput()),
-        ];
-    }
-
-    protected function usesLightsailDump(string $sourceMode): bool
-    {
-        return $sourceMode === 'production'
-            && Config::get('database.replication.production_dump.strategy') === 'lightsail';
+        return $path;
     }
 
     protected function sanitizeDumpContents(string $contents): string
@@ -624,152 +461,48 @@ class DatabaseReplicationService
         return "'".str_replace("'", "'\"'\"'", $value)."'";
     }
 
+    /** @return list<string> */
+    protected function ignoredReplicationTables(string $database): array
+    {
+        return array_map(fn (string $table): string => $database.'.'.$table, ['sessions', 'cache', 'cache_locks', 'jobs', 'job_batches', 'failed_jobs']);
+    }
+
+    /** @return array<string, string> */
+    protected function processEnvironment(?string $password): array
+    {
+        $home = (string) (getenv('HOME') ?: getenv('USERPROFILE') ?: '');
+
+        return array_filter(['MYSQL_PWD' => (string) $password, 'HOME' => $home, 'USERPROFILE' => (string) (getenv('USERPROFILE') ?: $home),
+            'PATH' => (string) getenv('PATH'), 'SystemRoot' => (string) getenv('SystemRoot'), 'TEMP' => sys_get_temp_dir(), 'TMP' => sys_get_temp_dir(),
+            'AWS_PROFILE' => (string) getenv('AWS_PROFILE')], static fn (string $value): bool => $value !== '');
+    }
+
     protected function resolveDumpBinary(string $driver): string
     {
-        $preferred = (string) Config::get('database.backup.binary', '');
-        $candidates = $driver === 'mariadb'
-            ? ['mariadb-dump', 'mysqldump']
-            : ['mysqldump', 'mariadb-dump'];
-
-        return $this->resolveBinary($preferred, $candidates);
+        return $this->resolveBinary((string) config('database.backup.binary'), $driver === 'mariadb' ? ['mariadb-dump', 'mysqldump'] : ['mysqldump', 'mariadb-dump']);
     }
 
     protected function resolveImportBinary(string $driver): string
     {
-        $preferred = (string) Config::get('database.restore.binary', '');
-        $candidates = $driver === 'mariadb'
-            ? ['mariadb', 'mysql']
-            : ['mysql', 'mariadb'];
-
-        return $this->resolveBinary($preferred, $candidates);
+        return $this->resolveBinary((string) config('database.restore.binary'), $driver === 'mariadb' ? ['mariadb', 'mysql'] : ['mysql', 'mariadb']);
     }
 
-    protected function escapeSqlString(string $value): string
+    /** @param list<string> $candidates */
+    protected function resolveBinary(string $preferred, array $candidates): string
     {
-        return str_replace(['\\', '\''], ['\\\\', '\\\''], $value);
-    }
+        foreach (array_filter([$preferred, ...$candidates]) as $candidate) {
+            try {
+                $process = new Process([$candidate, '--version']);
+                $process->setTimeout(5);
+                $process->run();
 
-    /**
-     * @return array<int, string>
-     */
-    protected function ignoredReplicationTables(string $database): array
-    {
-        $tables = [
-            'sessions',
-            'cache',
-            'cache_locks',
-            'jobs',
-            'job_batches',
-            'failed_jobs',
-        ];
-
-        return array_map(
-            fn (string $table): string => "{$database}.{$table}",
-            $tables
-        );
-    }
-
-    /**
-     * Build a minimal environment so mysqldump/mysql work under Apache on Windows.
-     *
-     * @return array<string, string>
-     */
-    protected function processEnvironment(?string $password): array
-    {
-        $systemRoot = $_SERVER['SystemRoot'] ?? getenv('SystemRoot') ?: '';
-        $path = $_SERVER['PATH'] ?? getenv('PATH') ?: '';
-        $home = $_SERVER['HOME'] ?? getenv('HOME') ?: $_SERVER['USERPROFILE'] ?? getenv('USERPROFILE') ?: '';
-        $temp = sys_get_temp_dir();
-        $env = [
-            'SystemRoot' => $systemRoot,
-            'WINDIR' => $_SERVER['WINDIR'] ?? getenv('WINDIR') ?: $systemRoot,
-            'PATH' => $path,
-            'HOME' => $home,
-            'TEMP' => $temp,
-            'TMP' => $temp,
-            'USERPROFILE' => $_SERVER['USERPROFILE'] ?? getenv('USERPROFILE') ?: $home,
-            'APPDATA' => $_SERVER['APPDATA'] ?? getenv('APPDATA') ?: '',
-            'LOCALAPPDATA' => $_SERVER['LOCALAPPDATA'] ?? getenv('LOCALAPPDATA') ?: '',
-            'AWS_PROFILE' => $_SERVER['AWS_PROFILE'] ?? getenv('AWS_PROFILE') ?: '',
-            'AWS_DEFAULT_PROFILE' => $_SERVER['AWS_DEFAULT_PROFILE'] ?? getenv('AWS_DEFAULT_PROFILE') ?: '',
-        ];
-
-        $filtered = array_filter($env, static fn (string $value): bool => $value !== '');
-
-        $filtered['MYSQL_PWD'] = (string) ($password ?? '');
-
-        return $filtered;
-    }
-
-    /**
-     * @param  array<int, string>  $fallbacks
-     */
-    protected function resolveBinary(string $preferred, array $fallbacks): string
-    {
-        $candidates = [];
-
-        if ($preferred !== '') {
-            $candidates[] = $preferred;
-        }
-
-        foreach ($fallbacks as $fallback) {
-            $candidates[] = $fallback;
-        }
-
-        foreach ($this->commonMampBinaryPaths($fallbacks) as $candidate) {
-            $candidates[] = $candidate;
-        }
-
-        foreach (array_values(array_unique($candidates)) as $candidate) {
-            if (! $this->looksUsableBinary($candidate)) {
-                continue;
+                if ($process->isSuccessful()) {
+                    return $candidate;
+                }
+            } catch (Throwable) {
             }
-
-            return $candidate;
         }
 
-        throw new RuntimeException('Nao encontrei um binario mysql/mysqldump executavel. Atualize DB_BACKUP_BINARY/DB_RESTORE_BINARY no .env.');
-    }
-
-    protected function looksUsableBinary(string $candidate): bool
-    {
-        if ($candidate === '') {
-            return false;
-        }
-
-        if ($this->isWindowsPath($candidate) && DIRECTORY_SEPARATOR !== '\\') {
-            return false;
-        }
-
-        if (str_contains($candidate, '/') || str_contains($candidate, '\\')) {
-            return is_file($candidate) && is_executable($candidate);
-        }
-
-        $probe = new Process(['sh', '-lc', 'command -v '.escapeshellarg($candidate)]);
-        $probe->setTimeout(5);
-        $probe->run();
-
-        return $probe->isSuccessful();
-    }
-
-    protected function isWindowsPath(string $path): bool
-    {
-        return preg_match('/^[A-Za-z]:[\\\\\\/]/', $path) === 1;
-    }
-
-    /**
-     * @param  array<int, string>  $fallbacks
-     * @return array<int, string>
-     */
-    protected function commonMampBinaryPaths(array $fallbacks): array
-    {
-        $paths = [];
-
-        foreach ($fallbacks as $binary) {
-            $paths[] = "/Applications/MAMP/Library/bin/mysql80/bin/{$binary}";
-            $paths[] = "/Applications/MAMP/Library/bin/mysql57/bin/{$binary}";
-        }
-
-        return $paths;
+        throw new RuntimeException('Configure DB_BACKUP_BINARY e DB_RESTORE_BINARY com executaveis MySQL/MariaDB validos.');
     }
 }

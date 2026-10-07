@@ -2,7 +2,8 @@
 
 use Illuminate\Support\Str;
 
-$databaseMode = env('DB_MODE', 'sandbox');
+$isLocalDatabaseManagement = in_array(env('APP_ENV', 'production'), ['local', 'testing'], true);
+$databaseMode = $isLocalDatabaseManagement ? env('DB_MODE', 'sandbox') : 'production';
 
 $databaseProfiles = [
     'sandbox' => [
@@ -15,11 +16,11 @@ $databaseProfiles = [
     ],
     'production' => [
         'driver' => env('DB_DRIVER_PRODUCTION', env('DB_CONNECTION', 'mysql')),
-        'host' => env('DB_HOST_PRODUCTION', '127.0.0.1'),
-        'port' => env('DB_PORT_PRODUCTION', '3306'),
-        'database' => env('DB_DATABASE_PRODUCTION', 'laravel'),
-        'username' => env('DB_USERNAME_PRODUCTION', 'root'),
-        'password' => env('DB_PASSWORD_PRODUCTION', ''),
+        'host' => $isLocalDatabaseManagement ? '127.0.0.1' : env('DB_HOST_PRODUCTION', env('DB_HOST', '127.0.0.1')),
+        'port' => env('DB_PORT_PRODUCTION', $isLocalDatabaseManagement ? '13306' : env('DB_PORT', '3306')),
+        'database' => env('DB_DATABASE_PRODUCTION', env('DB_DATABASE', 'laravel')),
+        'username' => env('DB_USERNAME_PRODUCTION', env('DB_USERNAME', 'root')),
+        'password' => env('DB_PASSWORD_PRODUCTION', env('DB_PASSWORD', '')),
     ],
 ];
 
@@ -60,6 +61,22 @@ return [
 
     'connections' => [
 
+        'database_management' => [
+            'driver' => 'sqlite',
+            'database' => storage_path('app/private/database-management/queue.sqlite'),
+            'prefix' => '',
+            'foreign_key_constraints' => true,
+            'busy_timeout' => 5000,
+        ],
+
+        'sandbox_operational' => [
+            ...$databaseProfiles['sandbox'],
+            'charset' => 'utf8mb4',
+            'collation' => 'utf8mb4_unicode_ci',
+            'prefix' => '',
+            'strict' => true,
+        ],
+
         'sqlite' => [
             'driver' => 'sqlite',
             'url' => env('DB_URL'),
@@ -74,7 +91,7 @@ return [
 
         'mysql' => [
             'driver' => 'mysql',
-            'url' => env('DB_URL'),
+            'url' => null,
             'host' => $databaseHost,
             'port' => $databasePort,
             'database' => $databaseName,
@@ -95,7 +112,7 @@ return [
 
         'mariadb' => [
             'driver' => 'mariadb',
-            'url' => env('DB_URL'),
+            'url' => null,
             'host' => $databaseHost,
             'port' => $databasePort,
             'database' => $databaseName,
@@ -212,7 +229,7 @@ return [
     ],
 
     'backup' => [
-        'disk' => env('DB_BACKUP_DISK', 'local'),
+        'disk' => env('DB_BACKUP_DISK', $isLocalDatabaseManagement ? 'local' : 's3'),
         'path' => env('DB_BACKUP_PATH', 'backups/database'),
         'binary' => env('DB_BACKUP_BINARY', null),
     ],
@@ -223,14 +240,15 @@ return [
 
     'replication' => [
         'production_dump' => [
-            'strategy' => env('DB_REPLICATION_PRODUCTION_DUMP_STRATEGY', 'local'),
+            'strategy' => env('DB_REPLICATION_PRODUCTION_DUMP_STRATEGY', $isLocalDatabaseManagement ? 'lightsail' : 'local'),
             'aws_binary' => env('DB_REPLICATION_AWS_BINARY', 'aws'),
             'aws_region' => env('DB_REPLICATION_AWS_REGION', env('AWS_DEFAULT_REGION', 'eu-west-3')),
-            'lightsail_instance' => env('DB_REPLICATION_LIGHTSAIL_INSTANCE'),
+            'lightsail_instance' => env('DB_REPLICATION_LIGHTSAIL_INSTANCE', 'zentrum-platform-prod-01'),
             'host' => env('DB_REPLICATION_SSH_HOST'),
             'ssh_binary' => env('DB_REPLICATION_SSH_BINARY', 'ssh'),
             'ssh_user' => env('DB_REPLICATION_SSH_USER', 'ubuntu'),
-            'container' => env('DB_REPLICATION_DOCKER_CONTAINER'),
+            'container' => env('DB_REPLICATION_DOCKER_CONTAINER', 'zentrum-tvde-web'),
+            'tunnel_target' => env('DB_REPLICATION_TUNNEL_TARGET', '127.0.0.1:3306'),
         ],
     ],
 
