@@ -30,7 +30,7 @@ class DriverResource extends Resource
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedUser;
 
-    protected static UnitEnum|string|null $navigationGroup = 'TVDE';
+    protected static UnitEnum|string|null $navigationGroup = 'TVDE Aluguer';
 
     protected static ?int $navigationSort = 10;
 
@@ -281,6 +281,11 @@ class DriverResource extends Resource
             RelationManagers\WeekStatementsRelationManager::class,
             RelationManagers\CandidateApplicationRelationManager::class,
         ];
+    }
+
+    public static function getEloquentQuery(): \Illuminate\Database\Eloquent\Builder
+    {
+        return parent::getEloquentQuery()->currentlyInOperation(\App\Enums\TvdeOperation::Rental);
     }
 
     public static function getPages(): array

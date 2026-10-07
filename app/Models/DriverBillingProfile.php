@@ -13,10 +13,14 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class DriverBillingProfile extends Model
 {
+    use \App\Models\Concerns\BelongsToParticipation;
+
     /** @use HasFactory<\Database\Factories\DriverBillingProfileFactory> */
     use HasFactory;
 
     protected $fillable = [
+        'driver_participation_id',
+        'operation',
         'driver_id',
         'active',
         'valid_from',

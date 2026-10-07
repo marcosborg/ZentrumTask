@@ -13,7 +13,7 @@ class VehicleDocumentAlertsUrgentTable extends TableWidget
     public function table(Table $table): Table
     {
         return $table
-            ->query(fn (): Builder => VehicleDocumentAlert::query()
+            ->query(fn (): Builder => VehicleDocumentAlert::query()->whereHas('document.vehicle', fn ($query) => $query->where('operation', 'rental'))
                 ->with(['document.vehicle'])
                 ->where('is_resolved', false)
                 ->orderByRaw("case level when 'expired' then 1 when 'expiring_7' then 2 when 'expiring_60' then 3 else 4 end")

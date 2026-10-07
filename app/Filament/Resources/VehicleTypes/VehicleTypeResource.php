@@ -24,7 +24,7 @@ class VehicleTypeResource extends Resource
 
     protected static string|BackedEnum|null $navigationIcon = 'heroicon-o-truck';
 
-    protected static UnitEnum|string|null $navigationGroup = 'TVDE';
+    protected static UnitEnum|string|null $navigationGroup = 'TVDE Aluguer';
 
     protected static ?int $navigationSort = 20;
 

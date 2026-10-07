@@ -14,7 +14,7 @@ class VehicleDocumentAlertsCalendar extends Page
 {
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedCalendarDays;
 
-    protected static UnitEnum|string|null $navigationGroup = 'TVDE';
+    protected static UnitEnum|string|null $navigationGroup = 'TVDE Aluguer';
 
     protected static ?int $navigationSort = 26;
 
@@ -49,7 +49,7 @@ class VehicleDocumentAlertsCalendar extends Page
         $calendarStart = $start->copy()->startOfWeek(Carbon::MONDAY);
         $calendarEnd = $end->copy()->endOfWeek(Carbon::SUNDAY);
 
-        $alerts = VehicleDocumentAlert::query()
+        $alerts = VehicleDocumentAlert::query()->whereHas('document.vehicle', fn ($query) => $query->where('operation', 'rental'))
             ->with(['document.vehicle'])
             ->whereBetween('triggered_on', [$start, $end])
             ->orderBy('level')

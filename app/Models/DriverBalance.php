@@ -9,6 +9,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class DriverBalance extends Model
 {
+    use \App\Models\Concerns\BelongsToParticipation;
+
     /** @use HasFactory<\Database\Factories\DriverBalanceFactory> */
     use HasFactory;
 
@@ -16,6 +18,8 @@ class DriverBalance extends Model
      * @var list<string>
      */
     protected $fillable = [
+        'driver_participation_id',
+        'operation',
         'driver_id',
         'current_balance',
         'last_settlement_id',

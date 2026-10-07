@@ -25,7 +25,7 @@ class VehicleAllocationsRelationManager extends RelationManager
             ->components([
                 Select::make('vehicle_id')
                     ->label('Viatura')
-                    ->relationship('vehicle', 'license_plate')
+                    ->relationship('vehicle', 'license_plate', fn ($query) => $query->forOperation(\App\Enums\TvdeOperation::Rental))
                     ->getOptionLabelFromRecordUsing(fn ($record): string => trim($record->license_plate.' - '.$record->make.' '.$record->model))
                     ->searchable()
                     ->required()

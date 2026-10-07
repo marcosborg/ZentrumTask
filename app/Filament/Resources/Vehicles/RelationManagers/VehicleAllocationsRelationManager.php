@@ -23,7 +23,7 @@ class VehicleAllocationsRelationManager extends RelationManager
             ->components([
                 Select::make('driver_id')
                     ->label('Motorista')
-                    ->relationship('driver', 'name')
+                    ->relationship('driver', 'name', fn ($query) => $query->forOperation(\App\Enums\TvdeOperation::Rental))
                     ->searchable()
                     ->required()
                     ->native(false)

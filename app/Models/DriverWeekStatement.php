@@ -11,10 +11,16 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class DriverWeekStatement extends Model
 {
+    use \App\Models\Concerns\BelongsToParticipation;
+
     /** @use HasFactory<\Database\Factories\DriverWeekStatementFactory> */
     use HasFactory;
 
     protected $fillable = [
+        'driver_participation_id',
+        'operation',
+        'slot_fee',
+        'rules_snapshot',
         'driver_id',
         'billing_profile_id',
         'tvde_week_id',
@@ -36,6 +42,8 @@ class DriverWeekStatement extends Model
     ];
 
     protected $casts = [
+        'slot_fee' => 'decimal:2',
+        'rules_snapshot' => 'array',
         'week_start_date' => 'date',
         'week_end_date' => 'date',
         'gross_total' => 'decimal:2',

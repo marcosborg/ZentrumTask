@@ -11,10 +11,14 @@ use Illuminate\Validation\ValidationException;
 
 class VehicleAllocation extends Model
 {
+    use \App\Models\Concerns\BelongsToParticipation;
+
     /** @use HasFactory<\Database\Factories\VehicleAllocationFactory> */
     use HasFactory;
 
     protected $fillable = [
+        'driver_participation_id',
+        'operation',
         'vehicle_id',
         'driver_id',
         'starts_at',
@@ -44,6 +48,11 @@ class VehicleAllocation extends Model
     protected static function booted(): void
     {
         static::saving(function (VehicleAllocation $allocation): void {
+            $vehicle = $allocation->vehicle;
+            $participation = $allocation->participation;
+            if ($vehicle && $participation && ($vehicle->operation !== $participation->operation->value || ($vehicle->operation === 'slot' && (int) $vehicle->owner_driver_id !== (int) $allocation->driver_id))) {
+                throw ValidationException::withMessages(['vehicle_id' => 'Viatura incompatível com a operação ou proprietário.']);
+            }
             if (! $allocation->starts_at) {
                 return;
             }

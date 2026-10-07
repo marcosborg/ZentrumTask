@@ -34,6 +34,17 @@ class DriverSettlementService
         array $inputs
     ): DriverWeekStatement {
         return DB::transaction(function () use ($driver, $profile, $inputs): DriverWeekStatement {
+            if ($profile->operation === 'slot') {
+                abort_unless(config('slots.enabled'), 403);
+                $participation = $profile->participation;
+                $start = (string) ($inputs['week_start_date'] ?? '');
+                $end = (string) ($inputs['week_end_date'] ?? '');
+                $parts = app(SlotStatementCalculator::class)->components($participation, $profile, $start, $end, $this->toFloat($inputs['net_total'] ?? 0), $this->toFloat($inputs['tips_total'] ?? 0), $this->toFloat($inputs['expenses_total'] ?? 0));
+                $statement = DriverWeekStatement::query()->create(['driver_id' => $driver->id, 'driver_participation_id' => $participation->id, 'operation' => 'slot', 'billing_profile_id' => $profile->id, 'week_start_date' => $start, 'week_end_date' => $end, 'net_total' => $parts['net_total'], 'tips_total' => $parts['tips_total'], 'company_share' => 0, 'driver_share' => $parts['driver_share'], 'vat_amount' => $parts['vat_amount'], 'withholding_amount' => $parts['withholding_amount'], 'expenses_total' => $parts['expenses_total'], 'rent_amount' => 0, 'additional_fees_total' => 0, 'slot_fee' => $parts['slot_fee'], 'amount_payable_to_driver' => $parts['amount_payable'], 'rules_snapshot' => $parts, 'status' => StatementStatus::Draft, 'calculated_at' => now()]);
+                $this->storeItems($statement, collect([['type' => 'income', 'description' => 'Ganhos sem gorjetas', 'amount' => $parts['driver_share']], ['type' => 'tip', 'description' => 'Gorjetas', 'amount' => $parts['tips_total']], ['type' => 'vat', 'description' => 'IVA do perfil fiscal', 'amount' => $parts['vat_amount']], ['type' => 'withholding', 'description' => 'Retenção na fonte', 'amount' => -$parts['withholding_amount']], ['type' => 'fee', 'description' => 'Pack SLOT (IVA incluído)', 'amount' => -$parts['slot_fee']], ['type' => 'expense', 'description' => 'Ajustes documentados', 'amount' => -$parts['expenses_total']]]));
+
+                return $statement->load(['items', 'driver', 'billingProfile']);
+            }
             $grossTotal = $this->toFloat($inputs['gross_total'] ?? 0);
             $netTotal = $this->toFloat($inputs['net_total'] ?? 0);
             $tipsTotal = $this->toFloat($inputs['tips_total'] ?? 0);

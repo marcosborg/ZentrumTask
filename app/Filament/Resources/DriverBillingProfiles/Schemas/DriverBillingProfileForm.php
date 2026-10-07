@@ -10,7 +10,6 @@ use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Schemas\Schema;
-use Illuminate\Validation\Rule;
 
 class DriverBillingProfileForm
 {
@@ -21,13 +20,10 @@ class DriverBillingProfileForm
             ->components([
                 Select::make('driver_id')
                     ->label('Motorista')
-                    ->relationship('driver', 'name')
+                    ->relationship('driver', 'name', fn ($query) => $query->forOperation(\App\Enums\TvdeOperation::Rental))
                     ->required()
                     ->searchable()
                     ->preload()
-                    ->rules(fn (?\App\Models\DriverBillingProfile $record) => [
-                        Rule::unique('driver_billing_profiles', 'driver_id')->ignore($record),
-                    ])
                     ->disabled(fn (?\App\Models\DriverBillingProfile $record): bool => (bool) $record)
                     ->columnSpan(2),
                 Toggle::make('active')

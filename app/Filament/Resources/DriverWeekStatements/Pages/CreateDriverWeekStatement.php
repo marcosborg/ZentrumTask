@@ -26,7 +26,7 @@ class CreateDriverWeekStatement extends CreateRecord
         $driver = Driver::findOrFail($data['driver_id']);
 
         $profileId = $data['billing_profile_id']
-            ?? DriverBillingProfile::query()
+            ?? DriverBillingProfile::query()->forOperation(\App\Enums\TvdeOperation::Rental)
                 ->active()
                 ->where('driver_id', $driver->id)
                 ->orderByDesc('valid_from')
@@ -38,7 +38,7 @@ class CreateDriverWeekStatement extends CreateRecord
             ]);
         }
 
-        $profile = DriverBillingProfile::findOrFail($profileId);
+        $profile = DriverBillingProfile::query()->forOperation(\App\Enums\TvdeOperation::Rental)->where('driver_id', $driver->id)->findOrFail($profileId);
 
         $statement = app(DriverSettlementService::class)
             ->createStatementFromInputs($driver, $profile, $data);

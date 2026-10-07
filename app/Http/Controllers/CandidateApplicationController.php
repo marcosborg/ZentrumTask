@@ -289,6 +289,7 @@ class CandidateApplicationController extends Controller
         }
 
         return Vehicle::query()
+            ->forOperation(\App\Enums\TvdeOperation::Rental)
             ->where('source', 'tvde')
             ->find($vehicleId);
     }

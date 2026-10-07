@@ -20,7 +20,7 @@ class SettlementBillingResolver
      */
     public function resolveBillingProfile(Driver $driver, Carbon $start, Carbon $end, ?Collection $profiles = null): array
     {
-        $profiles = $profiles ?? DriverBillingProfile::query()
+        $profiles = $profiles ?? DriverBillingProfile::query()->forOperation(\App\Enums\TvdeOperation::Rental)
             ->where('driver_id', $driver->id)
             ->where('active', true)
             ->get();
@@ -65,7 +65,7 @@ class SettlementBillingResolver
         ?Collection $allocations = null,
         ?DriverBillingProfile $profile = null
     ): int {
-        $allocations = $allocations ?? VehicleAllocation::query()
+        $allocations = $allocations ?? VehicleAllocation::query()->forOperation(\App\Enums\TvdeOperation::Rental)
             ->where('driver_id', $driver->id)
             ->where('starts_at', '<=', $end)
             ->where(function ($query) use ($start): void {

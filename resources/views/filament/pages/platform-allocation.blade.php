@@ -52,5 +52,14 @@
                 @endif
             </section>
         @endif
+        <section class="grid gap-3">
+            <h3 class="text-lg font-semibold">Imports pendentes (últimos 100)</h3>
+            @foreach ($this->pendingBalances() as $balance)
+                <div wire:key="pending-balance-{{ $balance->id }}" class="rounded-lg border border-gray-200 p-3 dark:border-gray-700">
+                    <strong>{{ strtoupper($balance->platform) }} — {{ $balance->driver_code }}</strong>
+                    <div>{{ $balance->period_start->format('d/m/Y') }} — {{ $balance->period_end->format('d/m/Y') }}: {{ $balance->allocation_error ?? 'Por distribuir' }}</div>
+                </div>
+            @endforeach
+        </section>
     </div>
 </x-filament-panels::page>

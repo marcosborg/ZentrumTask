@@ -38,7 +38,7 @@ class CandidateApplicationResource extends Resource
 
     protected static BackedEnum|string|null $navigationIcon = Heroicon::OutlinedDocumentText;
 
-    protected static UnitEnum|string|null $navigationGroup = 'TVDE';
+    protected static UnitEnum|string|null $navigationGroup = 'TVDE Aluguer';
 
     protected static ?int $navigationSort = 1;
 

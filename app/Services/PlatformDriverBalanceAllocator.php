@@ -19,14 +19,22 @@ class PlatformDriverBalanceAllocator
         $pending = 0;
 
         PlatformDriverBalance::query()
-            ->whereNull('driver_id')
+            ->whereNull('driver_participation_id')
             ->when($platform, fn ($query) => $query->where('platform', $platform))
             ->orderBy('id')
             ->chunkById(200, function ($balances) use (&$allocated, &$pending): void {
                 foreach ($balances as $balance) {
-                    $driver = $this->findDriver($balance->platform, $balance->driver_code);
+                    try {
+                        $driver = $balance->driver_id ? Driver::query()->find($balance->driver_id) : $this->findDriver($balance->platform, $balance->driver_code);
+                    } catch (RuntimeException $exception) {
+                        $balance->forceFill(['allocation_error' => $exception->getMessage()])->saveQuietly();
+                        $pending++;
+
+                        continue;
+                    }
 
                     if ($driver === null) {
+                        $balance->forceFill(['allocation_error' => 'Motorista não identificado.'])->saveQuietly();
                         $pending++;
                         Log::info('Balance pendente sem driver', [
                             'balance_id' => $balance->id,
@@ -37,8 +45,14 @@ class PlatformDriverBalanceAllocator
                         continue;
                     }
 
-                    $balance->driver_id = $driver->id;
-                    $balance->save();
+                    $participation = app(ParticipationService::class)->resolve($driver->id, $balance->period_start, $balance->period_end);
+                    if (! $participation) {
+                        $balance->forceFill(['driver_id' => $driver->id, 'allocation_error' => 'Participação inexistente, conflitante ou período incompatível.'])->saveQuietly();
+                        $pending++;
+
+                        continue;
+                    }
+                    $balance->forceFill(['driver_id' => $driver->id, 'driver_participation_id' => $participation->id, 'operation' => $participation->operation->value, 'allocation_error' => null])->save();
                     $allocated++;
                 }
             });

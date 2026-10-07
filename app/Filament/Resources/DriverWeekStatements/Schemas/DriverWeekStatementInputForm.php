@@ -17,14 +17,14 @@ class DriverWeekStatementInputForm
             ->components([
                 Select::make('driver_id')
                     ->label('Motorista')
-                    ->relationship('driver', 'name')
+                    ->relationship('driver', 'name', fn ($query) => $query->forOperation(\App\Enums\TvdeOperation::Rental))
                     ->required()
                     ->searchable()
                     ->preload()
                     ->live(),
                 Select::make('billing_profile_id')
                     ->label('Perfil de faturação')
-                    ->options(fn (callable $get) => DriverBillingProfile::query()
+                    ->options(fn (callable $get) => DriverBillingProfile::query()->forOperation(\App\Enums\TvdeOperation::Rental)
                         ->where('driver_id', $get('driver_id'))
                         ->pluck('id', 'id')
                         ->all())

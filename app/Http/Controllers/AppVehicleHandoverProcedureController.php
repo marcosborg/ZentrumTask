@@ -29,12 +29,12 @@ class AppVehicleHandoverProcedureController extends AppApiController
             ], 401);
         }
 
-        $vehicles = Vehicle::query()
+        $vehicles = Vehicle::query()->forOperation(\App\Enums\TvdeOperation::Rental)
             ->with(['currentAllocation.driver'])
             ->orderBy('license_plate')
             ->get();
 
-        $drivers = Driver::query()
+        $drivers = Driver::query()->currentlyInOperation(\App\Enums\TvdeOperation::Rental)
             ->with(['currentAllocation.vehicle'])
             ->orderBy('name')
             ->get();

@@ -19,7 +19,7 @@ class VehicleDetailsOverviewTable extends TableWidget
                 $expiring7 = $today->copy()->addDays(7);
                 $expiring60 = $today->copy()->addDays(60);
 
-                return Vehicle::query()
+                return Vehicle::query()->forOperation(\App\Enums\TvdeOperation::Rental)
                     ->with(['currentAllocation.driver'])
                     ->withCount([
                         'documents as expired_documents_count' => fn (Builder $query): Builder => $query

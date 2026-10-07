@@ -26,7 +26,7 @@ class DriverWeekStatementResource extends Resource
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedBanknotes;
 
-    protected static UnitEnum|string|null $navigationGroup = 'TVDE';
+    protected static UnitEnum|string|null $navigationGroup = 'TVDE Aluguer';
 
     protected static ?int $navigationSort = 30;
 
@@ -50,6 +50,11 @@ class DriverWeekStatementResource extends Resource
         return [
             ItemsRelationManager::class,
         ];
+    }
+
+    public static function getEloquentQuery(): \Illuminate\Database\Eloquent\Builder
+    {
+        return parent::getEloquentQuery()->forOperation(\App\Enums\TvdeOperation::Rental);
     }
 
     public static function getPages(): array

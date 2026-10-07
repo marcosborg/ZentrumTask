@@ -64,7 +64,7 @@ class VehicleHandoverProcedureForm
                             ->native(false),
                         Select::make('vehicle_id')
                             ->label('Viatura')
-                            ->options(fn (): array => Vehicle::query()
+                            ->options(fn (): array => Vehicle::query()->forOperation(\App\Enums\TvdeOperation::Rental)
                                 ->orderBy('license_plate')
                                 ->get()
                                 ->mapWithKeys(fn (Vehicle $vehicle): array => [
@@ -80,7 +80,7 @@ class VehicleHandoverProcedureForm
                                     return;
                                 }
 
-                                $vehicle = Vehicle::query()->with('currentAllocation.driver')->find($state);
+                                $vehicle = Vehicle::query()->forOperation(\App\Enums\TvdeOperation::Rental)->with('currentAllocation.driver')->find($state);
 
                                 if ($vehicle?->currentAllocation?->driver_id) {
                                     $set('driver_id', $vehicle->currentAllocation->driver_id);
@@ -88,7 +88,7 @@ class VehicleHandoverProcedureForm
                             }),
                         Select::make('driver_id')
                             ->label('Motorista')
-                            ->options(fn (): array => Driver::query()
+                            ->options(fn (): array => Driver::query()->forOperation(\App\Enums\TvdeOperation::Rental)
                                 ->orderBy('name')
                                 ->get()
                                 ->mapWithKeys(fn (Driver $driver): array => [
@@ -104,7 +104,7 @@ class VehicleHandoverProcedureForm
                                     return;
                                 }
 
-                                $driver = Driver::query()->with('currentAllocation.vehicle')->find($state);
+                                $driver = Driver::query()->forOperation(\App\Enums\TvdeOperation::Rental)->with('currentAllocation.vehicle')->find($state);
 
                                 if ($driver?->currentAllocation?->vehicle_id) {
                                     $set('vehicle_id', $driver->currentAllocation->vehicle_id);

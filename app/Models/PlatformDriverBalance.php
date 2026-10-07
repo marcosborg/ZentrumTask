@@ -7,10 +7,16 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class PlatformDriverBalance extends Model
 {
+    use \App\Models\Concerns\BelongsToParticipation;
+
     /**
      * @var list<string>
      */
     protected $fillable = [
+        'driver_id',
+        'allocation_error',
+        'driver_participation_id',
+        'operation',
         'platform',
         'driver_code',
         'period_start',

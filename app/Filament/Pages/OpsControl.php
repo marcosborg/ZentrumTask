@@ -56,11 +56,11 @@ class OpsControl extends Page
         ];
 
         $this->tvdeStats = [
-            'drivers' => Driver::count(),
-            'profiles' => DriverBillingProfile::count(),
-            'active_profiles' => DriverBillingProfile::where('active', true)->count(),
-            'statements' => DriverWeekStatement::count(),
-            'draft_statements' => DriverWeekStatement::where('status', StatementStatus::Draft)->count(),
+            'drivers' => Driver::query()->forOperation(\App\Enums\TvdeOperation::Rental)->count(),
+            'profiles' => DriverBillingProfile::query()->forOperation(\App\Enums\TvdeOperation::Rental)->count(),
+            'active_profiles' => DriverBillingProfile::query()->forOperation(\App\Enums\TvdeOperation::Rental)->where('active', true)->count(),
+            'statements' => DriverWeekStatement::query()->forOperation(\App\Enums\TvdeOperation::Rental)->count(),
+            'draft_statements' => DriverWeekStatement::query()->forOperation(\App\Enums\TvdeOperation::Rental)->where('status', StatementStatus::Draft)->count(),
         ];
 
         $this->recentTasks = Task::query()
@@ -69,7 +69,7 @@ class OpsControl extends Page
             ->limit(5)
             ->get(['id', 'title', 'stage_id', 'created_at']);
 
-        $this->recentStatements = DriverWeekStatement::query()
+        $this->recentStatements = DriverWeekStatement::query()->forOperation(\App\Enums\TvdeOperation::Rental)
             ->with(['driver'])
             ->latest('calculated_at')
             ->latest()
@@ -90,7 +90,7 @@ class OpsControl extends Page
             })
             ->toArray();
 
-        $this->tvdeAmountChart = DriverWeekStatement::query()
+        $this->tvdeAmountChart = DriverWeekStatement::query()->forOperation(\App\Enums\TvdeOperation::Rental)
             ->latest('week_end_date')
             ->limit(6)
             ->get(['week_start_date', 'week_end_date', 'amount_payable_to_driver'])

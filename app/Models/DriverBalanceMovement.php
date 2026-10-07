@@ -8,6 +8,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class DriverBalanceMovement extends Model
 {
+    use \App\Models\Concerns\BelongsToParticipation;
+
     /** @use HasFactory<\Database\Factories\DriverBalanceMovementFactory> */
     use HasFactory;
 
@@ -15,6 +17,9 @@ class DriverBalanceMovement extends Model
      * @var list<string>
      */
     protected $fillable = [
+        'payment_reference',
+        'driver_participation_id',
+        'operation',
         'driver_id',
         'driver_balance_id',
         'driver_settlement_id',

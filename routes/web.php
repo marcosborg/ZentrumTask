@@ -212,6 +212,7 @@ Route::get('/media-proxy/{uuid}/{conversion?}', [MediaProxyController::class, 's
     ->name('media.proxy');
 
 Route::middleware(['auth'])->get('/admin/driver-settlements/{driverSettlement}/recibo-verde', function (DriverSettlement $driverSettlement) {
+    abort_unless($driverSettlement->operation === 'rental' || config('slots.enabled'), 403);
     $path = $driverSettlement->green_receipt_path;
     $disk = Storage::disk(config('filesystems.settlement_receipts_disk', 'local'));
 

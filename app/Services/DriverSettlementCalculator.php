@@ -23,12 +23,18 @@ class DriverSettlementCalculator
     /**
      * @return array{created:int, skipped:int, missing_profiles:int}
      */
-    public function calculate(string $periodStart, string $periodEnd, ?int $driverId = null): array
+    public function calculate(string $periodStart, string $periodEnd, ?int $driverId = null, \App\Enums\TvdeOperation $operation = \App\Enums\TvdeOperation::Rental): array
     {
+        app(PlatformDriverBalanceAllocator::class)->allocate();
+        if ($operation === \App\Enums\TvdeOperation::Slot) {
+            return app(SlotSettlementCalculator::class)->calculate($periodStart, $periodEnd, $driverId);
+        }
         $start = Carbon::parse($periodStart)->startOfDay();
         $end = Carbon::parse($periodEnd)->endOfDay();
 
         $balances = PlatformDriverBalance::query()
+            ->forOperation(\App\Enums\TvdeOperation::Rental)
+            ->whereNotNull('driver_participation_id')
             ->whereNotNull('driver_id')
             ->whereDate('period_start', '>=', $start->toDateString())
             ->whereDate('period_end', '<=', $end->toDateString())
@@ -38,6 +44,7 @@ class DriverSettlementCalculator
         $grouped = $balances->groupBy('driver_id');
 
         $adjustmentExpenses = DriverAdjustment::query()
+            ->forOperation(\App\Enums\TvdeOperation::Rental)
             ->whereDate('starts_at', '<=', $end->toDateString())
             ->when($driverId, fn ($query) => $query->where('driver_id', $driverId))
             ->get()
@@ -45,6 +52,7 @@ class DriverSettlementCalculator
 
         $balanceDriverIds = $grouped->keys()->map(fn ($id): int => (int) $id)->values();
         $allocationDriverIds = VehicleAllocation::query()
+            ->forOperation(\App\Enums\TvdeOperation::Rental)
             ->whereNotNull('driver_id')
             ->where('starts_at', '<=', $end)
             ->where(function ($query) use ($start): void {
@@ -75,9 +83,14 @@ class DriverSettlementCalculator
         $billingResolver = app(SettlementBillingResolver::class);
 
         foreach ($driverIds as $driverId) {
+            $participation = app(ParticipationService::class)->resolve((int) $driverId, $start, $end);
+            if ($participation?->operation !== \App\Enums\TvdeOperation::Rental) {
+                continue;
+            }
             $driverBalances = $grouped->get($driverId, collect());
 
             $exists = DriverSettlement::query()
+                ->where('driver_participation_id', $participation->id)
                 ->where('driver_id', $driverId)
                 ->whereDate('period_start', $start->toDateString())
                 ->whereDate('period_end', $end->toDateString())
@@ -154,7 +167,7 @@ class DriverSettlementCalculator
                 : 1;
             $amountPayable = round($amountPayableBase * $vatMultiplier, 2);
             $balance = DriverBalance::query()->firstOrCreate(
-                ['driver_id' => $driverId],
+                ['driver_id' => $driverId, 'driver_participation_id' => $participation->id],
                 [
                     'current_balance' => 0,
                     'is_settled' => false,
@@ -164,6 +177,7 @@ class DriverSettlementCalculator
             $amountDue = round(($carryOverBalance + $amountPayableBase) * $vatMultiplier, 2);
 
             $settlement = DriverSettlement::query()->create([
+                'driver_participation_id' => $participation->id,
                 'driver_id' => $driverId,
                 'period_start' => $start->toDateString(),
                 'period_end' => $end->toDateString(),
@@ -207,6 +221,7 @@ class DriverSettlementCalculator
             ])->save();
 
             DriverBalanceMovement::query()->create([
+                'driver_participation_id' => $participation->id,
                 'driver_id' => $driverId,
                 'driver_balance_id' => $balance->id,
                 'driver_settlement_id' => $settlement->id,
@@ -228,6 +243,7 @@ class DriverSettlementCalculator
     private function resolveCarryOverBalance(int $driverId, Carbon $periodStart, DriverBalance $balance): float
     {
         $latestPreviousSettlement = DriverSettlement::query()
+            ->where('driver_participation_id', $balance->driver_participation_id)
             ->where('driver_id', $driverId)
             ->whereDate('period_end', '<', $periodStart->toDateString())
             ->orderByDesc('period_end')
@@ -244,6 +260,8 @@ class DriverSettlementCalculator
     private function resolveActiveProfile(int $driverId, Carbon $start, Carbon $end): ?DriverBillingProfile
     {
         $profile = DriverBillingProfile::query()
+            ->forOperation(\App\Enums\TvdeOperation::Rental)
+            ->where('driver_participation_id', app(ParticipationService::class)->resolve($driverId, $start, $end)?->id)
             ->where('driver_id', $driverId)
             ->where('active', true)
             ->where(function ($query) use ($end): void {

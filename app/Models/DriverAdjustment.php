@@ -8,6 +8,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class DriverAdjustment extends Model
 {
+    use \App\Models\Concerns\BelongsToParticipation;
+
     /** @use HasFactory<\Database\Factories\DriverAdjustmentFactory> */
     use HasFactory;
 
@@ -15,6 +17,8 @@ class DriverAdjustment extends Model
      * @var list<string>
      */
     protected $fillable = [
+        'driver_participation_id',
+        'operation',
         'driver_id',
         'starts_at',
         'recurrence_weeks',

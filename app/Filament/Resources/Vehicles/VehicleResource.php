@@ -24,7 +24,7 @@ class VehicleResource extends Resource
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedRectangleStack;
 
-    protected static UnitEnum|string|null $navigationGroup = 'TVDE';
+    protected static UnitEnum|string|null $navigationGroup = 'TVDE Aluguer';
 
     protected static ?int $navigationSort = 15;
 
@@ -54,7 +54,7 @@ class VehicleResource extends Resource
         $today = Carbon::today();
         $expiring60 = $today->copy()->addDays(60);
 
-        return parent::getEloquentQuery()
+        return parent::getEloquentQuery()->forOperation(\App\Enums\TvdeOperation::Rental)
             ->with(['currentAllocation.driver'])
             ->withCount([
                 'documents as expired_documents_count' => fn (Builder $query): Builder => $query

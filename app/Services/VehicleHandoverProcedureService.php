@@ -91,7 +91,7 @@ class VehicleHandoverProcedureService
             return $draft;
         }
 
-        $vehicle = Vehicle::query()->with('currentAllocation.driver')->findOrFail($data['vehicle_id']);
+        $vehicle = Vehicle::query()->forOperation(\App\Enums\TvdeOperation::Rental)->with('currentAllocation.driver')->findOrFail($data['vehicle_id']);
         $driver = Driver::query()->with('currentAllocation.vehicle')->findOrFail($data['driver_id']);
         $this->guardBusinessRules((string) $data['type'], $vehicle, $driver);
 
@@ -202,7 +202,7 @@ class VehicleHandoverProcedureService
                 throw ValidationException::withMessages(['operator_signature_data_url' => 'A assinatura do operador e obrigatoria.']);
             }
 
-            $vehicle = Vehicle::query()->with('currentAllocation.driver')->lockForUpdate()->findOrFail($procedure->vehicle_id);
+            $vehicle = Vehicle::query()->forOperation(\App\Enums\TvdeOperation::Rental)->with('currentAllocation.driver')->lockForUpdate()->findOrFail($procedure->vehicle_id);
             $driver = Driver::query()->with('currentAllocation.vehicle')->findOrFail($procedure->driver_id);
             $this->guardBusinessRules($procedure->type, $vehicle, $driver);
             $performedAt = $procedure->performed_at ?? now();
@@ -255,7 +255,7 @@ class VehicleHandoverProcedureService
         }
 
         $procedure = DB::transaction(function () use ($data, $operator, $procedure): VehicleHandoverProcedure {
-            $vehicle = Vehicle::query()->findOrFail($data['vehicle_id'] ?? $procedure->vehicle_id);
+            $vehicle = Vehicle::query()->forOperation(\App\Enums\TvdeOperation::Rental)->findOrFail($data['vehicle_id'] ?? $procedure->vehicle_id);
             $driver = Driver::query()->findOrFail($data['driver_id'] ?? $procedure->driver_id);
             $performedAt = isset($data['performed_at']) && $data['performed_at']
                 ? Carbon::parse((string) $data['performed_at'])
@@ -314,7 +314,7 @@ class VehicleHandoverProcedureService
 
     private function createProcedure(array $data, User $operator): VehicleHandoverProcedure
     {
-        $vehicle = Vehicle::query()->with('currentAllocation.driver')->findOrFail($data['vehicle_id']);
+        $vehicle = Vehicle::query()->forOperation(\App\Enums\TvdeOperation::Rental)->with('currentAllocation.driver')->findOrFail($data['vehicle_id']);
         $driver = Driver::query()->with('currentAllocation.vehicle')->findOrFail($data['driver_id']);
         $performedAt = isset($data['performed_at']) && $data['performed_at']
             ? Carbon::parse((string) $data['performed_at'])

@@ -8,10 +8,14 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class DriverDepositDebit extends Model
 {
+    use \App\Models\Concerns\BelongsToParticipation;
+
     /** @use HasFactory<\Database\Factories\DriverDepositDebitFactory> */
     use HasFactory;
 
     protected $fillable = [
+        'driver_participation_id',
+        'operation',
         'driver_id',
         'driver_settlement_id',
         'created_by_user_id',

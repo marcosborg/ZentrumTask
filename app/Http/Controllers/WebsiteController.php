@@ -66,7 +66,7 @@ class WebsiteController extends Controller
 
     public function showVehicle(Vehicle $vehicle, ?string $slug = null): RedirectResponse|View
     {
-        abort_unless($vehicle->source === 'tvde', 404);
+        abort_unless($vehicle->source === 'tvde' && $vehicle->operation === 'rental', 404);
 
         $vehicle->loadMissing('websitePhotos');
 
@@ -89,7 +89,7 @@ class WebsiteController extends Controller
         $vehicle = null;
 
         if (! empty($data['vehicle_id'])) {
-            $vehicle = Vehicle::query()->find($data['vehicle_id']);
+            $vehicle = Vehicle::query()->forOperation(\App\Enums\TvdeOperation::Rental)->find($data['vehicle_id']);
         }
 
         Log::info('PUSH_DEBUG website_form createContactLead:start', [

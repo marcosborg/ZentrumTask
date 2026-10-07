@@ -20,16 +20,19 @@ class DriverDepositService
      *     payment_method: string|null
      * }
      */
-    public function summaryForDriver(Driver|int $driver): array
+    public function summaryForDriver(Driver|int $driver, ?int $participationId = null): array
     {
         $driver = $driver instanceof Driver ? $driver : Driver::query()->findOrFail($driver);
 
-        $agreedAmount = round((float) ($driver->deposit_initial_amount ?? 0), 2);
-        $paidAmount = round((float) ($driver->deposit_amount ?? 0), 2);
-        $adjustmentsTotal = round((float) collect($this->chargedDepositAdjustmentsForDriver($driver))
+        $participationId ??= $driver->participations()->where('operation', 'rental')->latest('starts_at')->value('id');
+        $participation = $driver->participations()->findOrFail($participationId);
+        $agreedAmount = round((float) ($participation->deposit_initial_amount ?? 0), 2);
+        $paidAmount = round((float) ($participation->deposit_amount ?? 0), 2);
+        $adjustmentsTotal = round((float) collect($this->chargedDepositAdjustmentsForDriver($driver, $participationId))
             ->sum('amount'), 2);
         $debitsTotal = round((float) DriverDepositDebit::query()
             ->where('driver_id', $driver->id)
+            ->where('driver_participation_id', $participationId)
             ->sum('amount'), 2);
 
         return [
@@ -38,7 +41,7 @@ class DriverDepositService
             'adjustments_total' => $adjustmentsTotal,
             'debits_total' => $debitsTotal,
             'current_balance' => round($paidAmount + $adjustmentsTotal - $debitsTotal, 2),
-            'payment_method' => $driver->deposit_payment_method,
+            'payment_method' => $participation->deposit_payment_method,
         ];
     }
 
@@ -54,16 +57,18 @@ class DriverDepositService
      *     source_file: string|null
      * }>
      */
-    public function historyForDriver(Driver|int $driver): array
+    public function historyForDriver(Driver|int $driver, ?int $participationId = null): array
     {
         $driver = $driver instanceof Driver ? $driver : Driver::query()->findOrFail($driver);
+        $participationId ??= $driver->participations()->where('operation', 'rental')->latest('starts_at')->value('id');
+        $participation = $driver->participations()->findOrFail($participationId);
         $entries = collect();
 
-        $paidAmount = round((float) ($driver->deposit_amount ?? 0), 2);
+        $paidAmount = round((float) ($participation->deposit_amount ?? 0), 2);
 
         if ($paidAmount !== 0.0) {
             $entries->push([
-                'occurred_at' => $driver->deposit_paid_at ? Carbon::parse($driver->deposit_paid_at) : null,
+                'occurred_at' => $participation->deposit_paid_at ? Carbon::parse($participation->deposit_paid_at) : null,
                 'type' => 'Pago inicial',
                 'description' => 'Valor pago no ato inicial',
                 'amount' => $paidAmount,
@@ -73,7 +78,7 @@ class DriverDepositService
             ]);
         }
 
-        collect($this->chargedDepositAdjustmentsForDriver($driver))
+        collect($this->chargedDepositAdjustmentsForDriver($driver, $participationId))
             ->each(function (array $row) use ($entries): void {
                 $entries->push($row);
             });
@@ -81,6 +86,7 @@ class DriverDepositService
         DriverDepositDebit::query()
             ->with('settlement')
             ->where('driver_id', $driver->id)
+            ->where('driver_participation_id', $participationId)
             ->orderBy('occurred_at')
             ->orderBy('id')
             ->get(['id', 'driver_id', 'driver_settlement_id', 'occurred_at', 'amount', 'description', 'notes', 'source_file'])
@@ -122,6 +128,8 @@ class DriverDepositService
     public function createDebitFromSettlement(DriverSettlement $settlement, array $data): DriverDepositDebit
     {
         return DriverDepositDebit::query()->create([
+            'driver_participation_id' => $settlement->driver_participation_id,
+            'operation' => $settlement->operation,
             'driver_id' => $settlement->driver_id,
             'driver_settlement_id' => $settlement->id,
             'created_by_user_id' => auth()->id(),
@@ -160,10 +168,11 @@ class DriverDepositService
      *     source_file: string|null
      * }>
      */
-    private function chargedDepositAdjustmentsForDriver(Driver $driver): array
+    private function chargedDepositAdjustmentsForDriver(Driver $driver, ?int $participationId = null): array
     {
         $adjustments = DriverAdjustment::query()
             ->where('driver_id', $driver->id)
+            ->where('driver_participation_id', $participationId)
             ->where('category', 'caucao')
             ->orderBy('starts_at')
             ->orderBy('id')
@@ -175,6 +184,7 @@ class DriverDepositService
 
         $settlements = DriverSettlement::query()
             ->where('driver_id', $driver->id)
+            ->where('driver_participation_id', $participationId)
             ->orderBy('period_start')
             ->orderBy('id')
             ->get(['period_start', 'period_end']);

@@ -23,7 +23,7 @@ class VehicleAllocationTimeline extends Page
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedClock;
 
-    protected static UnitEnum|string|null $navigationGroup = 'TVDE';
+    protected static UnitEnum|string|null $navigationGroup = 'TVDE Aluguer';
 
     protected static ?int $navigationSort = 30;
 
@@ -61,7 +61,7 @@ class VehicleAllocationTimeline extends Page
                 ->form([
                     Select::make('vehicle_id')
                         ->label('Viatura')
-                        ->options(fn (): array => Vehicle::query()
+                        ->options(fn (): array => Vehicle::query()->forOperation(\App\Enums\TvdeOperation::Rental)
                             ->orderBy('license_plate')
                             ->pluck('license_plate', 'id')
                             ->all())
@@ -70,7 +70,7 @@ class VehicleAllocationTimeline extends Page
                         ->native(false),
                     Select::make('driver_id')
                         ->label('Motorista')
-                        ->options(fn (): array => Driver::query()
+                        ->options(fn (): array => Driver::query()->forOperation(\App\Enums\TvdeOperation::Rental)
                             ->orderBy('name')
                             ->pluck('name', 'id')
                             ->all())
@@ -142,7 +142,7 @@ class VehicleAllocationTimeline extends Page
 
         $totalSeconds = max(1, $rangeEnd->diffInSeconds($rangeStart));
 
-        $vehicles = Vehicle::query()
+        $vehicles = Vehicle::query()->forOperation(\App\Enums\TvdeOperation::Rental)
             ->with([
                 'allocations' => function ($query) use ($rangeStart, $rangeEnd) {
                     $query

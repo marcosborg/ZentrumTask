@@ -30,7 +30,7 @@ class AppOpsController extends AppApiController
             ->limit(50)
             ->get();
 
-        $drivers = Driver::query()
+        $drivers = Driver::query()->currentlyInOperation(\App\Enums\TvdeOperation::Rental)
             ->with(['currentAllocation.vehicle', 'company'])
             ->withExists([
                 'billingProfiles as has_active_billing_profile' => fn (Builder $query): Builder => $query->active(),
@@ -39,7 +39,7 @@ class AppOpsController extends AppApiController
             ->limit(50)
             ->get();
 
-        $vehicles = Vehicle::query()
+        $vehicles = Vehicle::query()->forOperation(\App\Enums\TvdeOperation::Rental)
             ->with(['currentAllocation.driver'])
             ->withCount([
                 'documents as expired_documents_count' => fn (Builder $query): Builder => $query

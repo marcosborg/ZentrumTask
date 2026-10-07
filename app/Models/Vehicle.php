@@ -21,6 +21,8 @@ class Vehicle extends Model implements HasMedia
     use InteractsWithMedia;
 
     protected $fillable = [
+        'operation',
+        'owner_driver_id',
         'license_plate',
         'prio_card_code',
         'prio_card_label',
@@ -44,9 +46,36 @@ class Vehicle extends Model implements HasMedia
         'notes',
     ];
 
+    protected static function booted(): void
+    {
+        static::saving(function (self $vehicle): void {
+            if ($vehicle->operation === 'slot' && ! $vehicle->owner_driver_id) {
+                throw \Illuminate\Validation\ValidationException::withMessages(['owner_driver_id' => 'Identifique o motorista proprietário.']);
+            }
+            if ($vehicle->exists && $vehicle->isDirty(['operation', 'owner_driver_id']) && $vehicle->allocations()->exists()) {
+                throw \Illuminate\Validation\ValidationException::withMessages(['operation' => 'Preserve a operação e o proprietário das viaturas com histórico.']);
+            }
+        });
+    }
+
     public function documents(): HasMany
     {
         return $this->hasMany(VehicleDocument::class);
+    }
+
+    public function owner(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    {
+        return $this->belongsTo(Driver::class, 'owner_driver_id');
+    }
+
+    public function checkups(): HasMany
+    {
+        return $this->hasMany(VehicleCheckup::class);
+    }
+
+    public function scopeForOperation(Builder $query, \App\Enums\TvdeOperation $operation): Builder
+    {
+        return $query->where('operation', $operation->value);
     }
 
     public function allocations(): HasMany
@@ -62,8 +91,9 @@ class Vehicle extends Model implements HasMedia
     public function currentAllocation(): HasOne
     {
         return $this->hasOne(VehicleAllocation::class)
-            ->where('status', 'active')
-            ->whereNull('ends_at')
+            ->whereIn('status', ['active', 'closed'])
+            ->where('starts_at', '<=', now())
+            ->where(fn ($query) => $query->whereNull('ends_at')->orWhere('ends_at', '>=', now()))
             ->latest('starts_at');
     }
 
@@ -105,6 +135,7 @@ class Vehicle extends Model implements HasMedia
     {
         return $query
             ->where('source', 'tvde')
+            ->where('operation', 'rental')
             ->orderByRaw("CASE WHEN status = 'available' THEN 0 ELSE 1 END")
             ->orderBy('make')
             ->orderBy('model')

@@ -8,10 +8,19 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class DriverSettlement extends Model
 {
+    use \App\Models\Concerns\BelongsToParticipation;
+
     /**
      * @var list<string>
      */
     protected $fillable = [
+        'driver_participation_id',
+        'operation',
+        'slot_fee',
+        'platform_received_at',
+        'reconciled_at',
+        'payment_due_at',
+        'payment_delay_reason',
         'driver_id',
         'period_start',
         'period_end',
@@ -42,6 +51,10 @@ class DriverSettlement extends Model
     protected function casts(): array
     {
         return [
+            'slot_fee' => 'decimal:2',
+            'platform_received_at' => 'datetime',
+            'reconciled_at' => 'datetime',
+            'payment_due_at' => 'date',
             'period_start' => 'date',
             'period_end' => 'date',
             'net_total' => 'decimal:2',

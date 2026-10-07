@@ -20,7 +20,7 @@ class PlatformAllocation extends Page implements HasForms
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedLink;
 
-    protected static UnitEnum|string|null $navigationGroup = 'TVDE';
+    protected static UnitEnum|string|null $navigationGroup = 'Imports TVDE';
 
     protected static ?string $navigationLabel = 'Alocacao de balances';
 
@@ -34,6 +34,11 @@ class PlatformAllocation extends Page implements HasForms
     public ?array $result = null;
 
     public ?string $errorMessage = null;
+
+    public function pendingBalances(): \Illuminate\Database\Eloquent\Collection
+    {
+        return \App\Models\PlatformDriverBalance::query()->whereNull('driver_participation_id')->latest('id')->limit(100)->get();
+    }
 
     public function mount(): void
     {

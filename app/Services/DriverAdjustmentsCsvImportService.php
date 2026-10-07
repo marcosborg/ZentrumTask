@@ -63,6 +63,13 @@ class DriverAdjustmentsCsvImportService
             }
 
             $startsAt = $this->parseDate((string) $dateValue);
+            $participation = app(ParticipationService::class)->resolve($driver->id, $startsAt);
+            if ($participation?->operation !== \App\Enums\TvdeOperation::Rental) {
+                $invalidRows++;
+                $skipped++;
+
+                continue;
+            }
             $amount = $this->parseAmount($amountRaw);
 
             if ($amount === null) {

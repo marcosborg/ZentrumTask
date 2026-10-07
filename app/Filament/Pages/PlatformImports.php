@@ -46,7 +46,7 @@ class PlatformImports extends Page implements HasForms, HasTable
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedArrowUpTray;
 
-    protected static UnitEnum|string|null $navigationGroup = 'TVDE';
+    protected static UnitEnum|string|null $navigationGroup = 'Imports TVDE';
 
     protected static ?string $navigationLabel = 'Imports';
 
@@ -194,6 +194,7 @@ class PlatformImports extends Page implements HasForms, HasTable
             }
 
             if (! in_array($platform, ['prio', 'via_verde'], true)) {
+                app(\App\Services\PlatformDriverBalanceAllocator::class)->allocate($platform);
                 $driverCodes = array_values(array_filter(array_map(
                     fn (string $code): string => strtolower(trim($code)),
                     $result['driver_codes'] ?? []

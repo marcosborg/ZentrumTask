@@ -19,7 +19,7 @@ class VehicleDocumentAlertResource extends Resource
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedBellAlert;
 
-    protected static UnitEnum|string|null $navigationGroup = 'TVDE';
+    protected static UnitEnum|string|null $navigationGroup = 'TVDE Aluguer';
 
     protected static ?int $navigationSort = 25;
 
@@ -38,7 +38,7 @@ class VehicleDocumentAlertResource extends Resource
 
     public static function getEloquentQuery(): Builder
     {
-        return parent::getEloquentQuery()
+        return parent::getEloquentQuery()->whereHas('document.vehicle', fn ($query) => $query->where('operation', 'rental'))
             ->with(['document.vehicle']);
     }
 

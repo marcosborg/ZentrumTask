@@ -21,7 +21,7 @@ class DriverBillingProfileResource extends Resource
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedDocumentText;
 
-    protected static UnitEnum|string|null $navigationGroup = 'TVDE';
+    protected static UnitEnum|string|null $navigationGroup = 'TVDE Aluguer';
 
     protected static ?int $navigationSort = 20;
 
@@ -42,6 +42,11 @@ class DriverBillingProfileResource extends Resource
         return [
             //
         ];
+    }
+
+    public static function getEloquentQuery(): \Illuminate\Database\Eloquent\Builder
+    {
+        return parent::getEloquentQuery()->forOperation(\App\Enums\TvdeOperation::Rental);
     }
 
     public static function getPages(): array

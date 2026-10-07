@@ -15,17 +15,17 @@ class VehicleDocumentAlertsOverview extends StatsOverviewWidget
         $expiring7 = $today->copy()->addDays(7);
         $expiring60 = $today->copy()->addDays(60);
 
-        $expiredCount = VehicleDocument::query()
+        $expiredCount = VehicleDocument::query()->whereHas('vehicle', fn ($query) => $query->where('operation', 'rental'))
             ->whereNotNull('expires_at')
             ->where('expires_at', '<', $today)
             ->count();
 
-        $expiring7Count = VehicleDocument::query()
+        $expiring7Count = VehicleDocument::query()->whereHas('vehicle', fn ($query) => $query->where('operation', 'rental'))
             ->whereNotNull('expires_at')
             ->whereBetween('expires_at', [$today, $expiring7])
             ->count();
 
-        $expiring60Count = VehicleDocument::query()
+        $expiring60Count = VehicleDocument::query()->whereHas('vehicle', fn ($query) => $query->where('operation', 'rental'))
             ->whereNotNull('expires_at')
             ->whereBetween('expires_at', [$today, $expiring60])
             ->count();

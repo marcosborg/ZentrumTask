@@ -33,7 +33,9 @@ class AdminPanelProvider extends PanelProvider
         $navigationGroups = [
             NavigationGroup::make('Dashboards'),
             NavigationGroup::make('Kanban')->collapsed(),
-            NavigationGroup::make('TVDE')->collapsed(),
+            NavigationGroup::make('TVDE Aluguer')->collapsed(),
+            NavigationGroup::make('TVDE SLOT')->collapsed(),
+            NavigationGroup::make('Imports TVDE')->collapsed(),
             NavigationGroup::make('Entradas TVDE')->collapsed(),
             NavigationGroup::make('Website')->collapsed(),
             NavigationGroup::make('Administracao')->collapsed(),

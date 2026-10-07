@@ -20,6 +20,16 @@ class EditDriver extends EditRecord
 {
     protected static string $resource = DriverResource::class;
 
+    protected function mutateFormDataBeforeFill(array $data): array
+    {
+        $participation = app(\App\Services\ParticipationService::class)->resolve($this->record->id, now(config('slots.timezone'))->toDateString());
+        if ($participation?->operation === \App\Enums\TvdeOperation::Rental) {
+            $data = array_merge($data, $participation->only(['deposit_amount', 'deposit_initial_amount', 'deposit_paid_at', 'deposit_payment_method']));
+        }
+
+        return $data;
+    }
+
     protected function getHeaderActions(): array
     {
         return [

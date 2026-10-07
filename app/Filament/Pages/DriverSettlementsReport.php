@@ -58,7 +58,7 @@ class DriverSettlementsReport extends Page implements HasTable
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedBanknotes;
 
-    protected static UnitEnum|string|null $navigationGroup = 'TVDE';
+    protected static UnitEnum|string|null $navigationGroup = 'TVDE Aluguer';
 
     protected static ?string $navigationLabel = 'Settlements';
 
@@ -138,7 +138,7 @@ class DriverSettlementsReport extends Page implements HasTable
 
     public function deleteManualAdjustment(int $driverId, int $adjustmentId): void
     {
-        $adjustment = DriverAdjustment::query()
+        $adjustment = DriverAdjustment::query()->forOperation(\App\Enums\TvdeOperation::Rental)
             ->where('driver_id', $driverId)
             ->find($adjustmentId);
 
@@ -277,6 +277,7 @@ class DriverSettlementsReport extends Page implements HasTable
 
     public function saveGreenReceipt(DriverSettlement $record, string $path): void
     {
+        abort_unless($record->operation === 'rental', 404);
         $previousPath = $record->green_receipt_path;
 
         if ($previousPath && $previousPath !== $path) {
@@ -292,6 +293,7 @@ class DriverSettlementsReport extends Page implements HasTable
 
     public function downloadGreenReceipt(DriverSettlement $record): ?StreamedResponse
     {
+        abort_unless($record->operation === 'rental', 404);
         $record->refresh();
         $path = $record->green_receipt_path;
 
@@ -312,27 +314,31 @@ class DriverSettlementsReport extends Page implements HasTable
 
     public function markSettlementPaid(DriverSettlement $record): bool
     {
+        abort_unless($record->operation === 'rental', 404);
         $record->refresh();
 
         DB::transaction(function () use ($record): void {
-            $balance = $this->resolveBalance((int) $record->driver_id);
+            $record = DriverSettlement::query()->whereKey($record->id)->lockForUpdate()->firstOrFail();
+            abort_unless($record->operation === 'rental' && ! $record->is_paid && (float) $record->amount_due > 0, 422);
+            $balance = $this->resolveBalance((int) $record->driver_id, (int) $record->driver_participation_id);
             $current = round((float) $balance->current_balance, 2);
             $transferredAmount = round((float) ($record->amount_due ?? 0), 2);
 
             if ($current !== 0.0) {
-                DriverBalanceMovement::query()->create([
+                DriverBalanceMovement::query()->forOperation(\App\Enums\TvdeOperation::Rental)->create([
                     'driver_id' => $record->driver_id,
+                    'driver_participation_id' => $record->driver_participation_id,
                     'driver_balance_id' => $balance->id,
                     'driver_settlement_id' => $record->id,
-                    'amount' => -$current,
+                    'amount' => -$transferredAmount,
                     'type' => 'payment',
                     'description' => 'Pagamento settlement '.$record->period_start?->format('d/m/Y').' - '.$record->period_end?->format('d/m/Y'),
                 ]);
             }
 
             $balance->forceFill([
-                'current_balance' => 0,
-                'is_settled' => true,
+                'current_balance' => round($current - $transferredAmount, 2),
+                'is_settled' => round($current - $transferredAmount, 2) === 0.0,
                 'settled_at' => now(),
                 'last_settlement_id' => $record->id,
             ])->save();
@@ -660,7 +666,7 @@ class DriverSettlementsReport extends Page implements HasTable
                     return;
                 }
 
-                $query = DriverSettlement::query()
+                $query = DriverSettlement::query()->forOperation(\App\Enums\TvdeOperation::Rental)
                     ->whereDate('period_start', '>=', $filters['period_start'])
                     ->whereDate('period_end', '<=', $filters['period_end']);
 
@@ -703,6 +709,8 @@ class DriverSettlementsReport extends Page implements HasTable
 
     public function recalculateSettlement(DriverSettlement $record): array
     {
+        abort_unless($record->operation === 'rental', 404);
+
         return DB::transaction(function () use ($record): array {
             $deleted = $this->deleteSettlementsForPeriod(
                 $record->period_start?->toDateString() ?? '',
@@ -855,36 +863,39 @@ class DriverSettlementsReport extends Page implements HasTable
         $driverId = $filters['driver_id'];
         $platform = $filters['platform'];
 
-        $query = DriverSettlement::query()
+        $query = DriverSettlement::query()->forOperation(\App\Enums\TvdeOperation::Rental)
             ->leftJoin('drivers', 'drivers.id', '=', 'driver_settlements.driver_id')
             ->select([
                 'driver_settlements.*',
             ]);
 
         $query->selectSub(
-            PlatformDriverBalance::query()
+            PlatformDriverBalance::query()->forOperation(\App\Enums\TvdeOperation::Rental)
                 ->selectRaw('COALESCE(SUM(net_amount), 0)')
                 ->where('platform', 'uber')
                 ->whereColumn('platform_driver_balances.driver_id', 'driver_settlements.driver_id')
+                ->whereColumn('platform_driver_balances.driver_participation_id', 'driver_settlements.driver_participation_id')
                 ->whereColumn('platform_driver_balances.period_start', '>=', 'driver_settlements.period_start')
                 ->whereColumn('platform_driver_balances.period_end', '<=', 'driver_settlements.period_end'),
             'uber_net'
         );
 
         $query->selectSub(
-            PlatformDriverBalance::query()
+            PlatformDriverBalance::query()->forOperation(\App\Enums\TvdeOperation::Rental)
                 ->selectRaw('COALESCE(SUM(net_amount), 0)')
                 ->where('platform', 'bolt')
                 ->whereColumn('platform_driver_balances.driver_id', 'driver_settlements.driver_id')
+                ->whereColumn('platform_driver_balances.driver_participation_id', 'driver_settlements.driver_participation_id')
                 ->whereColumn('platform_driver_balances.period_start', '>=', 'driver_settlements.period_start')
                 ->whereColumn('platform_driver_balances.period_end', '<=', 'driver_settlements.period_end'),
             'bolt_net'
         );
 
         $query->selectSub(
-            PlatformDriverBalance::query()
+            PlatformDriverBalance::query()->forOperation(\App\Enums\TvdeOperation::Rental)
                 ->selectRaw('COALESCE(SUM(tips_amount), 0)')
                 ->whereColumn('platform_driver_balances.driver_id', 'driver_settlements.driver_id')
+                ->whereColumn('platform_driver_balances.driver_participation_id', 'driver_settlements.driver_participation_id')
                 ->whereColumn('platform_driver_balances.period_start', '>=', 'driver_settlements.period_start')
                 ->whereColumn('platform_driver_balances.period_end', '<=', 'driver_settlements.period_end'),
             'tips_total_balance'
@@ -925,6 +936,7 @@ class DriverSettlementsReport extends Page implements HasTable
                     ->from('platform_driver_balances')
                     ->where('platform_driver_balances.platform', $platform)
                     ->whereColumn('platform_driver_balances.driver_id', 'driver_settlements.driver_id')
+                    ->whereColumn('platform_driver_balances.driver_participation_id', 'driver_settlements.driver_participation_id')
                     ->whereColumn('platform_driver_balances.period_start', '>=', 'driver_settlements.period_start')
                     ->whereColumn('platform_driver_balances.period_end', '<=', 'driver_settlements.period_end');
             });
@@ -951,9 +963,9 @@ class DriverSettlementsReport extends Page implements HasTable
                 $viaVerdeExpenses = $this->viaVerdeExpensesForSettlement($record);
                 $teslaChargingExpenses = $this->teslaChargingExpensesForSettlement($record);
                 $adjustments = $this->adjustmentsForSettlement($record);
-                $depositSummary = $this->depositSummaryForDriver((int) $record->driver_id);
-                $depositHistory = $this->depositHistoryForDriver((int) $record->driver_id);
-                $balance = $this->resolveBalance((int) $record->driver_id);
+                $depositSummary = $this->depositSummaryForDriver((int) $record->driver_id, (int) $record->driver_participation_id);
+                $depositHistory = $this->depositHistoryForDriver((int) $record->driver_id, (int) $record->driver_participation_id);
+                $balance = $this->resolveBalance((int) $record->driver_id, (int) $record->driver_participation_id);
                 $balanceMovements = $this->balanceMovementsForSettlement($record);
                 $emailLogs = $this->emailLogsForSettlement($record);
 
@@ -1218,14 +1230,14 @@ class DriverSettlementsReport extends Page implements HasTable
                 }
 
                 DB::transaction(function () use ($record, $data, $targetCarryValue): void {
-                    $balance = $this->resolveBalance((int) $record->driver_id);
+                    $balance = $this->resolveBalance((int) $record->driver_id, (int) $record->driver_participation_id);
                     $targetCarry = round($targetCarryValue, 2);
                     $currentCarry = round((float) $record->carry_over_balance, 2);
                     $delta = round($targetCarry - $currentCarry, 2);
 
                     $this->applyAdjustmentForward($record, $targetCarry);
 
-                    $latestSettlement = DriverSettlement::query()
+                    $latestSettlement = DriverSettlement::query()->forOperation(\App\Enums\TvdeOperation::Rental)
                         ->where('driver_id', $record->driver_id)
                         ->orderByDesc('period_end')
                         ->orderByDesc('id')
@@ -1242,7 +1254,7 @@ class DriverSettlementsReport extends Page implements HasTable
                         'last_settlement_id' => $latestSettlement?->id,
                     ])->save();
 
-                    DriverBalanceMovement::query()->create([
+                    DriverBalanceMovement::query()->forOperation(\App\Enums\TvdeOperation::Rental)->create([
                         'driver_id' => $record->driver_id,
                         'driver_balance_id' => $balance->id,
                         'driver_settlement_id' => $record->id,
@@ -1305,6 +1317,7 @@ class DriverSettlementsReport extends Page implements HasTable
 
     public function setExtraKmOverride(DriverSettlement $record, float $amount): void
     {
+        abort_unless($record->operation === 'rental', 404);
         DB::transaction(function () use ($record, $amount): void {
             $record->refresh();
             $rules = is_array($record->rules_snapshot) ? $record->rules_snapshot : [];
@@ -1326,19 +1339,19 @@ class DriverSettlementsReport extends Page implements HasTable
             $this->applyAdjustmentForward($record->fresh(), (float) $record->carry_over_balance);
 
             $updated = $record->fresh();
-            DriverBalanceMovement::query()
+            DriverBalanceMovement::query()->forOperation(\App\Enums\TvdeOperation::Rental)
                 ->where('driver_settlement_id', $record->id)
                 ->where('type', 'settlement')
                 ->update(['amount' => $updated->amount_payable]);
 
-            $latestSettlement = DriverSettlement::query()
+            $latestSettlement = DriverSettlement::query()->forOperation(\App\Enums\TvdeOperation::Rental)
                 ->where('driver_id', $record->driver_id)
                 ->latest('period_end')
                 ->latest('id')
                 ->first(['id', 'amount_due']);
 
             if ($latestSettlement) {
-                $this->resolveBalance((int) $record->driver_id)->forceFill([
+                $this->resolveBalance((int) $record->driver_id, (int) $record->driver_participation_id)->forceFill([
                     'current_balance' => $latestSettlement->amount_due,
                     'last_settlement_id' => $latestSettlement->id,
                     'is_settled' => false,
@@ -1573,7 +1586,7 @@ class DriverSettlementsReport extends Page implements HasTable
                 }
 
                 if ($operation === 'update') {
-                    $adjustment = DriverAdjustment::query()
+                    $adjustment = DriverAdjustment::query()->forOperation(\App\Enums\TvdeOperation::Rental)
                         ->where('driver_id', $record->driver_id)
                         ->find($adjustmentId);
 
@@ -1606,7 +1619,7 @@ class DriverSettlementsReport extends Page implements HasTable
                     return;
                 }
 
-                DriverAdjustment::query()->create([
+                DriverAdjustment::query()->forOperation(\App\Enums\TvdeOperation::Rental)->create([
                     'driver_id' => $record->driver_id,
                     'starts_at' => $startsAt,
                     'recurrence_weeks' => $weeks,
@@ -1632,7 +1645,7 @@ class DriverSettlementsReport extends Page implements HasTable
 
     private function applyAdjustmentForward(DriverSettlement $record, float $targetCarry): void
     {
-        $settlements = DriverSettlement::query()
+        $settlements = DriverSettlement::query()->forOperation(\App\Enums\TvdeOperation::Rental)
             ->where('driver_id', $record->driver_id)
             ->where(function (Builder $query) use ($record): void {
                 $query->whereDate('period_start', '>', $record->period_start)
@@ -1741,7 +1754,7 @@ class DriverSettlementsReport extends Page implements HasTable
             ->action(function (DriverSettlement $record): void {
                 DB::transaction(function () use ($record): void {
                     $this->deleteSettlementsAndRebuildBalances(
-                        DriverSettlement::query()->whereKey($record->id)
+                        DriverSettlement::query()->forOperation(\App\Enums\TvdeOperation::Rental)->whereKey($record->id)
                     );
                 });
 
@@ -1759,8 +1772,9 @@ class DriverSettlementsReport extends Page implements HasTable
      */
     private function balancesForSettlement(DriverSettlement $settlement): array
     {
-        return PlatformDriverBalance::query()
+        return PlatformDriverBalance::query()->forOperation(\App\Enums\TvdeOperation::Rental)
             ->where('driver_id', $settlement->driver_id)
+            ->where('driver_participation_id', $settlement->driver_participation_id)
             ->whereDate('period_start', '>=', $settlement->period_start)
             ->whereDate('period_end', '<=', $settlement->period_end)
             ->orderBy('platform')
@@ -1952,8 +1966,9 @@ class DriverSettlementsReport extends Page implements HasTable
 
     private function adjustmentsForSettlement(DriverSettlement $settlement): array
     {
-        $adjustments = DriverAdjustment::query()
+        $adjustments = DriverAdjustment::query()->forOperation(\App\Enums\TvdeOperation::Rental)
             ->where('driver_id', $settlement->driver_id)
+            ->where('driver_participation_id', $settlement->driver_participation_id)
             ->whereDate('starts_at', '<=', $settlement->period_end)
             ->orderBy('starts_at')
             ->get([
@@ -2024,7 +2039,7 @@ class DriverSettlementsReport extends Page implements HasTable
             ];
         }
 
-        $profile = DriverBillingProfile::query()->find($profileId);
+        $profile = DriverBillingProfile::query()->forOperation(\App\Enums\TvdeOperation::Rental)->find($profileId);
 
         if (! $profile) {
             return [
@@ -2085,7 +2100,7 @@ class DriverSettlementsReport extends Page implements HasTable
      */
     private function manualAdjustmentsForDriver(int $driverId): array
     {
-        return DriverAdjustment::query()
+        return DriverAdjustment::query()->forOperation(\App\Enums\TvdeOperation::Rental)
             ->where('driver_id', $driverId)
             ->orderByDesc('starts_at')
             ->orderByDesc('id')
@@ -2107,17 +2122,17 @@ class DriverSettlementsReport extends Page implements HasTable
     /**
      * @return array<string, mixed>
      */
-    private function depositSummaryForDriver(int $driverId): array
+    private function depositSummaryForDriver(int $driverId, int $participationId): array
     {
-        return app(DriverDepositService::class)->summaryForDriver($driverId);
+        return app(DriverDepositService::class)->summaryForDriver($driverId, $participationId);
     }
 
     /**
      * @return array<int, array<string, mixed>>
      */
-    private function depositHistoryForDriver(int $driverId): array
+    private function depositHistoryForDriver(int $driverId, int $participationId): array
     {
-        return app(DriverDepositService::class)->historyForDriver($driverId);
+        return app(DriverDepositService::class)->historyForDriver($driverId, $participationId);
     }
 
     /**
@@ -2125,8 +2140,9 @@ class DriverSettlementsReport extends Page implements HasTable
      */
     private function balanceMovementsForSettlement(DriverSettlement $settlement): array
     {
-        return DriverBalanceMovement::query()
+        return DriverBalanceMovement::query()->forOperation(\App\Enums\TvdeOperation::Rental)
             ->where('driver_id', $settlement->driver_id)
+            ->where('driver_participation_id', $settlement->driver_participation_id)
             ->where('driver_settlement_id', $settlement->id)
             ->orderByDesc('created_at')
             ->get([
@@ -2172,10 +2188,10 @@ class DriverSettlementsReport extends Page implements HasTable
             ->all();
     }
 
-    private function resolveBalance(int $driverId): DriverBalance
+    private function resolveBalance(int $driverId, ?int $participationId = null): DriverBalance
     {
-        return DriverBalance::query()->firstOrCreate(
-            ['driver_id' => $driverId],
+        return DriverBalance::query()->forOperation(\App\Enums\TvdeOperation::Rental)->firstOrCreate(
+            ['driver_id' => $driverId, 'driver_participation_id' => $participationId ?? \App\Models\DriverParticipation::query()->where('driver_id', $driverId)->where('operation', 'rental')->latest('starts_at')->value('id')],
             [
                 'current_balance' => 0,
                 'is_settled' => false,
@@ -2186,7 +2202,7 @@ class DriverSettlementsReport extends Page implements HasTable
     private function deleteSettlementsForPeriod(string $periodStart, string $periodEnd, ?int $driverId = null): int
     {
         return $this->deleteSettlementsAndRebuildBalances(
-            DriverSettlement::query()
+            DriverSettlement::query()->forOperation(\App\Enums\TvdeOperation::Rental)
                 ->when($driverId, fn (Builder $query) => $query->where('driver_id', $driverId))
                 ->whereDate('period_start', '>=', $periodStart)
                 ->whereDate('period_end', '<=', $periodEnd)
@@ -2196,7 +2212,7 @@ class DriverSettlementsReport extends Page implements HasTable
     private function deleteSettlementsAndRebuildBalances(Builder $query): int
     {
         $rows = (clone $query)
-            ->get(['id', 'driver_id']);
+            ->get(['id', 'driver_id', 'driver_participation_id']);
 
         if ($rows->isEmpty()) {
             return 0;
@@ -2204,24 +2220,27 @@ class DriverSettlementsReport extends Page implements HasTable
 
         $settlementIds = $rows->pluck('id')->all();
         $driverIds = $rows->pluck('driver_id')->filter()->unique()->values()->all();
+        $participations = $rows->map(fn ($row) => ['driver_id' => $row->driver_id, 'participation_id' => $row->driver_participation_id])->unique('participation_id');
 
-        DriverBalanceMovement::query()
+        DriverBalanceMovement::query()->forOperation(\App\Enums\TvdeOperation::Rental)
             ->whereIn('driver_settlement_id', $settlementIds)
             ->delete();
 
         $deleted = (clone $query)->delete();
 
-        DriverBalanceMovement::query()
-            ->whereIn('driver_id', $driverIds)
+        DriverBalanceMovement::query()->forOperation(\App\Enums\TvdeOperation::Rental)
+            ->whereIn('driver_participation_id', $rows->pluck('driver_participation_id'))
             ->where('type', 'settlement')
             ->whereNull('driver_settlement_id')
             ->delete();
 
-        foreach ($driverIds as $driverId) {
-            $balance = $this->resolveBalance((int) $driverId);
+        foreach ($participations as $participation) {
+            $driverId = $participation['driver_id'];
+            $balance = $this->resolveBalance((int) $driverId, (int) $participation['participation_id']);
 
-            $latestSettlement = DriverSettlement::query()
+            $latestSettlement = DriverSettlement::query()->forOperation(\App\Enums\TvdeOperation::Rental)
                 ->where('driver_id', $driverId)
+                ->where('driver_participation_id', $participation['participation_id'])
                 ->orderByDesc('period_end')
                 ->orderByDesc('id')
                 ->first(['id', 'amount_due', 'is_paid', 'paid_at']);
@@ -2254,7 +2273,7 @@ class DriverSettlementsReport extends Page implements HasTable
     private function driverOptions(): array
     {
         return cache()->remember('driver_options_select', 60, function (): array {
-            return Driver::query()
+            return Driver::query()->forOperation(\App\Enums\TvdeOperation::Rental)
                 ->orderBy('name')
                 ->get(['id', 'name'])
                 ->mapWithKeys(fn (Driver $driver): array => [
@@ -2269,12 +2288,12 @@ class DriverSettlementsReport extends Page implements HasTable
      */
     private function resolveDefaultPeriod(): array
     {
-        $latestBalance = PlatformDriverBalance::query()
+        $latestBalance = PlatformDriverBalance::query()->forOperation(\App\Enums\TvdeOperation::Rental)
             ->select(['period_start', 'period_end'])
             ->orderByDesc('period_end')
             ->first();
 
-        $latestSettlement = DriverSettlement::query()
+        $latestSettlement = DriverSettlement::query()->forOperation(\App\Enums\TvdeOperation::Rental)
             ->select(['period_start', 'period_end'])
             ->orderByDesc('period_end')
             ->first();
@@ -2387,7 +2406,7 @@ class DriverSettlementsReport extends Page implements HasTable
             return $this->driverIdentityCache[$driverId];
         }
 
-        $driver = Driver::query()->find($driverId, ['name', 'email']);
+        $driver = Driver::query()->forOperation(\App\Enums\TvdeOperation::Rental)->find($driverId, ['name', 'email']);
 
         $identity = [
             'name' => $this->sanitizeUtf8($driver?->name) ?? ('Motorista #'.$driverId),
@@ -2548,12 +2567,12 @@ class DriverSettlementsReport extends Page implements HasTable
         $minStart = Carbon::parse($records->min('period_start'))->startOfDay();
         $maxEnd = Carbon::parse($records->max('period_end'))->endOfDay();
 
-        $drivers = Driver::query()
+        $drivers = Driver::query()->forOperation(\App\Enums\TvdeOperation::Rental)
             ->whereIn('id', $driverIds)
             ->get()
             ->keyBy('id');
 
-        $profilesByDriver = DriverBillingProfile::query()
+        $profilesByDriver = DriverBillingProfile::query()->forOperation(\App\Enums\TvdeOperation::Rental)
             ->whereIn('driver_id', $driverIds)
             ->where('active', true)
             ->where(function ($query) use ($maxEnd): void {
@@ -2568,7 +2587,7 @@ class DriverSettlementsReport extends Page implements HasTable
             ->get()
             ->groupBy('driver_id');
 
-        $allocationsByDriver = VehicleAllocation::query()
+        $allocationsByDriver = VehicleAllocation::query()->forOperation(\App\Enums\TvdeOperation::Rental)
             ->whereIn('driver_id', $driverIds)
             ->where('starts_at', '<=', $maxEnd)
             ->where(function ($query) use ($minStart): void {
