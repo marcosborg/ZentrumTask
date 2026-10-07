@@ -74,13 +74,8 @@
     <div class="row g-4 mt-1">
       <div class="col-md-4"><h3 class="h5">1. Fale connosco</h3><p>Apresente a sua viatura e conheça as condições. A equipa acompanha a validação da documentação, perfil fiscal e contrato.</p></div>
       <div class="col-md-4"><h3 class="h5">2. Prepare a entrada</h3><p>A ativação depende da elegibilidade do motorista e da viatura, da documentação aprovada e do check-up inicial concluído.</p></div>
-      <div class="col-md-4"><h3 class="h5">3. Receba semanalmente</h3><p>Pagamentos à segunda-feira, após recebimento e reconciliação dos valores das plataformas. Atrasos no recebimento ficam pendentes, sem adiantamento automático.</p></div>
+      <div class="col-md-4"><h3 class="h5">3. Receba semanalmente</h3><p>Pagamentos à segunda-feira, após recebimento e reconciliação dos valores das plataformas.</p></div>
     </div>
-    <details class="tvde-offer-card mt-3">
-      <summary class="fw-bold">Cobrança, suspensão e mudança de pack</summary>
-      <p class="mt-3">A taxa semanal é devida quando existe pelo menos um dia ativo, incluindo semanas sem viagens. Semanas totalmente suspensas não têm taxa; a suspensão deve ser pedida previamente e registada pela equipa.</p>
-      <p class="mb-0">As mudanças de pack entram em vigor na segunda-feira seguinte. As condições de adesão e saída são confirmadas com a equipa antes da assinatura do contrato.</p>
-    </details>
   </section>
 
   <x-contact heading="Vamos falar sobre o seu SLOT?" intro="Escolha o seu pack e indique na mensagem a viatura que pretende integrar. A equipa Zentrum entra em contacto consigo." source="website_slot" anchor="contactos-slot" submitLabel="Pedir contacto SLOT" />
