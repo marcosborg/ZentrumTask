@@ -31,6 +31,27 @@ class VehicleDocument extends Model implements HasMedia
         'notes',
     ];
 
+    protected static function booted(): void
+    {
+        static::updated(function (self $document): void {
+            if ($document->wasChanged('expires_at')) {
+                $document->resolveAlerts();
+            }
+        });
+
+        static::deleted(function (self $document): void {
+            $document->resolveAlerts();
+        });
+    }
+
+    private function resolveAlerts(): void
+    {
+        $this->alerts()->where('is_resolved', false)->update([
+            'is_resolved' => true,
+            'resolved_at' => now(),
+        ]);
+    }
+
     public function vehicle(): BelongsTo
     {
         return $this->belongsTo(Vehicle::class);

@@ -35,20 +35,39 @@ class CheckVehicleDocumentsExpiry extends Command
         $today = Carbon::today();
         $createdAlerts = new Collection;
 
+        VehicleDocumentAlert::query()
+            ->where('is_resolved', false)
+            ->whereDoesntHave('document')
+            ->update(['is_resolved' => true, 'resolved_at' => now()]);
+
         VehicleDocument::query()
             ->with('vehicle')
-            ->whereNotNull('expires_at')
             ->chunkById(200, function ($documents) use ($createdAlerts, $today): void {
                 foreach ($documents as $document) {
-                    $level = $this->resolveLevel($document->expires_at, $today);
+                    $expiresAt = $document->expires_at?->toDateString();
+                    $level = $document->expires_at ? $this->resolveLevel($document->expires_at, $today) : null;
 
-                    if ($level === null) {
+                    $obsoleteAlerts = $document->alerts()->where('is_resolved', false);
+
+                    if ($level !== null) {
+                        $obsoleteAlerts->where(function ($query) use ($expiresAt): void {
+                            $query->whereNull('document_expires_at')->orWhereDate('document_expires_at', '!=', $expiresAt);
+                        });
+                    }
+
+                    $obsoleteAlerts->update(['is_resolved' => true, 'resolved_at' => now()]);
+
+                    if ($level === null || $document->alerts()
+                        ->whereDate('document_expires_at', $expiresAt)
+                        ->where('is_resolved', true)
+                        ->exists()) {
                         continue;
                     }
 
                     $alert = VehicleDocumentAlert::query()->firstOrCreate(
                         [
                             'vehicle_document_id' => $document->id,
+                            'document_expires_at' => $document->expires_at->copy()->startOfDay(),
                             'level' => $level,
                             'triggered_on' => $today->copy()->startOfDay(),
                         ],
@@ -57,7 +76,7 @@ class CheckVehicleDocumentsExpiry extends Command
                         ]
                     );
 
-                    if ($alert->wasRecentlyCreated) {
+                    if ($alert->wasRecentlyCreated && ! $alert->is_resolved) {
                         $alert->setRelation('document', $document);
                         $createdAlerts->push($alert);
                     }
