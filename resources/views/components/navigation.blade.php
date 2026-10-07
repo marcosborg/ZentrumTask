@@ -41,7 +41,10 @@
 
     <div class="collapse navbar-collapse justify-content-end" id="navbarNav">
       <ul class="navbar-nav align-items-xxl-center gap-xxl-3">
+        <li class="nav-item"><a class="nav-link nav-link-custom" href="{{ route('vehicle.index') }}">Aluguer</a></li>
+        <li class="nav-item"><a class="nav-link nav-link-custom" href="{{ route('slot.show') }}">SLOT</a></li>
         @forelse ($menuItems as $item)
+          @continue($item->children->isEmpty() && (in_array(rtrim(parse_url($item->url ?? '', PHP_URL_PATH) ?? '', '/'), ['/frota', '/slot'], true) || parse_url($item->url ?? '', PHP_URL_FRAGMENT) === 'aluguer'))
           @if ($item->children->isNotEmpty())
             <li class="nav-item dropdown">
               <a
@@ -69,16 +72,13 @@
           @endif
         @empty
           <li class="nav-item">
-            <a class="nav-link nav-link-custom" href="#home">Home</a>
-          </li>
-          <li class="nav-item">
-            <a class="nav-link nav-link-custom" href="#aluguer">Aluguer de viaturas</a>
+            <a class="nav-link nav-link-custom" href="{{ url('/') }}">Home</a>
           </li>
           <li class="nav-item">
             <a class="nav-link nav-link-custom" href="{{ $blogUrl }}">Noticias</a>
           </li>
           <li class="nav-item">
-            <a class="nav-link nav-link-custom" href="#contactos">Contactos</a>
+            <a class="nav-link nav-link-custom" href="{{ url('/').'#contactos' }}">Contactos</a>
           </li>
         @endforelse
         @unless ($menuItems->contains(fn ($item) => rtrim(parse_url($item->url ?? '', PHP_URL_PATH) ?? '', '/') === '/aluguer-carrinhas' || $item->children->contains(fn ($child) => rtrim(parse_url($child->url ?? '', PHP_URL_PATH) ?? '', '/') === '/aluguer-carrinhas')))

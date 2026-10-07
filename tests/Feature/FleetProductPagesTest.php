@@ -170,6 +170,43 @@ it('prefers website gallery photos over operational vehicle photos on public pag
         ->assertSee(Storage::disk('public')->url('vehicle-website-photos/site-leaf.jpg'), false);
 });
 
+it('exposes rental and slot offers with a dedicated public slot page', function () {
+    $this->get('/')
+        ->assertSuccessful()
+        ->assertSee(route('vehicle.index'), false)
+        ->assertSee(route('slot.show'), false)
+        ->assertSee('Tenho viatura própria');
+
+    $this->get(route('slot.show'))
+        ->assertSuccessful()
+        ->assertSee('30 €')
+        ->assertSee('50 €')
+        ->assertSee('website_slot')
+        ->assertSee('contactos-slot')
+        ->assertSee('Pagamentos à segunda-feira');
+});
+
+it('records public slot enquiries separately without enrolling a driver', function () {
+    createWebsiteLeadStage();
+    $driverCount = \App\Models\Driver::query()->count();
+
+    $this->mock(AndroidPushNotificationService::class, function ($mock): void {
+        $mock->shouldReceive('sendNewContactTask')->once();
+    });
+
+    $this->from(route('slot.show'))->post(route('contact.submit'), [
+        'name' => 'Maria Silva',
+        'email' => 'maria@example.com',
+        'phone' => '912345678',
+        'message' => 'Quero conhecer o Premium para a minha viatura.',
+        'page_url' => route('slot.show'),
+        'source' => 'website_slot',
+    ])->assertRedirect(route('slot.show'))->assertSessionHas('contact_success');
+
+    expect(Task::query()->firstOrFail()->meta['source'])->toBe('website_slot')
+        ->and(\App\Models\Driver::query()->count())->toBe($driverCount);
+});
+
 it('creates a kanban task with the vehicle name and contact name when submitting the vehicle form', function () {
     createWebsiteLeadStage();
 

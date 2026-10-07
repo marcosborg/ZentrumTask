@@ -142,6 +142,7 @@ Route::post('/app/contact', AppContactController::class)
     ->withoutMiddleware([VerifyCsrfToken::class])
     ->name('app.contact.submit');
 Route::get('/frota', [WebsiteController::class, 'listVehicles'])->name('vehicle.index');
+Route::view('/slot', 'website.slot')->name('slot.show');
 Route::get('/frota/{vehicle}/{slug?}', [WebsiteController::class, 'showVehicle'])->name('vehicle.show');
 Route::options('/app/candidatura', fn () => response('', 204, [
     'Access-Control-Allow-Origin' => '*',

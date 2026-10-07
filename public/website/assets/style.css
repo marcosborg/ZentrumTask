@@ -1,3 +1,12 @@
+.tvde-offers { padding: clamp(2rem, 5vw, 4rem) 0; background: linear-gradient(125deg, #eaf3ff, #f8fafc); }
+.tvde-eyebrow { display: block; font-size: .8rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; margin-bottom: .75rem; }
+.tvde-offer-card { display: flex; flex-direction: column; gap: .5rem; padding: clamp(1.5rem, 3vw, 2.5rem); border: 1px solid #d9e2ef; border-radius: 1.25rem; background: #fff; color: #0f172a; }
+.tvde-offer-card--slot { background: #164780; color: #fff; border-color: #164780; }
+.tvde-offer-card h3 { font-size: 2rem; }
+.tvde-offer-card li + li { margin-top: .6rem; }
+details.tvde-offer-card { display: block; }
+.tvde-offers .btn, .tvde-offer-card .btn { padding: .8rem 1.2rem; font-weight: 600; white-space: normal; }
+
 /* Global light theme */
 body {
   background-color: #eeeeee;

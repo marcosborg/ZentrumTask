@@ -8,6 +8,8 @@
 
 @section('content')
 
+    <x-tvde-offers />
+
     <x-hero />
 
     <x-services />
