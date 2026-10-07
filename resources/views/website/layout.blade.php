@@ -34,7 +34,7 @@
       href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
     />
     <!-- Custom styles -->
-    <link rel="stylesheet" href="/website/assets/style.css" />
+    <link rel="stylesheet" href="{{ asset('website/assets/style.css') }}?v={{ hash_file('sha256', public_path('website/assets/style.css')) }}" />
     @stack('styles')
   </head>
   <body>

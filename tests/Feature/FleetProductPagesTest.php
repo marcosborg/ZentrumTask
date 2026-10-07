@@ -186,6 +186,13 @@ it('exposes rental and slot offers with a dedicated public slot page', function 
         ->assertSee('Pagamentos à segunda-feira');
 });
 
+it('versions the public stylesheet by its contents to avoid stale cached styles', function () {
+    $stylesheetUrl = asset('website/assets/style.css').'?v='.hash_file('sha256', public_path('website/assets/style.css'));
+
+    $this->get('/')->assertSuccessful()->assertSee($stylesheetUrl, false);
+    $this->get(route('slot.show'))->assertSuccessful()->assertSee($stylesheetUrl, false);
+});
+
 it('records public slot enquiries separately without enrolling a driver', function (string $pack, string $label) {
     createWebsiteLeadStage();
     $driverCount = \App\Models\Driver::query()->count();
