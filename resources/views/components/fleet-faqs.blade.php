@@ -115,15 +115,15 @@
         <div class="steps-list">
           <div class="step-item">
             <div class="step-number">1</div>
-            <div class="step-text">Veja as viaturas disponiveis em destaque na home.</div>
+            <div class="step-text"><strong>Escolha a sua solução.</strong> Alugue uma viatura da nossa frota ou adira ao SLOT com a sua própria viatura.</div>
           </div>
           <div class="step-item">
             <div class="step-number">2</div>
-            <div class="step-text">Use “Ver todos” para consultar a frota completa, incluindo indisponiveis.</div>
+            <div class="step-text"><strong>Receba uma proposta.</strong> Diga-nos o que procura e quando pretende começar. A equipa confirma a disponibilidade, os valores e as condições.</div>
           </div>
           <div class="step-item">
             <div class="step-number">3</div>
-            <div class="step-text">Abra a ficha da viatura e envie o pedido de contacto para o kanban.</div>
+            <div class="step-text"><strong>Prepare a entrada.</strong> Acompanhamos a validação dos documentos e do contrato e combinamos consigo os próximos passos para começar.</div>
           </div>
         </div>
       </div>
@@ -131,20 +131,20 @@
       <div class="col-lg-8">
         <h3 class="mb-3">Perguntas frequentes</h3>
         <div class="faq-item">
-          <h6>Que viaturas aparecem na home?</h6>
-          <p>Mostramos sempre 8 carros: primeiro entram os disponiveis ate ao limite de 4 e os lugares restantes sao preenchidos com indisponiveis aleatorios.</p>
+          <h6>Preciso de ter viatura própria para trabalhar convosco?</h6>
+          <p>Não. Pode escolher uma viatura da frota Zentrum para aluguer. Se já tem viatura própria, conheça os <a href="{{ route('slot.show') }}">packs SLOT</a> e conte com o nosso apoio na gestão da operação.</p>
         </div>
         <div class="faq-item">
-          <h6>Onde vejo as indisponiveis?</h6>
-          <p>No botao `Ver todos`, que abre a pagina com toda a frota TVDE.</p>
+          <h6>Quanto custa o aluguer e o que está incluído?</h6>
+          <p>As condições dependem da viatura escolhida. Peça uma proposta para conhecer o valor semanal, os quilómetros incluídos, a caução e as condições de seguro e manutenção antes de decidir.</p>
         </div>
         <div class="faq-item">
-          <h6>Posso pedir contacto para uma viatura indisponivel?</h6>
-          <p>Sim. A ficha continua publica e o pedido entra no kanban com a referencia exata da viatura.</p>
+          <h6>Já tenho viatura. Como funciona o SLOT?</h6>
+          <p>Integre a sua viatura na frota Zentrum com o pack Base, por 30 €/semana, ou Premium, por 50 €/semana, com IVA incluído. Ambos incluem gestão documental, reconciliação de receitas, extratos e pagamentos. A entrada depende da validação do motorista, da viatura e da documentação.</p>
         </div>
         <div class="faq-item">
-          <h6>As fotos podem ser atualizadas no painel?</h6>
-          <p>Sim. A galeria publica usa as fotos reais anexadas na propria viatura em `admin/vehicles`.</p>
+          <h6>Que apoio de oficina tenho com o SLOT?</h6>
+          <p>Nos dois packs, tem check-up gratuito na entrada e a cada 12 meses, preços descontados e atendimento prioritário na nossa oficina. O Premium acrescenta acompanhamento de acidentes 24/7.</p>
         </div>
       </div>
     </div>
