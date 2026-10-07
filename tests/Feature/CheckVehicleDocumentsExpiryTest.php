@@ -15,6 +15,24 @@ afterEach(function () {
     Carbon::setTestNow();
 });
 
+it('can resume the migration without overwriting an existing expiry cycle', function () {
+    Carbon::setTestNow('2026-10-07 08:00:00');
+    $document = VehicleDocument::factory()->create(['expires_at' => now()->addYear()]);
+    $alert = VehicleDocumentAlert::factory()->for($document, 'document')->create([
+        'document_expires_at' => '2026-10-06',
+    ]);
+    $legacyAlert = VehicleDocumentAlert::factory()->for($document, 'document')->create([
+        'document_expires_at' => null,
+    ]);
+
+    $migration = require database_path('migrations/2026_10_07_092213_add_document_expires_at_to_vehicle_document_alerts_table.php');
+    $migration->up();
+    $migration->up();
+
+    expect($alert->fresh()->document_expires_at->toDateString())->toBe('2026-10-06')
+        ->and($legacyAlert->fresh()->document_expires_at->toDateString())->toBe('2027-10-07');
+});
+
 it('emails all daily alerts to Adriano and only TVDE alerts to Marcos', function () {
     Carbon::setTestNow('2026-07-29 08:00:00');
     Mail::fake();
