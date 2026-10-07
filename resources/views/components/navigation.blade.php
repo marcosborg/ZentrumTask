@@ -1,4 +1,4 @@
-<nav class="navbar navbar-expand-xxl py-3 navbar-website bg-white" aria-label="Main navigation">
+<nav class="navbar navbar-expand-lg py-3 navbar-website bg-white" aria-label="Main navigation">
   <div class="container">
     @php
         $adminPanel = filament()->getPanel('admin');
@@ -34,56 +34,36 @@
       data-bs-target="#navbarNav"
       aria-controls="navbarNav"
       aria-expanded="false"
-      aria-label="Toggle navigation"
+      aria-label="Abrir menu"
     >
       <span class="navbar-toggler-icon"></span>
     </button>
 
     <div class="collapse navbar-collapse justify-content-end" id="navbarNav">
-      <ul class="navbar-nav align-items-xxl-center gap-xxl-3">
+      <ul class="navbar-nav align-items-lg-center gap-lg-3">
         <li class="nav-item"><a class="nav-link nav-link-custom" href="{{ route('vehicle.index') }}">Aluguer</a></li>
         <li class="nav-item"><a class="nav-link nav-link-custom" href="{{ route('slot.show') }}">SLOT</a></li>
-        @forelse ($menuItems as $item)
-          @continue($item->children->isEmpty() && (in_array(rtrim(parse_url($item->url ?? '', PHP_URL_PATH) ?? '', '/'), ['/frota', '/slot'], true) || parse_url($item->url ?? '', PHP_URL_FRAGMENT) === 'aluguer'))
-          @if ($item->children->isNotEmpty())
-            <li class="nav-item dropdown">
-              <a
-                class="nav-link dropdown-toggle nav-link-custom"
-                href="#"
-                id="menuDropdown-{{ $item->id }}"
-                role="button"
-                data-bs-toggle="dropdown"
-                aria-expanded="false"
-              >
-                {{ $item->label }}
-              </a>
-              <ul class="dropdown-menu" aria-labelledby="menuDropdown-{{ $item->id }}">
+        <li class="nav-item"><a class="nav-link nav-link-custom" href="{{ route('van-rentals.index') }}">Carrinhas</a></li>
+        <li class="nav-item dropdown">
+          <button class="nav-link dropdown-toggle nav-link-custom" id="navbarMoreDropdown" type="button" data-bs-toggle="dropdown" aria-expanded="false">Mais</button>
+          <ul class="dropdown-menu dropdown-menu-end website-more-menu" aria-labelledby="navbarMoreDropdown">
+            @forelse ($menuItems as $item)
+              @continue($item->children->isEmpty() && (in_array(rtrim(parse_url($item->url ?? '', PHP_URL_PATH) ?? '', '/'), ['/frota', '/slot', '/aluguer-carrinhas'], true) || parse_url($item->url ?? '', PHP_URL_FRAGMENT) === 'aluguer'))
+              @if ($item->children->isNotEmpty())
+                <li><h6 class="dropdown-header">{{ $item->label }}</h6></li>
                 @foreach ($item->children as $child)
-                  <li>
-                    <a class="dropdown-item nav-link-custom" href="{{ $child->url }}">{{ $child->label }}</a>
-                  </li>
+                  <li><a class="dropdown-item nav-link-custom" href="{{ $child->url }}">{{ $child->label }}</a></li>
                 @endforeach
-              </ul>
-            </li>
-          @else
-            <li class="nav-item">
-              <a class="nav-link nav-link-custom" href="{{ $item->url ?? '#' }}">{{ $item->label }}</a>
-            </li>
-          @endif
-        @empty
-          <li class="nav-item">
-            <a class="nav-link nav-link-custom" href="{{ url('/') }}">Home</a>
-          </li>
-          <li class="nav-item">
-            <a class="nav-link nav-link-custom" href="{{ $blogUrl }}">Noticias</a>
-          </li>
-          <li class="nav-item">
-            <a class="nav-link nav-link-custom" href="{{ url('/').'#contactos' }}">Contactos</a>
-          </li>
-        @endforelse
-        @unless ($menuItems->contains(fn ($item) => rtrim(parse_url($item->url ?? '', PHP_URL_PATH) ?? '', '/') === '/aluguer-carrinhas' || $item->children->contains(fn ($child) => rtrim(parse_url($child->url ?? '', PHP_URL_PATH) ?? '', '/') === '/aluguer-carrinhas')))
-          <li class="nav-item"><a class="nav-link nav-link-custom" href="{{ route('van-rentals.index') }}">Aluguer de carrinhas</a></li>
-        @endunless
+              @else
+                <li><a class="dropdown-item nav-link-custom" href="{{ $item->url ?? '#' }}">{{ $item->label }}</a></li>
+              @endif
+            @empty
+              <li><a class="dropdown-item nav-link-custom" href="{{ url('/') }}">Início</a></li>
+              <li><a class="dropdown-item nav-link-custom" href="{{ $blogUrl }}">Notícias</a></li>
+              <li><a class="dropdown-item nav-link-custom" href="{{ url('/').'#contactos' }}">Contactos</a></li>
+            @endforelse
+          </ul>
+        </li>
         @guest
         <li class="nav-item">
           <a class="nav-link nav-link-custom d-flex align-items-center gap-2" href="{{ $loginUrl }}">

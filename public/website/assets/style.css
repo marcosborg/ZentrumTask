@@ -7,6 +7,10 @@
 details.tvde-offer-card { display: block; }
 .tvde-offers .btn, .tvde-offer-card .btn { padding: .8rem 1.2rem; font-weight: 600; white-space: normal; }
 
+.navbar-website .navbar-nav > .nav-item > .nav-link { white-space: nowrap; }
+.website-more-menu { max-height: 70vh; overflow-y: auto; }
+.website-more-menu .dropdown-item, .website-more-menu .dropdown-header { white-space: normal; overflow-wrap: anywhere; }
+
 /* Global light theme */
 body {
   background-color: #eeeeee;
