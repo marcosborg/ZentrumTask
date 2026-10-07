@@ -31,7 +31,11 @@
                       src="{{ Storage::disk('public')->url($testimonial->photo_path) }}"
                       alt="{{ $testimonial->author_name }}"
                       class="testimonial-photo"
+                      onerror="this.hidden = true; this.nextElementSibling.classList.remove('d-none');"
                     />
+                    <div class="testimonial-avatar d-none" aria-hidden="true">
+                      <i class="fa-solid fa-user"></i>
+                    </div>
                   @else
                     <div class="testimonial-avatar">
                       <i class="fa-solid fa-user"></i>
