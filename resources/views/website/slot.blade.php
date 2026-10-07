@@ -47,7 +47,7 @@
             <li>Admissão e controlo documental.</li>
             <li>Integração Uber/Bolt.</li>
             <li>Reconciliação de receitas, extratos e pagamentos.</li>
-            <li>Check-up gratuito e benefícios de oficina.</li>
+            <li>Check-up anual gratuito e benefícios de oficina.</li>
           </ul>
           <a href="#contactos-slot" class="btn btn-primary mt-auto align-self-start">Pedir contacto sobre o Base</a>
         </article>
@@ -60,7 +60,7 @@
             <li>Todos os benefícios do Base.</li>
             <li>Serviço de acompanhamento de acidentes 24/7.</li>
             <li>Pedidos de indemnização por imobilização.</li>
-            <li>Pedidos de viatura de substituição.</li>
+            <li>Viatura de substituição.</li>
           </ul>
           <p class="small">Os pedidos dependem das circunstâncias do sinistro e da apreciação das entidades responsáveis. Não é garantida a atribuição de indemnização ou de viatura.</p>
           <a href="#contactos-slot" class="btn btn-light mt-auto align-self-start">Pedir contacto sobre o Premium</a>
