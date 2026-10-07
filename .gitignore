@@ -2,6 +2,9 @@
 .vscode
 /.codex-tmp/
 /output/imagegen/
+/output/pdf/
+/outputs/contactos-20260923/
+/outputs/contas-20260928/
 /tmp/
 node_modules/
 .terraform/
