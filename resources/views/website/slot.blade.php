@@ -26,7 +26,7 @@
             <h2 class="h4">A nossa oficina, ao seu lado.</h2>
             <ul class="mb-0">
               <li>Check-up gratuito na entrada e a cada 12 meses.</li>
-              <li>Preços descontados em oficina.</li>
+              <li>Descontos em oficina.</li>
               <li>Atendimento prioritário.</li>
             </ul>
           </div>
