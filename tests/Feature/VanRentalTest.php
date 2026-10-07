@@ -45,7 +45,7 @@ it('shows up to four featured vans and does not duplicate a configured menu entr
     $this->van->update(['featured' => true]);
     WebsiteMenuItem::factory()->create(['label' => 'Aluguer de carrinhas', 'url' => '/aluguer-carrinhas']);
     $response = $this->get('/')->assertSuccessful()->assertSee($this->van->name);
-    expect(substr_count($response->getContent(), 'class="nav-link nav-link-custom" href="'.route('van-rentals.index').'">Carrinhas</a>'))->toBe(1);
+    expect(substr_count($response->getContent(), 'class="nav-link nav-link-custom" href="'.route('van-rentals.index').'">Aluguer de carrinhas para mudanças</a>'))->toBe(1);
 });
 
 it('requires complete publication data', function (): void {

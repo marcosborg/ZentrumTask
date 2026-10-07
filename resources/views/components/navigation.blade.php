@@ -1,4 +1,4 @@
-<nav class="navbar navbar-expand-lg py-3 navbar-website bg-white" aria-label="Main navigation">
+<nav class="navbar navbar-expand-xl py-3 navbar-website bg-white" aria-label="Main navigation">
   <div class="container">
     @php
         $adminPanel = filament()->getPanel('admin');
@@ -40,12 +40,12 @@
     </button>
 
     <div class="collapse navbar-collapse justify-content-end" id="navbarNav">
-      <ul class="navbar-nav align-items-lg-center gap-lg-3">
-        <li class="nav-item"><a class="nav-link nav-link-custom" href="{{ route('vehicle.index') }}">Aluguer</a></li>
+      <ul class="navbar-nav align-items-xl-center gap-xl-1">
+        <li class="nav-item"><a class="nav-link nav-link-custom" href="{{ route('vehicle.index') }}">Aluguer de viaturas para TVDE</a></li>
         <li class="nav-item"><a class="nav-link nav-link-custom" href="{{ route('slot.show') }}">SLOT</a></li>
-        <li class="nav-item"><a class="nav-link nav-link-custom" href="{{ route('van-rentals.index') }}">Carrinhas</a></li>
+        <li class="nav-item"><a class="nav-link nav-link-custom" href="{{ route('van-rentals.index') }}">Aluguer de carrinhas para mudanças</a></li>
         <li class="nav-item dropdown">
-          <button class="nav-link dropdown-toggle nav-link-custom" id="navbarMoreDropdown" type="button" data-bs-toggle="dropdown" aria-expanded="false">Mais</button>
+          <button class="nav-link dropdown-toggle nav-link-custom" id="navbarMoreDropdown" type="button" data-bs-toggle="dropdown" aria-expanded="false">Opções</button>
           <ul class="dropdown-menu dropdown-menu-end website-more-menu" aria-labelledby="navbarMoreDropdown">
             @forelse ($menuItems as $item)
               @continue($item->children->isEmpty() && (in_array(rtrim(parse_url($item->url ?? '', PHP_URL_PATH) ?? '', '/'), ['/frota', '/slot', '/aluguer-carrinhas'], true) || parse_url($item->url ?? '', PHP_URL_FRAGMENT) === 'aluguer'))
