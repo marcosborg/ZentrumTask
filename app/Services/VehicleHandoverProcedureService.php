@@ -590,24 +590,15 @@ class VehicleHandoverProcedureService
             return;
         }
 
-        $driverEmail = trim((string) ($first->driver?->email ?? data_get($first->driver_snapshot, 'email', '')));
         $recipients = ['info@zentrum-tvde.com'];
 
-        if ($driverEmail !== '' && filter_var($driverEmail, FILTER_VALIDATE_EMAIL)) {
-            array_unshift($recipients, $driverEmail);
-        }
-
-        $recipients = array_values(array_unique($recipients));
-
         try {
-            Mail::to(array_shift($recipients))
-                ->cc($recipients)
+            Mail::to($recipients)
                 ->send(new VehicleHandoverProceduresMail($procedures));
 
-            $sentTo = array_values(array_unique(array_merge([$driverEmail], $recipients, ['info@zentrum-tvde.com'])));
             $procedures->each(fn (VehicleHandoverProcedure $procedure) => $procedure->updateQuietly([
                 'email_sent_at' => now(),
-                'email_recipients' => array_values(array_filter($sentTo)),
+                'email_recipients' => $recipients,
             ]));
         } catch (\Throwable $exception) {
             Log::warning('vehicle_handover_mail_failed', [

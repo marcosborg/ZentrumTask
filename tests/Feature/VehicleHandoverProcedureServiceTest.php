@@ -1,5 +1,6 @@
 <?php
 
+use App\Mail\VehicleHandoverProceduresMail;
 use App\Models\Driver;
 use App\Models\User;
 use App\Models\Vehicle;
@@ -86,6 +87,16 @@ it('records a delivery handover and associates the selected driver and vehicle',
     ]);
 
     expect($handoverVehicle->refresh()->status)->toBe('allocated');
+
+    Mail::assertSent(VehicleHandoverProceduresMail::class, function (VehicleHandoverProceduresMail $mail): bool {
+        return $mail->hasTo('info@zentrum-tvde.com')
+            && count($mail->to) === 1
+            && $mail->cc === []
+            && $mail->bcc === [];
+    });
+    Mail::assertSentCount(1);
+    expect($procedure->refresh()->email_recipients)->toBe(['info@zentrum-tvde.com'])
+        ->and($procedure->email_sent_at)->not->toBeNull();
 });
 
 it('rejects a delivery when the selected driver already has another vehicle', function () {
@@ -210,6 +221,16 @@ it('records a return for the assigned driver and closes the allocation', functio
     expect($procedure->closed_allocation_id)->toBe($allocation->id)
         ->and($allocation->refresh()->status)->toBe('completed')
         ->and($vehicle->refresh()->status)->toBe('available');
+
+    Mail::assertSent(VehicleHandoverProceduresMail::class, function (VehicleHandoverProceduresMail $mail): bool {
+        return $mail->hasTo('info@zentrum-tvde.com')
+            && count($mail->to) === 1
+            && $mail->cc === []
+            && $mail->bcc === [];
+    });
+    Mail::assertSentCount(1);
+    expect($procedure->refresh()->email_recipients)->toBe(['info@zentrum-tvde.com'])
+        ->and($procedure->email_sent_at)->not->toBeNull();
 });
 
 it('creates a persistent draft without changing vehicle allocation or sending mail', function () {
@@ -277,6 +298,15 @@ it('completes a signed draft exactly once and creates the allocation', function 
         ->and($vehicle->refresh()->status)->toBe('allocated');
     expect(fn () => $service->completeDraft($completed, $operator))
         ->toThrow(\Illuminate\Validation\ValidationException::class);
+
+    Mail::assertSent(VehicleHandoverProceduresMail::class, function (VehicleHandoverProceduresMail $mail): bool {
+        return $mail->hasTo('info@zentrum-tvde.com')
+            && count($mail->to) === 1
+            && $mail->cc === []
+            && $mail->bcc === [];
+    });
+    Mail::assertSentCount(1);
+    expect($completed->refresh()->email_recipients)->toBe(['info@zentrum-tvde.com']);
 });
 
 it('creates resumes updates and completes a draft through the app api', function () {
