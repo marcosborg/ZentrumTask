@@ -103,6 +103,8 @@ it('builds personalized WhatsApp instructions from the task contact labels', fun
         ->and(urldecode((string) parse_url($page->whatsappInstructionsUrl, PHP_URL_QUERY)))
         ->toContain('Olá, Frederico! 👋')
         ->toContain('Viatura: Tesla Model 3')
+        ->toContain("Standard Range:\n💶 Aluguer semanal: 325 €\n🛣️ Quilometragem incluída: 2.000 km por semana")
+        ->toContain("Long Range:\n💶 Aluguer semanal: 375 €\n🛣️ Quilometragem incluída: 2.500 km por semana")
         ->toContain('As restantes condições do aluguer são explicadas pela nossa equipa durante o contacto')
         ->not->toContain('caução');
 });

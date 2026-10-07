@@ -589,12 +589,19 @@ class KanbanBoard extends Page
 
 Obrigado pelo seu interesse em trabalhar com a Zentrum TVDE.
 
-Estas são as condições para o aluguer da viatura:
+Temos duas opções para o aluguer da viatura:
 
 🚗 Viatura: Tesla Model 3
+
+Standard Range:
 💶 Aluguer semanal: 325 €
-📍 Recolha da viatura: Santa Maria da Feira
+🛣️ Quilometragem incluída: 2.000 km por semana
+
+Long Range:
+💶 Aluguer semanal: 375 €
 🛣️ Quilometragem incluída: 2.500 km por semana
+
+📍 Recolha da viatura: Santa Maria da Feira
 ➕ Quilómetros adicionais: 0,12 € por km
 
 As restantes condições do aluguer são explicadas pela nossa equipa durante o contacto.
