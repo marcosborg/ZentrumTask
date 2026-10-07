@@ -76,6 +76,6 @@ it('uploads and reorders photographs on the rental storage disk', function (): v
 
 it('shows reservation history and manages calendar blocks', function (): void {
     $van = RentalVan::factory()->create();
-    Livewire::test(VanRentalCalendar::class)->callAction('block', data: ['van_id' => $van->id, 'starts_at' => '2026-09-15T09:00', 'ends_at' => '2026-09-15T12:00', 'reason' => 'Inspeção'])->assertHasNoActionErrors()->assertSee('Inspeção');
+    Livewire::test(VanRentalCalendar::class)->set('date', '2026-09-15')->callAction('block', data: ['van_id' => $van->id, 'starts_at' => '2026-09-15T09:00', 'ends_at' => '2026-09-15T12:00', 'reason' => 'Inspeção'])->assertHasNoActionErrors()->assertSee('Inspeção');
     expect($van->blocks()->count())->toBe(1);
 });
