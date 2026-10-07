@@ -87,6 +87,16 @@
               required
             />
           </div>
+          @if ($source === 'website_slot')
+            <div class="col-md-6">
+              <label for="{{ $formId }}-slot-pack" class="form-label">Pack SLOT (obrigatório)</label>
+              <select class="form-select" id="{{ $formId }}-slot-pack" name="slot_pack" required>
+                <option value="" @selected(! old('slot_pack')) disabled>Escolha o seu pack</option>
+                <option value="base" @selected(old('slot_pack') === 'base')>Base — 30 €/semana, IVA incluído</option>
+                <option value="premium" @selected(old('slot_pack') === 'premium')>Premium — 50 €/semana, IVA incluído</option>
+              </select>
+            </div>
+          @endif
           <div class="col-12">
             <label for="{{ $formId }}-message" class="form-label">Mensagem</label>
             <textarea

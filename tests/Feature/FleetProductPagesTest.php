@@ -186,7 +186,7 @@ it('exposes rental and slot offers with a dedicated public slot page', function 
         ->assertSee('Pagamentos à segunda-feira');
 });
 
-it('records public slot enquiries separately without enrolling a driver', function () {
+it('records public slot enquiries separately without enrolling a driver', function (string $pack, string $label) {
     createWebsiteLeadStage();
     $driverCount = \App\Models\Driver::query()->count();
 
@@ -201,10 +201,39 @@ it('records public slot enquiries separately without enrolling a driver', functi
         'message' => 'Quero conhecer o Premium para a minha viatura.',
         'page_url' => route('slot.show'),
         'source' => 'website_slot',
+        'slot_pack' => $pack,
     ])->assertRedirect(route('slot.show'))->assertSessionHas('contact_success');
 
-    expect(Task::query()->firstOrFail()->meta['source'])->toBe('website_slot')
+    $task = Task::query()->firstOrFail();
+
+    expect($task->meta['source'])->toBe('website_slot')
+        ->and($task->meta['slot_pack'])->toBe($pack)
+        ->and($task->title)->toBe('Maria Silva — SLOT '.$label)
+        ->and($task->description)->toContain('Pack SLOT: '.$label)
         ->and(\App\Models\Driver::query()->count())->toBe($driverCount);
+})->with(['base' => ['base', 'Base'], 'premium' => ['premium', 'Premium']]);
+
+it('rejects slot enquiries without a valid pack and preserves form input', function (?string $pack) {
+    $this->from(route('slot.show'))->post(route('contact.submit'), [
+        'name' => 'Maria Silva',
+        'email' => 'maria@example.com',
+        'phone' => '912345678',
+        'message' => 'Quero integrar a minha viatura.',
+        'source' => 'website_slot',
+        'slot_pack' => $pack,
+    ])->assertRedirect(route('slot.show'))
+        ->assertSessionHasErrors('slot_pack')
+        ->assertSessionHasInput('name', 'Maria Silva');
+
+    expect(Task::query()->count())->toBe(0);
+})->with([null, '', 'unknown']);
+
+it('shows a required pack choice only on the slot form', function () {
+    $this->get(route('slot.show'))->assertSuccessful()
+        ->assertSee('name="slot_pack" required', false)
+        ->assertSee('Escolha o seu pack');
+
+    $this->get('/')->assertSuccessful()->assertDontSee('name="slot_pack"', false);
 });
 
 it('creates a kanban task with the vehicle name and contact name when submitting the vehicle form', function () {

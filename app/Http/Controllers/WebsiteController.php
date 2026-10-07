@@ -131,6 +131,18 @@ class WebsiteController extends Controller
                 ? "Viatura: {$vehicle->displayName()}\nMatricula: {$vehicle->license_plate}\nEstado: {$vehicle->statusLabel()}\n\n".$data['message']."\nTelefone: ".$data['phone']
                 : $data['message']."\nTelefone: ".$data['phone'];
 
+            $slotPack = $source === 'website_slot' ? ($data['slot_pack'] ?? null) : null;
+
+            if ($source === 'website_slot') {
+                $slotPackLabel = match ($slotPack) {
+                    'base' => 'Base',
+                    'premium' => 'Premium',
+                    default => 'Não indicado',
+                };
+                $title = $data['name'].' — SLOT '.$slotPackLabel;
+                $description = 'Pack SLOT: '.$slotPackLabel."\n\n".$description;
+            }
+
             if (! empty($data['page_url'])) {
                 $description .= "\nPagina: ".$data['page_url'];
             }
@@ -146,6 +158,7 @@ class WebsiteController extends Controller
                     'email' => $data['email'],
                     'phone' => $data['phone'],
                     'source' => $source,
+                    'slot_pack' => $slotPack,
                     'contact_name' => $data['name'],
                     'page_url' => $data['page_url'] ?? null,
                     'vehicle_id' => $vehicle?->getKey(),

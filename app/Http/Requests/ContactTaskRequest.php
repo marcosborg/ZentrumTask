@@ -21,6 +21,15 @@ class ContactTaskRequest extends FormRequest
             'vehicle_id' => ['nullable', 'integer', 'exists:vehicles,id'],
             'page_url' => ['nullable', 'string', 'max:500'],
             'source' => ['nullable', 'string', 'max:100'],
+            'slot_pack' => ['exclude_unless:source,website_slot', 'required', 'string', 'in:base,premium'],
+        ];
+    }
+
+    public function messages(): array
+    {
+        return [
+            'slot_pack.required' => 'Escolha o pack SLOT: Base ou Premium.',
+            'slot_pack.in' => 'Escolha um pack SLOT válido: Base ou Premium.',
         ];
     }
 }

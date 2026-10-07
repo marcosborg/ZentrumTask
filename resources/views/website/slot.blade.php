@@ -83,5 +83,5 @@
     </details>
   </section>
 
-  <x-contact heading="Vamos falar sobre o seu SLOT?" intro="Indique o pack que lhe interessa e a viatura que pretende integrar. A equipa Zentrum entra em contacto consigo." source="website_slot" anchor="contactos-slot" submitLabel="Pedir contacto SLOT" />
+  <x-contact heading="Vamos falar sobre o seu SLOT?" intro="Escolha o seu pack e indique na mensagem a viatura que pretende integrar. A equipa Zentrum entra em contacto consigo." source="website_slot" anchor="contactos-slot" submitLabel="Pedir contacto SLOT" />
 @endsection
