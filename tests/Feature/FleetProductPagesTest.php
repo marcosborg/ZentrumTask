@@ -79,7 +79,10 @@ it('shows tvde vehicles on the homepage and links to the product page', function
         ->assertDontSee('Caução')
         ->assertDontSee('Reserva imediata')
         ->assertDontSee('Iniciar reserva')
-        ->assertSee('Autonomia alargada e conforto para TVDE.')
+        ->assertDontSee('Autonomia alargada e conforto para TVDE.')
+        ->assertDontSee('Descricao da viatura')
+        ->assertDontSee('Ficha publica da viatura TVDE')
+        ->assertSee('Conheça esta viatura da frota TVDE da Zentrum e peça informações sobre disponibilidade e aluguer.')
         ->assertSee('application/ld+json', false);
 });
 
@@ -167,6 +170,7 @@ it('prefers website gallery photos over operational vehicle photos on public pag
 
     $this->get(route('vehicle.show', ['vehicle' => $vehicle, 'slug' => $vehicle->publicSlug()]))
         ->assertSuccessful()
+        ->assertDontSee('Ficha publica da viatura TVDE')
         ->assertSee(Storage::disk('public')->url('vehicle-website-photos/site-leaf.jpg'), false);
 });
 

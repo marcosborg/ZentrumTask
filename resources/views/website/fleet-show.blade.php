@@ -2,10 +2,14 @@
 
 @section('title', $vehicle->displayName().' | Zentrum TVDE')
 
+@php
+  $publicDescription = 'Conheça esta viatura da frota TVDE da Zentrum e peça informações sobre disponibilidade e aluguer.';
+@endphp
+
 @push('head')
-  <meta name="description" content="{{ $vehicle->notes ?: 'Consulte a ficha da viatura '.$vehicle->displayName().' com estado e pedido de contacto.' }}">
+  <meta name="description" content="{{ $publicDescription }}">
   <meta property="og:title" content="{{ $vehicle->displayName().' | Zentrum TVDE' }}" />
-  <meta property="og:description" content="{{ $vehicle->notes ?: 'Consulte a ficha da viatura '.$vehicle->displayName().' com estado e pedido de contacto.' }}" />
+  <meta property="og:description" content="{{ $publicDescription }}" />
   <meta property="og:image" content="{{ $vehicle->primaryImageUrl() }}" />
   <meta name="twitter:image" content="{{ $vehicle->primaryImageUrl() }}" />
   <script type="application/ld+json">
@@ -13,7 +17,7 @@
         '@'.'context' => 'https://schema.org',
         '@type' => 'Product',
         'name' => $vehicle->displayName(),
-        'description' => $vehicle->notes ?: 'Ficha publica da viatura TVDE.',
+        'description' => $publicDescription,
         'image' => $vehicle->galleryImageUrls(),
         'brand' => $vehicle->make ? [
             '@type' => 'Brand',
@@ -104,8 +108,6 @@
               @endif
             </div>
 
-            <p class="fleet-detail-excerpt">{{ $vehicle->notes ?: 'Ficha publica da viatura TVDE com informacao de estado e contacto imediato para a equipa.' }}</p>
-
             <div class="fleet-detail-actions">
               <a href="tel:256112333" class="btn btn-outline-secondary btn-lg">Ligar agora</a>
               <button type="button" class="btn btn-primary btn-lg fleet-detail-primary" data-bs-toggle="modal" data-bs-target="#{{ $contactModalId }}">
@@ -117,21 +119,6 @@
 
         </div>
       </div>
-    </div>
-  </section>
-
-  <section class="container pb-4">
-    <div class="row g-4">
-      @if (filled($vehicle->notes))
-        <div class="col-lg-7">
-          <div class="fleet-copy-card">
-            <h2>Descricao da viatura</h2>
-            <div class="fleet-copy-body">
-              {!! nl2br(e($vehicle->notes)) !!}
-            </div>
-          </div>
-        </div>
-      @endif
     </div>
   </section>
 
@@ -192,7 +179,6 @@
 
     .fleet-gallery-shell,
     .fleet-product-panel,
-    .fleet-copy-card,
     .fleet-reservation-card {
       background: #fff;
       border: 1px solid #dde7f2;
@@ -322,12 +308,6 @@
       margin-bottom: 0.25rem;
     }
 
-    .fleet-detail-excerpt {
-      color: #49627b;
-      font-size: 1.04rem;
-      margin-bottom: 1.4rem;
-    }
-
     .fleet-detail-actions {
       margin-bottom: 1.15rem;
     }
@@ -388,11 +368,6 @@
       color: #7a5a1e;
       font-size: 0.96rem;
       line-height: 1.55;
-    }
-
-    .fleet-copy-card {
-      padding: 2rem;
-      height: 100%;
     }
 
     .fleet-reservation-card {
@@ -563,17 +538,6 @@
       min-width: 220px;
     }
 
-    .fleet-copy-card h2 {
-      margin-bottom: 1rem;
-      color: #0f172a;
-    }
-
-    .fleet-copy-body {
-      color: #425b75;
-      font-size: 1.02rem;
-      line-height: 1.8;
-    }
-
     .fleet-contact-shell .contact-section {
       padding: 2rem;
     }
@@ -617,7 +581,6 @@
 
     @media (max-width: 767.98px) {
       .fleet-product-panel,
-      .fleet-copy-card,
       .fleet-reservation-card {
         padding: 1.4rem;
       }
