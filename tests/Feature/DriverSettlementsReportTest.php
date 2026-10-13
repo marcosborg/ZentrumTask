@@ -5,7 +5,9 @@ use App\Models\Driver;
 use App\Models\DriverAdjustment;
 use App\Models\DriverBalance;
 use App\Models\DriverBillingProfile;
+use App\Models\DriverParticipation;
 use App\Models\DriverSettlement;
+use App\Models\PlatformDriverBalance;
 use App\Models\Vehicle;
 use App\Models\VehicleWeeklyMileage;
 use App\Services\DriverSettlementCalculator;
@@ -40,6 +42,81 @@ function createReportSettlement(array $attributes = []): DriverSettlement
         'rules_snapshot' => [],
     ], $attributes));
 }
+
+it('shows original file amounts only in the two specified platform columns', function () {
+    $this->actingAs(\App\Models\User::factory()->create());
+
+    $camilo = Driver::factory()->create(['id' => 20, 'name' => 'Camilo Ricardo Correia Tristão']);
+    $zacaria = Driver::factory()->create(['id' => 30, 'name' => 'Zacaria Isabel Fernandes Vasconcelos']);
+
+    $camiloParticipation = DriverParticipation::factory()->create([
+        'id' => 14,
+        'driver_id' => $camilo->id,
+        'operation' => 'rental',
+        'starts_at' => '2026-10-01',
+    ]);
+    $zacariaParticipation = DriverParticipation::factory()->create([
+        'id' => 24,
+        'driver_id' => $zacaria->id,
+        'operation' => 'rental',
+        'starts_at' => '2026-10-01',
+    ]);
+
+    $camiloSettlement = createReportSettlement([
+        'driver' => $camilo,
+        'driver_participation_id' => $camiloParticipation->id,
+        'operation' => 'rental',
+        'period_start' => '2026-10-05',
+        'period_end' => '2026-10-11',
+        'net_total' => 444.23,
+        'amount_payable' => 116.56,
+    ]);
+    $zacariaSettlement = createReportSettlement([
+        'driver' => $zacaria,
+        'driver_participation_id' => $zacariaParticipation->id,
+        'operation' => 'rental',
+        'period_start' => '2026-10-05',
+        'period_end' => '2026-10-11',
+        'net_total' => 860.49,
+        'amount_payable' => 321.58,
+    ]);
+
+    foreach ([
+        [$camilo, $camiloParticipation, 'uber', 544.23],
+        [$zacaria, $zacariaParticipation, 'bolt', 469.88],
+    ] as [$driver, $participation, $platform, $amount]) {
+        PlatformDriverBalance::query()->create([
+            'driver_id' => $driver->id,
+            'driver_participation_id' => $participation->id,
+            'operation' => 'rental',
+            'platform' => $platform,
+            'driver_code' => 'report-display-test-'.$driver->id,
+            'period_start' => '2026-10-05',
+            'period_end' => '2026-10-11',
+            'net_amount' => $amount,
+            'tips_amount' => 0,
+            'source_file' => 'test.csv',
+            'imported_at' => now(),
+        ]);
+    }
+
+    Livewire::test(DriverSettlementsReport::class, [
+        'filtersForm' => ['period_start' => '2026-10-05', 'period_end' => '2026-10-11'],
+    ])
+        ->assertTableColumnStateSet('uber_net', 544.23, $camiloSettlement->id)
+        ->assertTableColumnFormattedStateSet('uber_net', '444,23 €', $camiloSettlement->id)
+        ->assertTableColumnFormattedStateSet('bolt_net', '0,00 €', $camiloSettlement->id)
+        ->assertTableColumnStateSet('bolt_net', 469.88, $zacariaSettlement->id)
+        ->assertTableColumnFormattedStateSet('bolt_net', '366,31 €', $zacariaSettlement->id)
+        ->assertTableColumnFormattedStateSet('uber_net', '0,00 €', $zacariaSettlement->id)
+        ->assertTableColumnStateSet('total_operadores', 544.23, $camiloSettlement->id)
+        ->assertTableColumnStateSet('total_operadores', 469.88, $zacariaSettlement->id);
+
+    expect($camiloSettlement->refresh()->amount_payable)->toBe('116.56')
+        ->and($zacariaSettlement->refresh()->amount_payable)->toBe('321.58')
+        ->and(PlatformDriverBalance::query()->where('driver_id', $camilo->id)->value('net_amount'))->toBe('544.23')
+        ->and(PlatformDriverBalance::query()->where('driver_id', $zacaria->id)->value('net_amount'))->toBe('469.88');
+});
 
 it('deletes a manual adjustment directly from the settlements report modal', function () {
     $driver = Driver::factory()->create();
