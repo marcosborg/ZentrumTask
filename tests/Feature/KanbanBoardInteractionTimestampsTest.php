@@ -102,11 +102,14 @@ it('builds personalized WhatsApp instructions from the task contact labels', fun
         ->toStartWith('whatsapp://send?phone=351912345678&text=')
         ->and(urldecode((string) parse_url($page->whatsappInstructionsUrl, PHP_URL_QUERY)))
         ->toContain('Olá, Frederico! 👋')
+        ->toContain('Temos apenas duas viaturas em stock.')
         ->toContain('Viatura: Tesla Model 3')
         ->toContain("Standard Range:\n💶 Aluguer semanal: 325 €\n🛣️ Quilometragem incluída: 2.000 km por semana")
         ->toContain("Long Range:\n💶 Aluguer semanal: 375 €\n🛣️ Quilometragem incluída: 2.500 km por semana")
         ->toContain('As restantes condições do aluguer são explicadas pela nossa equipa durante o contacto')
-        ->not->toContain('caução');
+        ->toContain('➕ Quilómetros adicionais: 0,12 € por km')
+        ->toContain("🔒 Caução particionada\n\n")
+        ->not->toMatch('/caução[^\r\n]*\d/iu');
 });
 
 it('does not expose WhatsApp instructions when the task has no valid phone', function () {

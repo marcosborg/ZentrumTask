@@ -589,6 +589,8 @@ class KanbanBoard extends Page
 
 Obrigado pelo seu interesse em trabalhar com a Zentrum TVDE.
 
+Temos apenas duas viaturas em stock.
+
 Temos duas opções para o aluguer da viatura:
 
 🚗 Viatura: Tesla Model 3
@@ -603,6 +605,7 @@ Long Range:
 
 📍 Recolha da viatura: Santa Maria da Feira
 ➕ Quilómetros adicionais: 0,12 € por km
+🔒 Caução particionada
 
 As restantes condições do aluguer são explicadas pela nossa equipa durante o contacto.
 
