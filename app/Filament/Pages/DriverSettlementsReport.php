@@ -235,25 +235,21 @@ class DriverSettlementsReport extends Page implements HasTable
                 ->searchable()
                 ->native(false)
                 ->nullable(),
-            Grid::make(['md' => 2, 'xl' => 4])
+            Grid::make(['md' => 3])
                 ->columnSpanFull()
                 ->schema([
-                    Checkbox::make('show_all')
-                        ->label('Mostrar todos')
-                        ->helperText('Ignora recibo, pagamento e email.')
-                        ->default(false),
-                    Checkbox::make('with_receipt')
-                        ->label('Com recibo')
-                        ->helperText('Desmarcado: sem recibo.')
-                        ->default(false),
-                    Checkbox::make('paid')
-                        ->label('Pago')
-                        ->helperText('Desmarcado: não pago.')
-                        ->default(false),
-                    Checkbox::make('email_sent')
-                        ->label('Email enviado')
-                        ->helperText('Desmarcado: por enviar.')
-                        ->default(false),
+                    Grid::make(1)->schema([
+                        Checkbox::make('with_receipt')->label('Com recibo')->default(false),
+                        Checkbox::make('without_receipt')->label('Sem recibo')->default(false),
+                    ]),
+                    Grid::make(1)->schema([
+                        Checkbox::make('paid')->label('Pago')->default(false),
+                        Checkbox::make('unpaid')->label('Não pago')->default(false),
+                    ]),
+                    Grid::make(1)->schema([
+                        Checkbox::make('email_sent')->label('Email enviado')->default(false),
+                        Checkbox::make('email_not_sent')->label('Email por enviar')->default(false),
+                    ]),
                 ]),
         ];
     }
@@ -841,7 +837,7 @@ class DriverSettlementsReport extends Page implements HasTable
     }
 
     /**
-     * @return array{period_start: string|null, period_end: string|null, driver_id: int|null, platform: string|null, show_all: bool, with_receipt: bool, paid: bool, email_sent: bool}
+     * @return array{period_start: string|null, period_end: string|null, driver_id: int|null, platform: string|null, with_receipt: bool, without_receipt: bool, paid: bool, unpaid: bool, email_sent: bool, email_not_sent: bool}
      */
     private function filtersState(): array
     {
@@ -853,7 +849,9 @@ class DriverSettlementsReport extends Page implements HasTable
             'period_end' => $this->normalizeDate($state['period_end'] ?? null),
             'driver_id' => $state['driver_id'] ?? null,
             'with_receipt' => (bool) ($state['with_receipt'] ?? false),
-            'show_all' => (bool) ($state['show_all'] ?? false),
+            'without_receipt' => (bool) ($state['without_receipt'] ?? false),
+            'unpaid' => (bool) ($state['unpaid'] ?? false),
+            'email_not_sent' => (bool) ($state['email_not_sent'] ?? false),
             'paid' => (bool) ($state['paid'] ?? false),
             'email_sent' => (bool) ($state['email_sent'] ?? false),
         ];
@@ -938,7 +936,7 @@ class DriverSettlementsReport extends Page implements HasTable
             $query->where('driver_settlements.driver_id', $driverId);
         }
 
-        if (! $filters['show_all']) {
+        if ($filters['with_receipt'] !== $filters['without_receipt']) {
             if ($filters['with_receipt']) {
                 $query->whereNotNull('driver_settlements.green_receipt_path')
                     ->where('driver_settlements.green_receipt_path', '!=', '');
@@ -948,9 +946,14 @@ class DriverSettlementsReport extends Page implements HasTable
                         ->orWhere('driver_settlements.green_receipt_path', '');
                 });
             }
+        }
 
-            $query->where('driver_settlements.is_paid', $filters['paid'])
-                ->where('driver_settlements.email_sent_count', $filters['email_sent'] ? '>' : '=', 0);
+        if ($filters['paid'] !== $filters['unpaid']) {
+            $query->where('driver_settlements.is_paid', $filters['paid']);
+        }
+
+        if ($filters['email_sent'] !== $filters['email_not_sent']) {
+            $query->where('driver_settlements.email_sent_count', $filters['email_sent'] ? '>' : '=', 0);
         }
 
         if ($platform) {

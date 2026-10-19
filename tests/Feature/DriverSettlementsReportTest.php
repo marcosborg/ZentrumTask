@@ -231,7 +231,7 @@ it('uploads a green receipt through the table action', function () {
     Storage::disk('local')->assertExists($settlement->green_receipt_path);
 });
 
-it('filters settlements with three binary receipt payment and email controls', function (bool $withReceipt, bool $paid, bool $emailSent) {
+it('filters settlements with separate positive and negative status controls', function (?bool $withReceipt, ?bool $paid, ?bool $emailSent) {
     $this->actingAs(\App\Models\User::factory()->create());
     $settlements = collect();
     foreach ([null, '', 'receipts/one.pdf'] as $receipt) {
@@ -245,26 +245,39 @@ it('filters settlements with three binary receipt payment and email controls', f
             }
         }
     }
-    $expected = $settlements->filter(fn (DriverSettlement $settlement): bool => filled($settlement->green_receipt_path) === $withReceipt
-        && $settlement->is_paid === $paid
-        && ($settlement->email_sent_count > 0) === $emailSent
+    $expected = $settlements->filter(fn (DriverSettlement $settlement): bool => ($withReceipt === null || filled($settlement->green_receipt_path) === $withReceipt)
+        && ($paid === null || $settlement->is_paid === $paid)
+        && ($emailSent === null || ($settlement->email_sent_count > 0) === $emailSent)
     );
 
     Livewire::test(DriverSettlementsReport::class, [
         'filtersForm' => ['period_start' => '2026-05-04', 'period_end' => '2026-05-10'],
     ])
-        ->set('filtersForm.with_receipt', $withReceipt)
-        ->set('filtersForm.paid', $paid)
-        ->set('filtersForm.email_sent', $emailSent)
+        ->set('tableRecordsPerPage', 50)
+        ->set('filtersForm.with_receipt', $withReceipt === true)
+        ->set('filtersForm.without_receipt', $withReceipt === false)
+        ->set('filtersForm.paid', $paid === true)
+        ->set('filtersForm.unpaid', $paid === false)
+        ->set('filtersForm.email_sent', $emailSent === true)
+        ->set('filtersForm.email_not_sent', $emailSent === false)
         ->call('applyFilters')
         ->assertCanSeeTableRecords($expected)
         ->assertCanNotSeeTableRecords($settlements->diff($expected))
-        ->set('filtersForm.with_receipt', ! $withReceipt)
-        ->set('filtersForm.paid', ! $paid)
-        ->set('filtersForm.email_sent', ! $emailSent)
+        ->set('filtersForm.with_receipt', $withReceipt === false)
+        ->set('filtersForm.without_receipt', $withReceipt === true)
+        ->set('filtersForm.paid', $paid === false)
+        ->set('filtersForm.unpaid', $paid === true)
+        ->set('filtersForm.email_sent', $emailSent === false)
+        ->set('filtersForm.email_not_sent', $emailSent === true)
         ->call('applyFilters')
         ->assertCanNotSeeTableRecords($expected);
 })->with([
+    [null, null, true],
+    [null, null, false],
+    [null, true, null],
+    [null, false, null],
+    [true, null, null],
+    [false, null, null],
     [false, false, false],
     [false, false, true],
     [false, true, false],
@@ -274,7 +287,7 @@ it('filters settlements with three binary receipt payment and email controls', f
     [true, true, false],
     [true, true, true],
 ]);
-it('shows every status within the selected period and restores status filters when unchecked', function () {
+it('shows all statuses when no checkbox or both sides are selected and never changes payment state', function () {
     $this->actingAs(\App\Models\User::factory()->create());
     $pending = createReportSettlement();
     $completed = createReportSettlement([
@@ -287,15 +300,15 @@ it('shows every status within the selected period and restores status filters wh
     Livewire::test(DriverSettlementsReport::class, [
         'filtersForm' => ['period_start' => '2026-05-04', 'period_end' => '2026-05-10'],
     ])
-        ->assertCanSeeTableRecords([$pending])
-        ->assertCanNotSeeTableRecords([$completed, $outsidePeriod])
-        ->set('filtersForm.show_all', true)
-        ->call('applyFilters')
+        ->assertDontSee('Mostrar todos')
         ->assertCanSeeTableRecords([$pending, $completed])
         ->assertCanNotSeeTableRecords([$outsidePeriod])
         ->set('filtersForm.with_receipt', true)
         ->set('filtersForm.paid', true)
         ->set('filtersForm.email_sent', true)
+        ->set('filtersForm.without_receipt', true)
+        ->set('filtersForm.unpaid', true)
+        ->set('filtersForm.email_not_sent', true)
         ->call('applyFilters')
         ->assertCanSeeTableRecords([$pending, $completed])
         ->set('filtersForm.driver_id', $completed->driver_id)
@@ -303,10 +316,21 @@ it('shows every status within the selected period and restores status filters wh
         ->assertCanSeeTableRecords([$completed])
         ->assertCanNotSeeTableRecords([$pending, $outsidePeriod])
         ->set('filtersForm.driver_id', null)
-        ->set('filtersForm.show_all', false)
+        ->set('filtersForm.without_receipt', false)
+        ->set('filtersForm.unpaid', false)
+        ->set('filtersForm.email_not_sent', false)
         ->call('applyFilters')
         ->assertCanSeeTableRecords([$completed])
-        ->assertCanNotSeeTableRecords([$pending, $outsidePeriod]);
+        ->assertCanNotSeeTableRecords([$pending, $outsidePeriod])
+        ->set('filtersForm.with_receipt', false)
+        ->set('filtersForm.paid', false)
+        ->set('filtersForm.email_sent', false)
+        ->call('applyFilters')
+        ->assertCanSeeTableRecords([$pending, $completed])
+        ->assertCanNotSeeTableRecords([$outsidePeriod]);
+
+    expect($pending->refresh()->is_paid)->toBeFalse()
+        ->and($completed->refresh()->is_paid)->toBeTrue();
 });
 
 it('shows upload and open receipt controls in the settlement column', function () {
