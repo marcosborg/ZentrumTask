@@ -231,46 +231,49 @@ it('uploads a green receipt through the table action', function () {
     Storage::disk('local')->assertExists($settlement->green_receipt_path);
 });
 
-it('filters settlements by receipt and payment status', function (bool $withReceipt, bool $withoutReceipt, bool $unpaid, bool $paid) {
+it('filters settlements with three binary receipt payment and email controls', function (bool $withReceipt, bool $paid, bool $emailSent) {
     $this->actingAs(\App\Models\User::factory()->create());
-    $settlements = collect([
-        createReportSettlement(['green_receipt_path' => 'receipts/one.pdf', 'is_paid' => false]),
-        createReportSettlement(['green_receipt_path' => 'receipts/two.pdf', 'is_paid' => true]),
-        createReportSettlement(['green_receipt_path' => null, 'is_paid' => false]),
-        createReportSettlement(['green_receipt_path' => '', 'is_paid' => true]),
-    ]);
-    $expected = $settlements->filter(fn (DriverSettlement $settlement): bool => (! $withReceipt || filled($settlement->green_receipt_path))
-        && (! $withoutReceipt || blank($settlement->green_receipt_path))
-        && (! $unpaid || ! $settlement->is_paid)
-        && (! $paid || $settlement->is_paid)
+    $settlements = collect();
+    foreach ([null, '', 'receipts/one.pdf'] as $receipt) {
+        foreach ([false, true] as $payment) {
+            foreach ([0, 1, 2] as $emails) {
+                $settlements->push(createReportSettlement([
+                    'green_receipt_path' => $receipt,
+                    'is_paid' => $payment,
+                    'email_sent_count' => $emails,
+                ]));
+            }
+        }
+    }
+    $expected = $settlements->filter(fn (DriverSettlement $settlement): bool => filled($settlement->green_receipt_path) === $withReceipt
+        && $settlement->is_paid === $paid
+        && ($settlement->email_sent_count > 0) === $emailSent
     );
 
     Livewire::test(DriverSettlementsReport::class, [
         'filtersForm' => ['period_start' => '2026-05-04', 'period_end' => '2026-05-10'],
     ])
         ->set('filtersForm.with_receipt', $withReceipt)
-        ->set('filtersForm.without_receipt', $withoutReceipt)
-        ->set('filtersForm.unpaid', $unpaid)
         ->set('filtersForm.paid', $paid)
+        ->set('filtersForm.email_sent', $emailSent)
         ->call('applyFilters')
         ->assertCanSeeTableRecords($expected)
         ->assertCanNotSeeTableRecords($settlements->diff($expected))
-        ->set('filtersForm.with_receipt', false)
-        ->set('filtersForm.without_receipt', false)
-        ->set('filtersForm.unpaid', false)
-        ->set('filtersForm.paid', false)
+        ->set('filtersForm.with_receipt', ! $withReceipt)
+        ->set('filtersForm.paid', ! $paid)
+        ->set('filtersForm.email_sent', ! $emailSent)
         ->call('applyFilters')
-        ->assertCanSeeTableRecords($settlements);
+        ->assertCanNotSeeTableRecords($expected);
 })->with([
-    'no filters' => [false, false, false, false],
-    'with receipt' => [true, false, false, false],
-    'without receipt' => [false, true, false, false],
-    'unpaid' => [false, false, true, false],
-    'paid' => [false, false, false, true],
-    'with receipt and unpaid' => [true, false, true, false],
-    'without receipt and paid' => [false, true, false, true],
+    [false, false, false],
+    [false, false, true],
+    [false, true, false],
+    [false, true, true],
+    [true, false, false],
+    [true, false, true],
+    [true, true, false],
+    [true, true, true],
 ]);
-
 it('shows upload and open receipt controls in the settlement column', function () {
     $this->actingAs(\App\Models\User::factory()->create());
     $settlement = createReportSettlement();
@@ -281,7 +284,7 @@ it('shows upload and open receipt controls in the settlement column', function (
 
     $settlement->update(['green_receipt_path' => 'driver-settlement-receipts/'.$settlement->id.'/receipt.pdf']);
 
-    $page->call('$refresh')->assertSee('Abrir recibo')->assertSee('Substituir PDF');
+    $page->set('filtersForm.with_receipt', true)->call('$refresh')->assertSee('Abrir recibo')->assertSee('Substituir PDF');
 });
 
 it('opens a green receipt inline while keeping downloads available', function () {

@@ -28,6 +28,7 @@ use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
 use Filament\Pages\Dashboard\Concerns\HasFiltersForm;
 use Filament\Pages\Page;
+use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
@@ -234,18 +235,22 @@ class DriverSettlementsReport extends Page implements HasTable
                 ->searchable()
                 ->native(false)
                 ->nullable(),
-            Checkbox::make('with_receipt')
-                ->label('Com recibo')
-                ->default(false),
-            Checkbox::make('without_receipt')
-                ->label('Sem recibo')
-                ->default(false),
-            Checkbox::make('unpaid')
-                ->label('Não pago')
-                ->default(false),
-            Checkbox::make('paid')
-                ->label('Pago')
-                ->default(false),
+            Grid::make(3)
+                ->columnSpanFull()
+                ->schema([
+                    Checkbox::make('with_receipt')
+                        ->label('Com recibo')
+                        ->helperText('Desmarcado: sem recibo.')
+                        ->default(false),
+                    Checkbox::make('paid')
+                        ->label('Pago')
+                        ->helperText('Desmarcado: não pago.')
+                        ->default(false),
+                    Checkbox::make('email_sent')
+                        ->label('Email enviado')
+                        ->helperText('Desmarcado: por enviar.')
+                        ->default(false),
+                ]),
         ];
     }
 
@@ -844,9 +849,8 @@ class DriverSettlementsReport extends Page implements HasTable
             'period_end' => $this->normalizeDate($state['period_end'] ?? null),
             'driver_id' => $state['driver_id'] ?? null,
             'with_receipt' => (bool) ($state['with_receipt'] ?? false),
-            'without_receipt' => (bool) ($state['without_receipt'] ?? false),
-            'unpaid' => (bool) ($state['unpaid'] ?? false),
             'paid' => (bool) ($state['paid'] ?? false),
+            'email_sent' => (bool) ($state['email_sent'] ?? false),
         ];
     }
 
@@ -932,22 +936,15 @@ class DriverSettlementsReport extends Page implements HasTable
         if ($filters['with_receipt']) {
             $query->whereNotNull('driver_settlements.green_receipt_path')
                 ->where('driver_settlements.green_receipt_path', '!=', '');
-        }
-
-        if ($filters['without_receipt']) {
+        } else {
             $query->where(function (Builder $query): void {
                 $query->whereNull('driver_settlements.green_receipt_path')
                     ->orWhere('driver_settlements.green_receipt_path', '');
             });
         }
 
-        if ($filters['unpaid']) {
-            $query->where('driver_settlements.is_paid', false);
-        }
-
-        if ($filters['paid']) {
-            $query->where('driver_settlements.is_paid', true);
-        }
+        $query->where('driver_settlements.is_paid', $filters['paid'])
+            ->where('driver_settlements.email_sent_count', $filters['email_sent'] ? '>' : '=', 0);
 
         if ($platform) {
             $query->whereExists(function (QueryBuilder $sub) use ($platform): void {
