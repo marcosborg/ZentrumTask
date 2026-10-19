@@ -235,9 +235,13 @@ class DriverSettlementsReport extends Page implements HasTable
                 ->searchable()
                 ->native(false)
                 ->nullable(),
-            Grid::make(3)
+            Grid::make(['md' => 2, 'xl' => 4])
                 ->columnSpanFull()
                 ->schema([
+                    Checkbox::make('show_all')
+                        ->label('Mostrar todos')
+                        ->helperText('Ignora recibo, pagamento e email.')
+                        ->default(false),
                     Checkbox::make('with_receipt')
                         ->label('Com recibo')
                         ->helperText('Desmarcado: sem recibo.')
@@ -837,7 +841,7 @@ class DriverSettlementsReport extends Page implements HasTable
     }
 
     /**
-     * @return array{period_start: string|null, period_end: string|null, driver_id: int|null, platform: string|null, with_receipt: bool, without_receipt: bool, unpaid: bool, paid: bool}
+     * @return array{period_start: string|null, period_end: string|null, driver_id: int|null, platform: string|null, show_all: bool, with_receipt: bool, paid: bool, email_sent: bool}
      */
     private function filtersState(): array
     {
@@ -849,6 +853,7 @@ class DriverSettlementsReport extends Page implements HasTable
             'period_end' => $this->normalizeDate($state['period_end'] ?? null),
             'driver_id' => $state['driver_id'] ?? null,
             'with_receipt' => (bool) ($state['with_receipt'] ?? false),
+            'show_all' => (bool) ($state['show_all'] ?? false),
             'paid' => (bool) ($state['paid'] ?? false),
             'email_sent' => (bool) ($state['email_sent'] ?? false),
         ];
@@ -933,18 +938,20 @@ class DriverSettlementsReport extends Page implements HasTable
             $query->where('driver_settlements.driver_id', $driverId);
         }
 
-        if ($filters['with_receipt']) {
-            $query->whereNotNull('driver_settlements.green_receipt_path')
-                ->where('driver_settlements.green_receipt_path', '!=', '');
-        } else {
-            $query->where(function (Builder $query): void {
-                $query->whereNull('driver_settlements.green_receipt_path')
-                    ->orWhere('driver_settlements.green_receipt_path', '');
-            });
-        }
+        if (! $filters['show_all']) {
+            if ($filters['with_receipt']) {
+                $query->whereNotNull('driver_settlements.green_receipt_path')
+                    ->where('driver_settlements.green_receipt_path', '!=', '');
+            } else {
+                $query->where(function (Builder $query): void {
+                    $query->whereNull('driver_settlements.green_receipt_path')
+                        ->orWhere('driver_settlements.green_receipt_path', '');
+                });
+            }
 
-        $query->where('driver_settlements.is_paid', $filters['paid'])
-            ->where('driver_settlements.email_sent_count', $filters['email_sent'] ? '>' : '=', 0);
+            $query->where('driver_settlements.is_paid', $filters['paid'])
+                ->where('driver_settlements.email_sent_count', $filters['email_sent'] ? '>' : '=', 0);
+        }
 
         if ($platform) {
             $query->whereExists(function (QueryBuilder $sub) use ($platform): void {

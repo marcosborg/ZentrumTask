@@ -274,6 +274,41 @@ it('filters settlements with three binary receipt payment and email controls', f
     [true, true, false],
     [true, true, true],
 ]);
+it('shows every status within the selected period and restores status filters when unchecked', function () {
+    $this->actingAs(\App\Models\User::factory()->create());
+    $pending = createReportSettlement();
+    $completed = createReportSettlement([
+        'green_receipt_path' => 'receipts/completed.pdf',
+        'is_paid' => true,
+        'email_sent_count' => 2,
+    ]);
+    $outsidePeriod = createReportSettlement(['period_start' => '2026-04-27', 'period_end' => '2026-05-03']);
+
+    Livewire::test(DriverSettlementsReport::class, [
+        'filtersForm' => ['period_start' => '2026-05-04', 'period_end' => '2026-05-10'],
+    ])
+        ->assertCanSeeTableRecords([$pending])
+        ->assertCanNotSeeTableRecords([$completed, $outsidePeriod])
+        ->set('filtersForm.show_all', true)
+        ->call('applyFilters')
+        ->assertCanSeeTableRecords([$pending, $completed])
+        ->assertCanNotSeeTableRecords([$outsidePeriod])
+        ->set('filtersForm.with_receipt', true)
+        ->set('filtersForm.paid', true)
+        ->set('filtersForm.email_sent', true)
+        ->call('applyFilters')
+        ->assertCanSeeTableRecords([$pending, $completed])
+        ->set('filtersForm.driver_id', $completed->driver_id)
+        ->call('applyFilters')
+        ->assertCanSeeTableRecords([$completed])
+        ->assertCanNotSeeTableRecords([$pending, $outsidePeriod])
+        ->set('filtersForm.driver_id', null)
+        ->set('filtersForm.show_all', false)
+        ->call('applyFilters')
+        ->assertCanSeeTableRecords([$completed])
+        ->assertCanNotSeeTableRecords([$pending, $outsidePeriod]);
+});
+
 it('shows upload and open receipt controls in the settlement column', function () {
     $this->actingAs(\App\Models\User::factory()->create());
     $settlement = createReportSettlement();
