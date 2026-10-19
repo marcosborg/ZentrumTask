@@ -83,6 +83,19 @@ class DriverSettlementCalculator
         $billingResolver = app(SettlementBillingResolver::class);
 
         foreach ($driverIds as $driverId) {
+            $driver = $driversById->get((int) $driverId);
+            /** @var list<array{period_start: string, period_end: string, reason?: string}> $exclusions */
+            $exclusions = $driver?->rental_settlement_exclusions ?? [];
+            $excluded = collect($exclusions)->contains(fn (array $period): bool => $period['period_start'] <= $end->toDateString()
+                && $period['period_end'] >= $start->toDateString()
+            );
+
+            if ($excluded) {
+                $skipped++;
+
+                continue;
+            }
+
             $participation = app(ParticipationService::class)->resolve((int) $driverId, $start, $end);
             if ($participation?->operation !== \App\Enums\TvdeOperation::Rental) {
                 continue;

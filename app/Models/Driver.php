@@ -171,6 +171,7 @@ class Driver extends Model
     {
         return [
             'has_active_billing_profile' => 'boolean',
+            'rental_settlement_exclusions' => 'array',
             'date_of_birth' => 'date',
             'identity_document_expires_at' => 'date',
             'license_issued_at' => 'date',
