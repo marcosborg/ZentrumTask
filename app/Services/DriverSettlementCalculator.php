@@ -427,21 +427,37 @@ class DriverSettlementCalculator
             ->whereDate('period_end', '<=', $end->toDateString())
             ->orderBy('vehicle_id')
             ->orderBy('period_start')
-            ->get(['vehicle_id', 'period_start', 'period_end', 'weekly_km']);
+            ->get(['vehicle_id', 'period_start', 'period_end', 'weekly_km', 'raw_row']);
 
         if ($rows->isEmpty()) {
             return 0.0;
         }
 
+        $previousRows = VehicleWeeklyMileage::query()
+            ->whereIn('vehicle_id', $rows->pluck('vehicle_id'))
+            ->whereDate('period_start', '>=', $start->copy()->subWeek()->toDateString())
+            ->whereDate('period_end', '<=', $end->copy()->subWeek()->toDateString())
+            ->get(['vehicle_id', 'period_start', 'period_end'])
+            ->keyBy(fn (VehicleWeeklyMileage $row): string => $row->vehicle_id.'|'.$row->period_start->toDateString().'|'.$row->period_end->toDateString());
         $total = 0.0;
 
         foreach ($rows as $row) {
+            $hasPreviousWeek = data_get($row->raw_row, 'has_previous_week_reading');
+
+            $previousWeekKey = $row->vehicle_id.'|'.$row->period_start->copy()->subWeek()->toDateString().'|'.$row->period_end->copy()->subWeek()->toDateString();
+
+            if ($hasPreviousWeek === false || ($hasPreviousWeek !== true && ! $previousRows->has($previousWeekKey))) {
+                return 0.0;
+            }
+
             $weeklyKm = (float) $row->weekly_km;
 
             $extraKm = max(0.0, $weeklyKm - $limit);
             $total += $extraKm * $rate;
         }
 
-        return round($total, 2);
+        $total = round($total, 2);
+
+        return $total > 60 ? 0.0 : $total;
     }
 }

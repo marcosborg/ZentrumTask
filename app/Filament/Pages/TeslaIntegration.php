@@ -6,12 +6,15 @@ use App\Mail\TeslaTirePressureAlertMail;
 use App\Models\TeslaAccount;
 use App\Models\TeslaChargingEvent;
 use App\Models\TeslaVehicle;
+use App\Models\Vehicle;
 use App\Models\VehicleAllocation;
 use App\Services\TeslaService;
+use App\Services\VehicleOdometerService;
 use App\Support\TeslaTirePressureEvaluator;
 use BackedEnum;
 use Filament\Actions\Action;
 use Filament\Forms\Components\DatePicker;
+use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Filament\Support\Icons\Heroicon;
@@ -24,7 +27,9 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
+use Livewire\Attributes\Locked;
 use Throwable;
 use UnitEnum;
 
@@ -51,6 +56,16 @@ class TeslaIntegration extends Page implements HasTable
     public Collection $accounts;
 
     public Collection $vehicles;
+
+    /** @var list<int> */
+    #[Locked]
+    public array $pendingOdometerVehicleIds = [];
+
+    #[Locked]
+    public string $mileagePeriodStart = '';
+
+    #[Locked]
+    public string $mileagePeriodEnd = '';
 
     public function mount(): void
     {
@@ -182,8 +197,8 @@ class TeslaIntegration extends Page implements HasTable
                 ->icon('heroicon-m-camera')
                 ->color('warning')
                 ->requiresConfirmation()
-                ->modalHeading('Criar snapshots manuais para toda a frota Tesla')
-                ->modalDescription('Vai buscar a leitura atual de cada viatura à Tesla. Quando existir uma leitura manual anterior e a viatura estiver ligada ao cadastro interno, grava os km no periodo escolhido para os settlements.')
+                ->modalHeading('Recolher km da frota TVDE')
+                ->modalDescription('Consulta as viaturas TVDE. Os km sem resposta e os das viaturas sem Tesla, incluindo o IONIQ, serao pedidos manualmente. Introduza sempre a leitura total do odometro.')
                 ->form([
                     DatePicker::make('period_start')
                         ->label('Periodo inicio')
@@ -192,47 +207,120 @@ class TeslaIntegration extends Page implements HasTable
                         ->native(false),
                     DatePicker::make('period_end')
                         ->label('Periodo fim')
+                        ->afterOrEqual('period_start')
                         ->default(now()->startOfWeek(Carbon::MONDAY)->subDay()->toDateString())
                         ->required()
                         ->native(false),
                 ])
                 ->action(function (array $data, TeslaService $teslaService): void {
-                    $periodStart = (string) ($data['period_start'] ?? '');
-                    $periodEnd = (string) ($data['period_end'] ?? '');
+                    $this->mileagePeriodStart = $data['period_start'];
+                    $this->mileagePeriodEnd = $data['period_end'];
+                    $this->pendingOdometerVehicleIds = [];
                     $created = 0;
-                    $weeklyMileageCreated = 0;
-                    $failed = 0;
 
-                    TeslaVehicle::query()
-                        ->with('account')
-                        ->orderBy('display_name')
-                        ->get()
-                        ->each(function (TeslaVehicle $vehicle) use ($teslaService, $periodStart, $periodEnd, &$created, &$weeklyMileageCreated, &$failed): void {
-                            try {
-                                $snapshot = $teslaService->createManualOdometerSnapshot($vehicle, $periodStart, $periodEnd);
-                            } catch (Throwable) {
-                                $failed++;
+                    $vehicles = $this->tvdeMileageVehicles();
+                    $teslas = TeslaVehicle::query()->with('account')->get();
 
-                                return;
+                    foreach ($vehicles as $vehicle) {
+                        $tesla = $teslas->first(fn (TeslaVehicle $tesla): bool => $tesla->vehicle_id === $vehicle->getKey()
+                            || (filled($vehicle->vin) && $tesla->vin === $vehicle->vin));
+
+                        if (! $tesla || str_contains(strtolower((string) $vehicle->model), 'ioniq')) {
+                            $this->pendingOdometerVehicleIds[] = $vehicle->getKey();
+
+                            continue;
+                        }
+
+                        if (! $tesla->vehicle_id) {
+                            $tesla->update(['vehicle_id' => $vehicle->getKey()]);
+                        }
+
+                        try {
+                            $snapshot = $teslaService->createManualOdometerSnapshot($tesla, $this->mileagePeriodStart, $this->mileagePeriodEnd);
+
+                            if (! is_numeric($snapshot->odometer)) {
+                                $this->pendingOdometerVehicleIds[] = $vehicle->getKey();
+
+                                continue;
                             }
 
                             $created++;
-
-                            if ($snapshot->vehicle_weekly_mileage_id) {
-                                $weeklyMileageCreated++;
-                            }
-                        });
+                        } catch (Throwable) {
+                            $this->pendingOdometerVehicleIds[] = $vehicle->getKey();
+                        }
+                    }
 
                     $this->mount();
                     $this->resetTable();
 
                     Notification::make()
                         ->success()
-                        ->title('Snapshots da frota concluídos')
-                        ->body("Criados: {$created}. Sem resposta/erro: {$failed}. Semanas calculadas: {$weeklyMileageCreated}.")
+                        ->title('Recolha de km concluida')
+                        ->body('Leituras obtidas: '.$created.'. Leituras manuais: '.count($this->pendingOdometerVehicleIds).'.')
                         ->send();
+
+                    if ($this->pendingOdometerVehicleIds !== []) {
+                        $this->replaceMountedAction('enterManualOdometers');
+                    }
                 }),
         ];
+    }
+
+    public function enterManualOdometersAction(): Action
+    {
+        return Action::make('enterManualOdometers')
+            ->authorize(fn (): bool => auth()->check() && $this->pendingOdometerVehicleIds !== [])
+            ->modalHeading('Introduzir km em falta — TVDE')
+            ->modalDescription(fn (): string => $this->mileagePeriodStart.' a '.$this->mileagePeriodEnd.'. Indique o total do odometro em km. Sem leitura da semana anterior, a despesa de km extra sera 0 €.')
+            ->modalSubmitActionLabel('Guardar leituras')
+            ->schema(fn (): array => $this->tvdeMileageVehicles()
+                ->whereIn('id', $this->pendingOdometerVehicleIds)
+                ->map(fn (Vehicle $vehicle): TextInput => TextInput::make('odometers.'.$vehicle->getKey())
+                    ->label($vehicle->license_plate.' — '.($vehicle->currentAllocation?->driver?->name ?? 'Sem condutor atribuido'))
+                    ->helperText($vehicle->displayName())
+                    ->numeric()
+                    ->minValue(0)
+                    ->required()
+                    ->suffix('km'))
+                ->values()->all())
+            ->action(function (array $data, VehicleOdometerService $odometerService): void {
+                abort_unless(auth()->check(), 403);
+
+                Vehicle::resolveConnection()->transaction(function () use ($data, $odometerService): void {
+                    foreach ($this->tvdeMileageVehicles()->whereIn('id', $this->pendingOdometerVehicleIds) as $vehicle) {
+                        try {
+                            $odometerService->record(
+                                $vehicle,
+                                (float) $data['odometers'][$vehicle->getKey()],
+                                $this->mileagePeriodStart,
+                                $this->mileagePeriodEnd,
+                            );
+                        } catch (ValidationException $exception) {
+                            $statePath = $this->getMountedActionSchema()->getStatePath();
+
+                            throw ValidationException::withMessages(collect($exception->errors())
+                                ->mapWithKeys(fn (array $messages, string $key): array => [$statePath.'.'.$key => $messages])
+                                ->all());
+                        }
+                    }
+                });
+
+                $this->pendingOdometerVehicleIds = [];
+
+                Notification::make()->success()->title('Leituras manuais guardadas')->send();
+            });
+    }
+
+    /** @return Collection<int, Vehicle> */
+    protected function tvdeMileageVehicles(): Collection
+    {
+        return Vehicle::query()
+            ->where('source', 'tvde')
+            ->where('operation', 'rental')
+            ->whereNotIn('status', ['sold', 'inactive'])
+            ->with('currentAllocation.driver')
+            ->orderBy('license_plate')
+            ->get();
     }
 
     public function table(Table $table): Table

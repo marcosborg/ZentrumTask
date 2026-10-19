@@ -8,8 +8,6 @@ use App\Models\TeslaVehicle;
 use App\Models\TeslaVehicleError;
 use App\Models\TeslaVehicleSnapshot;
 use App\Models\Vehicle;
-use App\Models\VehicleAllocation;
-use App\Models\VehicleWeeklyMileage;
 use Carbon\CarbonInterface;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Http\Client\RequestException;
@@ -455,53 +453,19 @@ class TeslaService
             return;
         }
 
-        $previous = $vehicle->snapshots()
-            ->where('is_manual', true)
-            ->whereNotNull('odometer')
-            ->whereKeyNot($snapshot->getKey())
-            ->where('recorded_at', '<', $snapshot->recorded_at)
-            ->latest('recorded_at')
-            ->first();
-
-        if (! $previous || ! is_numeric($previous->odometer)) {
-            return;
-        }
-
-        $weeklyKm = round(max(0, (float) $snapshot->odometer - (float) $previous->odometer), 2);
         $periodStartDate = $periodStart
             ? Carbon::parse($periodStart)->startOfDay()
-            : $previous->recorded_at->copy()->startOfDay();
+            : $snapshot->recorded_at->copy()->startOfWeek(Carbon::MONDAY)->subWeek();
         $periodEndDate = $periodEnd
             ? Carbon::parse($periodEnd)->endOfDay()
-            : $snapshot->recorded_at->copy()->endOfDay();
+            : $periodStartDate->copy()->endOfWeek(Carbon::SUNDAY);
 
-        if ($periodEndDate->lt($periodStartDate)) {
-            throw new RuntimeException('Periodo invalido: fim anterior ao inicio.');
-        }
-
-        $driverMatch = $this->resolveDriverForVehiclePeriod($internalVehicle, $periodStartDate, $periodEndDate);
-
-        $weeklyMileage = VehicleWeeklyMileage::query()->updateOrCreate(
-            [
-                'vehicle_id' => $internalVehicle->getKey(),
-                'period_start' => $periodStartDate->toDateString(),
-                'period_end' => $periodEndDate->toDateString(),
-            ],
-            [
-                'driver_id' => $driverMatch['driver_id'],
-                'weekly_km' => $weeklyKm,
-                'assignment_status' => $driverMatch['status'],
-                'raw_row' => [
-                    'source' => 'tesla_manual_snapshot',
-                    'tesla_vehicle_id' => $vehicle->getKey(),
-                    'previous_snapshot_id' => $previous->getKey(),
-                    'current_snapshot_id' => $snapshot->getKey(),
-                    'previous_odometer' => (float) $previous->odometer,
-                    'current_odometer' => (float) $snapshot->odometer,
-                ],
-                'imported_at' => now(),
-                'source_file' => 'tesla_manual_snapshot',
-            ],
+        $weeklyMileage = app(VehicleOdometerService::class)->record(
+            $internalVehicle,
+            (float) $snapshot->odometer,
+            $periodStartDate->toDateString(),
+            $periodEndDate->toDateString(),
+            $snapshot,
         );
 
         $snapshot->forceFill([
@@ -543,43 +507,6 @@ class TeslaService
         }
 
         return $internalVehicle;
-    }
-
-    /**
-     * @return array{driver_id: int|null, status: string}
-     */
-    protected function resolveDriverForVehiclePeriod(Vehicle $vehicle, Carbon $periodStart, Carbon $periodEnd): array
-    {
-        $matches = VehicleAllocation::query()
-            ->where('vehicle_id', $vehicle->getKey())
-            ->where('starts_at', '<=', $periodEnd)
-            ->where(function ($query) use ($periodStart): void {
-                $query->whereNull('ends_at')
-                    ->orWhere('ends_at', '>=', $periodStart);
-            })
-            ->pluck('driver_id')
-            ->filter()
-            ->unique()
-            ->values();
-
-        if ($matches->count() === 1) {
-            return [
-                'driver_id' => (int) $matches->first(),
-                'status' => 'ok',
-            ];
-        }
-
-        if ($matches->count() > 1) {
-            return [
-                'driver_id' => null,
-                'status' => 'ambiguous_driver',
-            ];
-        }
-
-        return [
-            'driver_id' => null,
-            'status' => 'unassigned_driver',
-        ];
     }
 
     /**

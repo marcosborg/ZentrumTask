@@ -2047,6 +2047,10 @@ class DriverSettlementsReport extends Page implements HasTable
      */
     private function extraKmExpensesForSettlement(DriverSettlement $settlement): array
     {
+        if ((float) data_get($settlement->rules_snapshot, 'extra_km_total', 0) <= 0) {
+            return ['total' => 0.0, 'count' => 0, 'rows' => []];
+        }
+
         $billing = $this->billingFor($settlement);
         $profileId = (int) ($billing['billing_profile_id'] ?? 0);
 

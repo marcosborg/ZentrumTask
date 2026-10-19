@@ -557,7 +557,7 @@ it('charges rent only until the billing profile valid_to date inside the week', 
         ->and($settlement->amount_due)->toBe('300.00');
 });
 
-it('charges extra km when imported weekly km is lower than a previous cumulative reading', function () {
+it('does not charge extra km from an older reading or above sixty euros', function () {
     $driver = Driver::factory()->create();
     $vehicle = Vehicle::query()->create([
         'license_plate' => 'CB-47-ZP',
@@ -626,10 +626,10 @@ it('charges extra km when imported weekly km is lower than a previous cumulative
         ->firstOrFail();
 
     expect($result['created'])->toBe(1)
-        ->and((float) data_get($settlement->rules_snapshot, 'extra_km_total'))->toBe(98.4)
-        ->and($settlement->expenses_total)->toBe('98.40')
-        ->and($settlement->amount_payable)->toBe('1108.97')
-        ->and($settlement->amount_due)->toBe('1108.97');
+        ->and((float) data_get($settlement->rules_snapshot, 'extra_km_total'))->toBe(0.0)
+        ->and($settlement->expenses_total)->toBe('0.00')
+        ->and($settlement->amount_payable)->toBe('1230.00')
+        ->and($settlement->amount_due)->toBe('1230.00');
 });
 
 it('treats imported weekly mileage as the week total even when a previous reading exists', function () {
@@ -751,3 +751,43 @@ it('creates a settlement for a driver with vehicle usage and no platform balance
         ->and($settlement->amount_payable)->toBe('-100.00')
         ->and($settlement->amount_due)->toBe('-100.00');
 });
+
+it('protects extra km charges when the prior week is missing or the charge exceeds sixty euros', function (bool $hasPreviousWeek, float $weeklyKm, float $expected): void {
+    $driver = Driver::factory()->create();
+    $vehicle = Vehicle::factory()->create();
+    VehicleAllocation::factory()->create([
+        'vehicle_id' => $vehicle->id,
+        'driver_id' => $driver->id,
+        'starts_at' => '2026-01-01',
+        'ends_at' => null,
+        'status' => 'active',
+    ]);
+    DriverBillingProfile::factory()->create([
+        'driver_id' => $driver->id,
+        'valid_from' => '2026-01-01',
+        'extra_km_limit' => 2000,
+        'extra_km_rate' => 0.12,
+    ]);
+    if ($hasPreviousWeek) {
+        VehicleWeeklyMileage::factory()->create([
+            'vehicle_id' => $vehicle->id, 'driver_id' => $driver->id,
+            'period_start' => '2026-10-05', 'period_end' => '2026-10-11',
+        ]);
+    }
+    VehicleWeeklyMileage::factory()->create([
+        'vehicle_id' => $vehicle->id, 'driver_id' => $driver->id,
+        'period_start' => '2026-10-12', 'period_end' => '2026-10-18',
+        'weekly_km' => $weeklyKm,
+    ]);
+
+    app(DriverSettlementCalculator::class)->calculate('2026-10-12', '2026-10-18', $driver->id);
+
+    $settlement = DriverSettlement::query()->where('driver_id', $driver->id)->firstOrFail();
+    expect((float) data_get($settlement->rules_snapshot, 'extra_km_total'))->toBe($expected);
+})->with([
+    'no previous week' => [false, 2250.0, 0.0],
+    'below ceiling' => [true, 2250.0, 30.0],
+    'exactly sixty euros' => [true, 2500.0, 60.0],
+    'above ceiling' => [true, 2501.0, 0.0],
+    'below allowance' => [true, 1900.0, 0.0],
+]);

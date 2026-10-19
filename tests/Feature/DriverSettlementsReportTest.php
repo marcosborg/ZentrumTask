@@ -518,7 +518,7 @@ it('recalculates only one driver settlement without changing the others', functi
         ->and($unchangedDriverTwoSettlement->amount_due)->toBe('120.00');
 });
 
-it('shows extra km expenses in the report when there is no previous mileage reading', function () {
+it('shows the protected extra km expense in the report', function (bool $hasPreviousWeek, float $weeklyKm, float $expected): void {
     $driver = Driver::factory()->create();
     $vehicle = Vehicle::query()->create([
         'license_plate' => 'AA-11-BB',
@@ -553,12 +553,21 @@ it('shows extra km expenses in the report when there is no previous mileage read
         'updated_at' => now(),
     ]);
 
+    if ($hasPreviousWeek) {
+        VehicleWeeklyMileage::factory()->create([
+            'vehicle_id' => $vehicle->id,
+            'driver_id' => $driver->id,
+            'period_start' => '2026-04-06',
+            'period_end' => '2026-04-12',
+        ]);
+    }
+
     VehicleWeeklyMileage::query()->create([
         'vehicle_id' => $vehicle->id,
         'driver_id' => $driver->id,
         'period_start' => '2026-04-13',
         'period_end' => '2026-04-19',
-        'weekly_km' => 4159,
+        'weekly_km' => $weeklyKm,
         'assignment_status' => 'ok',
         'source_file' => 'kms.csv',
         'imported_at' => now(),
@@ -587,14 +596,24 @@ it('shows extra km expenses in the report when there is no previous mileage read
         return $this->extraKmExpensesForSettlement($record);
     })->call($page, $settlement);
 
-    expect((float) data_get($settlement->rules_snapshot, 'extra_km_total'))->toBe(259.08)
-        ->and($expenses['count'])->toBe(1)
-        ->and($expenses['total'])->toBe(259.08)
-        ->and($expenses['rows'][0])->toMatchArray([
-            'total_km' => 4159.0,
-            'weekly_km' => 4159.0,
-            'extra_km' => 2159.0,
-            'amount' => 259.08,
+    expect((float) data_get($settlement->rules_snapshot, 'extra_km_total'))->toBe($expected)
+        ->and($expenses['total'])->toBe($expected)
+        ->and($expenses['count'])->toBe($expected > 0 ? 1 : 0);
+
+    if ($expected > 0) {
+        expect($expenses['rows'][0])->toMatchArray([
+            'total_km' => $weeklyKm,
+            'weekly_km' => $weeklyKm,
+            'extra_km' => $weeklyKm - 2000,
+            'amount' => $expected,
             'vehicle_id' => $vehicle->id,
         ]);
-});
+    } else {
+        expect($expenses['rows'])->toBe([]);
+    }
+})->with([
+    'without prior week' => [false, 2250.0, 0.0],
+    'above sixty euros' => [true, 4159.0, 0.0],
+    'valid charge' => [true, 2250.0, 30.0],
+    'exactly sixty euros' => [true, 2500.0, 60.0],
+]);
