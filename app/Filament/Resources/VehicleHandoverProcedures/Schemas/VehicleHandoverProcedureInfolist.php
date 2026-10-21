@@ -48,6 +48,15 @@ class VehicleHandoverProcedureInfolist
                             ->label('Caucao')
                             ->formatStateUsing(fn ($state): string => $state ? Number::currency((float) $state, 'EUR') : '-'),
                     ]),
+                Section::make('Comparar com a última entrega')
+                    ->visible(fn ($record): bool => $record->type === 'inspection')
+                    ->columnSpanFull()
+                    ->components([
+                        Html::make(fn ($record): HtmlString => new HtmlString(view('vehicle-handovers.inspection-reference', [
+                            'reference' => app(\App\Services\VehicleHandoverProcedureService::class)->inspectionReference($record->vehicle_id, $record->performed_at?->toDateTimeString()),
+                            'currentPhotos' => $record->guided_photo_items ?? [],
+                        ])->render())),
+                    ]),
                 Section::make('Documento')
                     ->components([
                         Html::make(fn ($record): HtmlString => new HtmlString($record->html_snapshot

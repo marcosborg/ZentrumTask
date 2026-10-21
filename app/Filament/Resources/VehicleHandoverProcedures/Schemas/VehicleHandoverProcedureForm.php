@@ -52,6 +52,7 @@ class VehicleHandoverProcedureForm
                             ->default(fn (): string => request()->query('type') === 'inspection' ? 'inspection' : 'delivery'),
                         DateTimePicker::make('performed_at')
                             ->label('Data e hora')
+                            ->live()
                             ->required()
                             ->native(false)
                             ->default(now()),
@@ -116,6 +117,17 @@ class VehicleHandoverProcedureForm
                         Textarea::make('notes')
                             ->label('Observacoes')
                             ->columnSpanFull(),
+                    ]),
+                Section::make('Comparar com a última entrega')
+                    ->visible(fn (Get $get): bool => $get('type') === 'inspection')
+                    ->columnSpanFull()
+                    ->components([
+                        \Filament\Schemas\Components\Html::make(fn (Get $get): \Illuminate\Support\HtmlString => new \Illuminate\Support\HtmlString(
+                            view('vehicle-handovers.inspection-reference', [
+                                'reference' => $service->inspectionReference($get('vehicle_id') ? (int) $get('vehicle_id') : null, $get('performed_at')),
+                                'currentPhotos' => $get('guided_photo_items') ?? [],
+                            ])->render()
+                        )),
                     ]),
                 Section::make('Checklist')
                     ->columns(2)

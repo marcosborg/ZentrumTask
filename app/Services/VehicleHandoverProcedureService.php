@@ -75,6 +75,55 @@ class VehicleHandoverProcedureService
         return $procedure->refresh();
     }
 
+    /**
+     * @return array<string, mixed>|null
+     */
+    public function inspectionReference(?int $vehicleId, ?string $performedAt = null): ?array
+    {
+        if (! $vehicleId) {
+            return null;
+        }
+
+        $delivery = VehicleHandoverProcedure::query()
+            ->with('driver')
+            ->where('vehicle_id', $vehicleId)
+            ->where('type', 'delivery')
+            ->where('status', 'completed')
+            ->where('performed_at', '<=', $performedAt ? Carbon::parse($performedAt) : now())
+            ->orderByDesc('performed_at')
+            ->orderByDesc('id')
+            ->first();
+
+        if (! $delivery) {
+            return null;
+        }
+
+        $disk = Storage::disk('public');
+        $photos = [];
+        foreach ($delivery->guided_photo_items ?? [] as $key => $item) {
+            if (! empty($item['photo_path'])) {
+                $photos[] = ['key' => $key, 'label' => $item['label'] ?? $key, 'url' => $disk->url($item['photo_path'])];
+            }
+        }
+        foreach ($delivery->general_photo_paths ?? [] as $index => $path) {
+            $photos[] = ['key' => 'general_'.$index, 'label' => 'Foto geral '.($index + 1), 'url' => $disk->url($path)];
+        }
+
+        return [
+            'id' => $delivery->id,
+            'performed_at_label' => $delivery->performed_at?->format('d/m/Y H:i'),
+            'driver_name' => $delivery->driver?->name ?? data_get($delivery->driver_snapshot, 'name'),
+            'photos' => $photos,
+            'damage_items' => collect($delivery->damage_items ?? [])
+                ->map(fn (array $item): array => [
+                    'type' => $item['type'] ?? null,
+                    'zone' => $item['zone'] ?? null,
+                    'description' => $item['description'] ?? null,
+                    'photo_url' => ! empty($item['photo_path']) ? $disk->url($item['photo_path']) : null,
+                ])->values()->all(),
+        ];
+    }
+
     public function activeDraft(User $operator): ?VehicleHandoverProcedure
     {
         return VehicleHandoverProcedure::query()

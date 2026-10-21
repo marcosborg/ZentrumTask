@@ -299,6 +299,9 @@ class AppVehicleHandoverProcedureController extends AppApiController
             ->all();
 
         return array_merge($this->serializeProcedureSummary($procedure), [
+            'inspection_reference' => $procedure->type === 'inspection'
+                ? $this->service->inspectionReference($procedure->vehicle_id, $procedure->performed_at?->toDateTimeString())
+                : null,
             'status' => $procedure->status,
             'draft_step' => $procedure->draft_step,
             'completed_at' => optional($procedure->completed_at)?->toIso8601String(),
