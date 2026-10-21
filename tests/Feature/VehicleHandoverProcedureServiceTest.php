@@ -35,7 +35,7 @@ it('saves and reloads wheel photos multiple general photos and an extra video in
     $photos = [];
     foreach (['wheel_front_left', 'wheel_front_right', 'wheel_rear_left', 'wheel_rear_right'] as $key) {
         $form->assertFormFieldExists("guided_photo_items.{$key}.photo");
-        $photos[$key] = ['photo' => UploadedFile::fake()->image($key.'.jpg')];
+        $photos[$key] = ['photo' => UploadedFile::fake()->image($key.'.jpg', 640, 480)];
     }
 
     $form->fillForm([
@@ -61,6 +61,31 @@ it('saves and reloads wheel photos multiple general photos and an extra video in
     }
     expect(array_values($reloaded->get('data.general_photos')))->toBe($draft->general_photo_paths);
     expect(array_values($reloaded->get('data.video_items.general')))->toBe([$videoPath]);
+
+    app(VehicleHandoverProcedureService::class)->generateArtifacts($draft);
+    Storage::disk('public')->assertExists($draft->pdf_path);
+
+    foreach (['vehicle-handovers.snippet', 'pdf.vehicle-handover-procedure'] as $template) {
+        $html = view($template, [
+            'procedure' => $draft,
+            'typeLabels' => \App\Support\VehicleHandoverDefinition::typeLabels(),
+            'logo' => null,
+        ])->render();
+        $wheelSectionStart = strpos($html, '>Fotos das jantes<');
+        $generalSectionStart = strpos($html, '>Fotos gerais<');
+
+        expect($wheelSectionStart)->not->toBeFalse();
+        foreach (['Jante dianteira esquerda', 'Jante dianteira direita', 'Jante traseira esquerda', 'Jante traseira direita'] as $label) {
+            expect(strpos($html, $label))->toBeGreaterThan($wheelSectionStart)
+                ->toBeLessThan($generalSectionStart);
+        }
+    }
+
+    $draft->update(['html_snapshot' => '<p>Old document layout</p>']);
+    \Livewire\Livewire::test(\App\Filament\Resources\VehicleHandoverProcedures\Pages\ViewVehicleHandoverProcedure::class, ['record' => $draft->id])
+        ->assertSee('Fotos das jantes')
+        ->assertSee('Jante dianteira esquerda')
+        ->assertDontSee('Old document layout');
 });
 
 it('stores handover videos before the procedure is completed', function () {

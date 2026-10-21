@@ -77,8 +77,10 @@
             'label' => $item['label'] ?? $key,
             'view' => $item['view'] ?? 'geral',
             'photo_src' => $publicDataUri($item['photo_path'] ?? null),
-        ])
-        ->groupBy('view');
+        ]);
+    $wheelPhotoKeys = array_column(\App\Support\VehicleHandoverDefinition::wheelPhotoZones(), 'key');
+    $wheelPhotoItems = $guidedPhotoItems->whereIn('key', $wheelPhotoKeys)->values();
+    $guidedPhotoItems = $guidedPhotoItems->whereNotIn('key', $wheelPhotoKeys)->groupBy('view');
     $videoItems = collect($procedure->video_items ?? [])
         ->map(function ($item) use ($qrDataUri): array {
             $url = $item['url'] ?? (! empty($item['video_path']) ? \Illuminate\Support\Facades\Storage::disk('public')->url($item['video_path']) : null);
@@ -238,10 +240,13 @@
             <div class="section-note">Sem avarias registadas.</div>
         @endif
 
-        <div class="section-title">Mapa fotografico</div>
-        @if($guidedPhotoItems->isNotEmpty())
-            @foreach($guidedPhotoItems as $view => $items)
-                <div class="card-meta">{{ ucfirst((string) $view) }}</div>
+        @foreach(['Mapa fotografico' => $guidedPhotoItems, 'Fotos das jantes' => $wheelPhotoItems->isEmpty() ? collect() : collect(['' => $wheelPhotoItems])] as $photoSectionTitle => $photoGroups)
+        <div class="section-title">{{ $photoSectionTitle }}</div>
+        @if($photoGroups->isNotEmpty())
+            @foreach($photoGroups as $view => $items)
+                @if($view !== '')
+                    <div class="card-meta">{{ ucfirst((string) $view) }}</div>
+                @endif
                 <table class="card-table">
                     @foreach($items->values()->chunk(3) as $row)
                         <tr>
@@ -263,8 +268,9 @@
                 </table>
             @endforeach
         @else
-            <div class="section-note">Sem fotografias guiadas.</div>
+            <div class="section-note">{{ $photoSectionTitle === 'Fotos das jantes' ? 'Sem fotografias das jantes.' : 'Sem fotografias guiadas.' }}</div>
         @endif
+        @endforeach
 
         <div class="section-title">Fotos gerais</div>
         @if($generalPhotoItems->isNotEmpty())

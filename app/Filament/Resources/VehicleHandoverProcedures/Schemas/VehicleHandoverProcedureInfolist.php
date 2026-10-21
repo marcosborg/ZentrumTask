@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\VehicleHandoverProcedures\Schemas;
 
+use App\Support\VehicleHandoverDefinition;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Schemas\Components\Html;
 use Filament\Schemas\Components\Section;
@@ -47,7 +48,12 @@ class VehicleHandoverProcedureInfolist
                     ]),
                 Section::make('Documento')
                     ->components([
-                        Html::make(fn ($record): HtmlString => new HtmlString($record->html_snapshot ?: '<p>Documento ainda nao gerado.</p>')),
+                        Html::make(fn ($record): HtmlString => new HtmlString($record->html_snapshot
+                            ? view('vehicle-handovers.snippet', [
+                                'procedure' => $record,
+                                'typeLabels' => VehicleHandoverDefinition::typeLabels(),
+                            ])->render()
+                            : '<p>Documento ainda nao gerado.</p>')),
                     ]),
             ]);
     }

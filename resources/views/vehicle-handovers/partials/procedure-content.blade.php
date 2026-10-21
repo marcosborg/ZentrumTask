@@ -27,8 +27,10 @@
             'view' => $item['view'] ?? null,
             'required' => (bool) ($item['required'] ?? false),
             'photo_url' => !empty($item['photo_path']) ? Storage::disk('public')->url($item['photo_path']) : null,
-        ])
-        ->groupBy('view');
+        ]);
+    $wheelPhotoKeys = array_column(\App\Support\VehicleHandoverDefinition::wheelPhotoZones(), 'key');
+    $wheelPhotoItems = $guidedPhotoItems->whereIn('key', $wheelPhotoKeys)->values();
+    $guidedPhotoItems = $guidedPhotoItems->whereNotIn('key', $wheelPhotoKeys)->groupBy('view');
     $videoItems = collect($procedure->video_items ?? [])
         ->map(fn ($item) => [
             'label' => $item['label'] ?? 'Video',
@@ -128,16 +130,19 @@
         @endif
     </section>
 
+    @foreach(['Mapa fotografico' => $guidedPhotoItems, 'Fotos das jantes' => $wheelPhotoItems->isEmpty() ? collect() : collect(['' => $wheelPhotoItems])] as $photoSectionTitle => $photoGroups)
     <section>
-        <h2>Mapa fotografico</h2>
-        @if($guidedPhotoItems->isNotEmpty())
+        <h2>{{ $photoSectionTitle }}</h2>
+        @if($photoGroups->isNotEmpty())
             <div class="handover-doc__stack">
-                @foreach($guidedPhotoItems as $view => $items)
+                @foreach($photoGroups as $view => $items)
                     <div class="handover-doc__damage">
+                        @if($view !== '')
                         <div class="handover-doc__damage-head">
                             <strong>{{ ucfirst((string) $view) }}</strong>
                             <span>{{ $items->filter(fn ($item) => !empty($item['photo_url']))->count() }} foto(s)</span>
                         </div>
+                        @endif
                         <div class="handover-doc__photos">
                             @foreach($items as $item)
                                 <div>
@@ -154,9 +159,10 @@
                 @endforeach
             </div>
         @else
-            <p class="handover-doc__muted">Sem fotografias guiadas.</p>
+            <p class="handover-doc__muted">{{ $photoSectionTitle === 'Fotos das jantes' ? 'Sem fotografias das jantes.' : 'Sem fotografias guiadas.' }}</p>
         @endif
     </section>
+    @endforeach
 
     <section>
         <h2>Fotos gerais</h2>
