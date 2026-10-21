@@ -15,6 +15,38 @@ use Illuminate\Support\Facades\Storage;
 
 uses(RefreshDatabase::class);
 
+it('uploads wheel photos and saves replaces and removes the general video through the draft api', function () {
+    Storage::fake('public');
+    $operator = User::factory()->create();
+    $vehicle = Vehicle::factory()->create(['status' => 'available']);
+    $driver = Driver::factory()->create();
+    $draft = app(VehicleHandoverProcedureService::class)->createDraft([
+        'type' => 'delivery', 'vehicle_id' => $vehicle->id, 'driver_id' => $driver->id,
+    ], $operator);
+    $token = 'handover-extra-media-token';
+    Cache::put('app_auth_token:'.$token, $operator->id, now()->addMinute());
+    $endpoint = "/app/ops/vehicle-handovers/{$draft->id}/media";
+
+    foreach (['wheel_front_left', 'wheel_front_right', 'wheel_rear_left', 'wheel_rear_right'] as $key) {
+        $this->withToken($token)->post($endpoint, [
+            'kind' => 'photo', 'key' => $key, 'media' => UploadedFile::fake()->image($key.'.jpg'),
+        ])->assertSuccessful();
+        Storage::disk('public')->assertExists($draft->refresh()->guided_photo_items[$key]['photo_path']);
+    }
+
+    foreach (['exterior', 'general', 'general'] as $key) {
+        $this->withToken($token)->post($endpoint, [
+            'kind' => 'video', 'key' => $key, 'media' => UploadedFile::fake()->create($key.'.mp4', 100, 'video/mp4'),
+        ])->assertSuccessful();
+        Storage::disk('public')->assertExists($draft->refresh()->video_items[$key]['video_path']);
+    }
+    expect($draft->video_items['general']['label'])->toBe('Video geral');
+    $exteriorPath = $draft->video_items['exterior']['video_path'];
+    $this->withToken($token)->post($endpoint, ['kind' => 'video', 'key' => 'general', 'media' => ''])->assertSuccessful();
+    expect($draft->refresh()->video_items['general']['video_path'])->toBeNull()
+        ->and($draft->video_items['exterior']['video_path'])->toBe($exteriorPath);
+});
+
 it('saves and reloads wheel photos multiple general photos and an extra video in the edit form', function () {
     Storage::fake('public');
     \Filament\Facades\Filament::setCurrentPanel('admin');

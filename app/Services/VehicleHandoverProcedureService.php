@@ -168,12 +168,16 @@ class VehicleHandoverProcedureService
                 'photo_path' => $this->storeSinglePhoto($media, 'vehicle-handovers/guided-photos'),
             ];
             $procedure->update(['guided_photo_items' => $items, 'last_synced_at' => now()]);
-        } elseif ($kind === 'video' && in_array($key, ['exterior', 'interior'], true)) {
+        } elseif ($kind === 'video' && in_array($key, ['exterior', 'interior', 'general'], true)) {
             $path = $this->storeSingleVideo($media);
             $url = $path ? Storage::disk('public')->url($path) : null;
             $items = (array) $procedure->video_items;
             $items[$key] = [
-                'label' => $key === 'exterior' ? 'Video exterior' : 'Video interior', 'required' => false,
+                'label' => match ($key) {
+                    'exterior' => 'Video exterior',
+                    'interior' => 'Video interior',
+                    'general' => 'Video geral',
+                }, 'required' => false,
                 'video_path' => $path, 'qr_path' => $url ? $this->storeQrCode($url, $key) : null, 'url' => $url,
             ];
             $procedure->update(['video_items' => $items, 'last_synced_at' => now()]);
