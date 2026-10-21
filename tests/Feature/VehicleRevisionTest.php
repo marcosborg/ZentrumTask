@@ -40,8 +40,8 @@ it('warns at either inclusive threshold and includes overdue revisions', functio
 })->with([
     '30 days' => ['2025-11-20', 1, null, 90000, true, false],
     '31 days' => ['2025-11-21', 1, null, 90000, false, false],
-    '1000 km' => ['2026-09-01', null, 100000, 99000, true, false],
-    '1001 km' => ['2026-09-01', null, 100000, 98999, false, false],
+    '5000 km' => ['2026-09-01', null, 100000, 95000, true, false],
+    '5001 km' => ['2026-09-01', null, 100000, 94999, false, false],
     'date due today' => ['2025-10-21', 1, null, 90000, true, true],
     'date overdue' => ['2025-10-20', 1, null, 90000, true, true],
     'km overdue' => ['2026-09-01', 1, 100000, 100001, true, true],

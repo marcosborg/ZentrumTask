@@ -79,10 +79,10 @@ class VehicleRevisionService
             $reasons[] = $overdue ? 'Prazo de revisão atingido' : 'Revisão nos próximos 30 dias';
         }
 
-        if ($nextOdometer !== null && $reading['value'] !== null && $nextOdometer - $reading['value'] <= 1000) {
+        if ($nextOdometer !== null && $reading['value'] !== null && $nextOdometer - $reading['value'] <= 5000) {
             $kilometresOverdue = $reading['value'] >= $nextOdometer;
             $overdue = $overdue || $kilometresOverdue;
-            $reasons[] = $kilometresOverdue ? 'Limite de quilómetros atingido' : 'Faltam até 1.000 km';
+            $reasons[] = $kilometresOverdue ? 'Limite de quilómetros atingido' : 'Faltam até 5.000 km';
         }
 
         return [
