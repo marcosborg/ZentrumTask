@@ -24,6 +24,7 @@ it('saves and reloads wheel photos multiple general photos and an extra video in
     $driver = Driver::factory()->create();
     $draft = app(VehicleHandoverProcedureService::class)->createDraft([
         'type' => 'delivery', 'vehicle_id' => $vehicle->id, 'driver_id' => $driver->id,
+        'performed_at' => '2026-10-20 09:45:00',
     ], $operator);
     $draft->update(['driver_signature_data_url' => 'driver-signature']);
 
@@ -63,6 +64,7 @@ it('saves and reloads wheel photos multiple general photos and an extra video in
     expect(array_values($reloaded->get('data.video_items.general')))->toBe([$videoPath]);
 
     app(VehicleHandoverProcedureService::class)->generateArtifacts($draft);
+    expect($draft->refresh()->performed_at->format('Y-m-d H:i:s'))->toBe('2026-10-20 09:45:00');
     Storage::disk('public')->assertExists($draft->pdf_path);
 
     foreach (['vehicle-handovers.snippet', 'pdf.vehicle-handover-procedure'] as $template) {
@@ -82,6 +84,7 @@ it('saves and reloads wheel photos multiple general photos and an extra video in
     }
 
     $draft->update(['html_snapshot' => '<p>Old document layout</p>']);
+    expect($draft->refresh()->performed_at->format('Y-m-d H:i:s'))->toBe('2026-10-20 09:45:00');
     \Livewire\Livewire::test(\App\Filament\Resources\VehicleHandoverProcedures\Pages\ViewVehicleHandoverProcedure::class, ['record' => $draft->id])
         ->assertSee('Fotos das jantes')
         ->assertSee('Jante dianteira esquerda')
