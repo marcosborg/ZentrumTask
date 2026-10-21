@@ -15,6 +15,54 @@ use Illuminate\Support\Facades\Storage;
 
 uses(RefreshDatabase::class);
 
+it('saves and reloads wheel photos multiple general photos and an extra video in the edit form', function () {
+    Storage::fake('public');
+    \Filament\Facades\Filament::setCurrentPanel('admin');
+    $operator = User::factory()->create();
+    $this->actingAs($operator);
+    $vehicle = Vehicle::factory()->create(['status' => 'available']);
+    $driver = Driver::factory()->create();
+    $draft = app(VehicleHandoverProcedureService::class)->createDraft([
+        'type' => 'delivery', 'vehicle_id' => $vehicle->id, 'driver_id' => $driver->id,
+    ], $operator);
+    $draft->update(['driver_signature_data_url' => 'driver-signature']);
+
+    $form = \Livewire\Livewire::test(\App\Filament\Resources\VehicleHandoverProcedures\Pages\EditVehicleHandoverProcedure::class, ['record' => $draft->id])
+        ->assertSee('Fotos das jantes')
+        ->assertSee('Video geral')
+        ->assertFormFieldExists('video_items.general');
+
+    $photos = [];
+    foreach (['wheel_front_left', 'wheel_front_right', 'wheel_rear_left', 'wheel_rear_right'] as $key) {
+        $form->assertFormFieldExists("guided_photo_items.{$key}.photo");
+        $photos[$key] = ['photo' => UploadedFile::fake()->image($key.'.jpg')];
+    }
+
+    $form->fillForm([
+        'guided_photo_items' => $photos,
+        'general_photos' => [UploadedFile::fake()->image('general-one.jpg'), UploadedFile::fake()->image('general-two.jpg')],
+        'video_items.general' => UploadedFile::fake()->create('general.mp4', 100, 'video/mp4'),
+        'operator_signature_data_url' => 'operator-signature',
+    ])->call('save')->assertHasNoFormErrors();
+
+    $draft->refresh();
+    expect($draft->general_photo_paths)->toHaveCount(2);
+    Storage::disk('public')->assertExists($draft->general_photo_paths);
+    $videoPath = $draft->video_items['general']['video_path'];
+    expect($videoPath)->not->toBeNull();
+    Storage::disk('public')->assertExists($videoPath);
+
+    $reloaded = \Livewire\Livewire::test(\App\Filament\Resources\VehicleHandoverProcedures\Pages\EditVehicleHandoverProcedure::class, ['record' => $draft->id]);
+    foreach (array_keys($photos) as $key) {
+        $path = $draft->guided_photo_items[$key]['photo_path'];
+        expect($path)->not->toBeNull();
+        Storage::disk('public')->assertExists($path);
+        expect(array_values($reloaded->get("data.guided_photo_items.{$key}.photo")))->toBe([$path]);
+    }
+    expect(array_values($reloaded->get('data.general_photos')))->toBe($draft->general_photo_paths);
+    expect(array_values($reloaded->get('data.video_items.general')))->toBe([$videoPath]);
+});
+
 it('stores handover videos before the procedure is completed', function () {
     Storage::fake('public');
 

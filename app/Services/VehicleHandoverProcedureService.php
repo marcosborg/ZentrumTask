@@ -511,6 +511,7 @@ class VehicleHandoverProcedureService
         $definitions = [
             'exterior' => 'Video exterior',
             'interior' => 'Video interior',
+            'general' => 'Video geral',
         ];
 
         $normalized = [];

@@ -6,6 +6,7 @@ use App\Models\Driver;
 use App\Models\Vehicle;
 use App\Models\VehicleHandoverProcedure;
 use App\Services\VehicleHandoverProcedureService;
+use App\Support\VehicleHandoverDefinition;
 use Filament\Forms\Components\BaseFileUpload;
 use Filament\Forms\Components\Checkbox;
 use Filament\Forms\Components\DateTimePicker;
@@ -147,8 +148,22 @@ class VehicleHandoverProcedureForm
                     ->columns(2)
                     ->components(
                         collect($service->guidedPhotoZones())
+                            ->whereNotIn('key', array_column(VehicleHandoverDefinition::wheelPhotoZones(), 'key'))
                             ->map(fn (array $zone) => self::handoverUpload("guided_photo_items.{$zone['key']}.photo")
                                 ->label($zone['label'])
+                                ->disk('public')
+                                ->directory('vehicle-handovers/guided-photos')
+                                ->visibility('public'))
+                            ->all()
+                    ),
+                Section::make('Fotos das jantes')
+                    ->description('Adiciona uma fotografia de cada uma das quatro jantes.')
+                    ->columns(2)
+                    ->components(
+                        collect(VehicleHandoverDefinition::wheelPhotoZones())
+                            ->map(fn (array $zone) => self::handoverUpload("guided_photo_items.{$zone['key']}.photo")
+                                ->label($zone['label'])
+                                ->image()
                                 ->disk('public')
                                 ->directory('vehicle-handovers/guided-photos')
                                 ->visibility('public'))
@@ -168,6 +183,16 @@ class VehicleHandoverProcedureForm
                             ->disk('public')
                             ->directory('vehicle-handovers/videos')
                             ->visibility('public'),
+                    ]),
+                Section::make('Video geral')
+                    ->description('Adiciona, se quiseres, mais um video da viatura.')
+                    ->components([
+                        self::handoverUpload('video_items.general')
+                            ->label('Video geral (opcional)')
+                            ->disk('public')
+                            ->directory('vehicle-handovers/videos')
+                            ->visibility('public')
+                            ->columnSpanFull(),
                     ]),
                 Section::make('Danos')
                     ->components([
@@ -234,7 +259,8 @@ class VehicleHandoverProcedureForm
                 Section::make('Fotos gerais')
                     ->components([
                         self::handoverUpload('general_photos')
-                            ->label('Fotos opcionais')
+                            ->label('Fotografias gerais (opcionais)')
+                            ->helperText('Podes adicionar varias fotografias gerais e alterar a sua ordem.')
                             ->multiple()
                             ->disk('public')
                             ->directory('vehicle-handovers/general-photos')

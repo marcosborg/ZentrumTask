@@ -53,6 +53,20 @@ class VehicleHandoverDefinition
             ['key' => 'interior_front_seats', 'label' => 'Bancos da frente', 'view' => 'interior', 'required' => true],
             ['key' => 'interior_rear_seats', 'label' => 'Bancos traseiros', 'view' => 'interior', 'required' => true],
             ['key' => 'boot', 'label' => 'Mala / bagageira', 'view' => 'rear', 'required' => false],
+            ...self::wheelPhotoZones(),
+        ];
+    }
+
+    /**
+     * @return array<int, array{key: string, label: string, view: string, required: bool}>
+     */
+    public static function wheelPhotoZones(): array
+    {
+        return [
+            ['key' => 'wheel_front_left', 'label' => 'Jante dianteira esquerda', 'view' => 'left', 'required' => false],
+            ['key' => 'wheel_front_right', 'label' => 'Jante dianteira direita', 'view' => 'right', 'required' => false],
+            ['key' => 'wheel_rear_left', 'label' => 'Jante traseira esquerda', 'view' => 'left', 'required' => false],
+            ['key' => 'wheel_rear_right', 'label' => 'Jante traseira direita', 'view' => 'right', 'required' => false],
         ];
     }
 
