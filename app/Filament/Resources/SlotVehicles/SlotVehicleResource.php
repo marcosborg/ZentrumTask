@@ -54,7 +54,10 @@ class SlotVehicleResource extends SlotResource
 
     public static function getRelations(): array
     {
-        return [\App\Filament\Resources\Vehicles\RelationManagers\VehicleDocumentsRelationManager::class];
+        return [
+            \App\Filament\Resources\Vehicles\RelationManagers\VehicleDocumentsRelationManager::class,
+            \App\Filament\Resources\Vehicles\RelationManagers\RevisionsRelationManager::class,
+        ];
     }
 
     public static function getPages(): array

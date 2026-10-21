@@ -23,6 +23,7 @@ class VehicleDocumentAlertsSummaryMail extends Mailable
         public User $recipient,
         public Collection $alerts,
         public Carbon $alertDate,
+        public ?\Illuminate\Support\Collection $revisions = null,
     ) {}
 
     /**
@@ -31,7 +32,7 @@ class VehicleDocumentAlertsSummaryMail extends Mailable
     public function envelope(): Envelope
     {
         return new Envelope(
-            subject: 'Resumo diario de alertas de documentos de viaturas',
+            subject: 'Resumo diário de documentos e revisões de viaturas',
         );
     }
 
@@ -46,6 +47,7 @@ class VehicleDocumentAlertsSummaryMail extends Mailable
                 'recipient' => $this->recipient,
                 'alerts' => $this->alerts,
                 'alertDate' => $this->alertDate,
+                'revisions' => $this->revisions ?? collect(),
             ],
         );
     }

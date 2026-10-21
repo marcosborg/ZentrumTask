@@ -63,6 +63,21 @@ class Vehicle extends Model implements HasMedia
         return $this->hasMany(VehicleDocument::class);
     }
 
+    public function revisions(): HasMany
+    {
+        return $this->hasMany(VehicleRevision::class);
+    }
+
+    public function weeklyMileages(): HasMany
+    {
+        return $this->hasMany(VehicleWeeklyMileage::class);
+    }
+
+    public function teslaVehicles(): HasMany
+    {
+        return $this->hasMany(TeslaVehicle::class);
+    }
+
     public function owner(): \Illuminate\Database\Eloquent\Relations\BelongsTo
     {
         return $this->belongsTo(Driver::class, 'owner_driver_id');

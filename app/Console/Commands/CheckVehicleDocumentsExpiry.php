@@ -6,9 +6,12 @@ use App\Mail\VehicleDocumentAlertsSummaryMail;
 use App\Models\User;
 use App\Models\VehicleDocument;
 use App\Models\VehicleDocumentAlert;
+use App\Models\VehicleRevisionReminder;
+use App\Services\VehicleRevisionService;
 use Illuminate\Console\Command;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Mail;
 
 class CheckVehicleDocumentsExpiry extends Command
@@ -25,12 +28,26 @@ class CheckVehicleDocumentsExpiry extends Command
      *
      * @var string
      */
-    protected $description = 'Create daily alerts for vehicle document expiry';
+    protected $description = 'Send daily alerts for vehicle documents and revisions';
 
     /**
      * Execute the console command.
      */
     public function handle(): int
+    {
+        $lock = Cache::lock('vehicle-document-revision-summary', 3600);
+        if (! $lock->get()) {
+            return self::SUCCESS;
+        }
+
+        try {
+            return $this->checkAlerts();
+        } finally {
+            $lock->release();
+        }
+    }
+
+    private function checkAlerts(): int
     {
         $today = Carbon::today();
         $createdAlerts = new Collection;
@@ -93,7 +110,8 @@ class CheckVehicleDocumentsExpiry extends Command
      */
     private function sendDailySummaries(Collection $alerts, Carbon $today): void
     {
-        if ($alerts->isEmpty()) {
+        $revisions = app(VehicleRevisionService::class)->pending();
+        if ($alerts->isEmpty() && $revisions->isEmpty()) {
             return;
         }
 
@@ -105,7 +123,7 @@ class CheckVehicleDocumentsExpiry extends Command
         $adriano = $recipients->get('Adriano Silve') ?? $recipients->get('Adriano Silva');
 
         if ($adriano !== null) {
-            Mail::to($adriano)->send(new VehicleDocumentAlertsSummaryMail($adriano, $alerts, $today));
+            $this->sendSummary($adriano, $alerts, $revisions, $today);
         }
 
         $tvdeAlerts = $alerts->filter(
@@ -113,8 +131,30 @@ class CheckVehicleDocumentsExpiry extends Command
         )->values();
         $marcos = $recipients->get('Marcos Borges');
 
-        if ($marcos !== null && $tvdeAlerts->isNotEmpty()) {
-            Mail::to($marcos)->send(new VehicleDocumentAlertsSummaryMail($marcos, $tvdeAlerts, $today));
+        if ($marcos !== null) {
+            $this->sendSummary($marcos, $tvdeAlerts, $revisions->filter(fn (array $revision): bool => $revision['vehicle']->source === 'tvde')->values(), $today);
+        }
+    }
+
+    private function sendSummary(User $recipient, Collection $alerts, \Illuminate\Support\Collection $revisions, Carbon $today): void
+    {
+        $sentCycles = VehicleRevisionReminder::query()->where('user_id', $recipient->id)
+            ->whereDate('sent_on', $today)->pluck('cycle');
+        $revisions = $revisions->reject(fn (array $revision): bool => $sentCycles->contains($revision['cycle']))->values();
+
+        if ($alerts->isEmpty() && $revisions->isEmpty()) {
+            return;
+        }
+
+        Mail::to($recipient)->send(new VehicleDocumentAlertsSummaryMail($recipient, $alerts, $today, $revisions));
+
+        foreach ($revisions as $revision) {
+            VehicleRevisionReminder::query()->firstOrCreate([
+                'vehicle_revision_id' => $revision['revision_id'],
+                'user_id' => $recipient->id,
+                'cycle' => $revision['cycle'],
+                'sent_on' => $today->toDateString(),
+            ]);
         }
     }
 

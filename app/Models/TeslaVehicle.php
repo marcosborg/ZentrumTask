@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -45,6 +46,14 @@ class TeslaVehicle extends Model
     public function latestSnapshot(): HasOne
     {
         return $this->hasOne(TeslaVehicleSnapshot::class)->latestOfMany('recorded_at');
+    }
+
+    public function latestOdometerSnapshot(): HasOne
+    {
+        return $this->hasOne(TeslaVehicleSnapshot::class)->ofMany(
+            ['recorded_at' => 'max', 'id' => 'max'],
+            fn (Builder $query): Builder => $query->where('odometer', '>=', 0)->where('recorded_at', '<=', now()),
+        );
     }
 
     public function chargingEvents(): HasMany
