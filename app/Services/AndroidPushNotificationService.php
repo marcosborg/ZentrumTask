@@ -218,6 +218,10 @@ class AndroidPushNotificationService
                 'phone' => (string) data_get($task->meta ?? [], 'phone', ''),
                 'contact_name' => (string) data_get($task->meta ?? [], 'contact_name', ''),
             ],
+            'apns' => [
+                'headers' => ['apns-push-type' => 'alert', 'apns-priority' => '10'],
+                'payload' => ['aps' => ['sound' => 'default']],
+            ],
             'android' => [
                 'priority' => 'high',
                 'notification' => [
@@ -243,7 +247,7 @@ class AndroidPushNotificationService
     protected function resolveTokens(Task $task): Collection
     {
         $assignedTokens = AppDeviceToken::query()
-            ->where('platform', 'android')
+            ->whereIn('platform', ['android', 'ios'])
             ->when(
                 $task->assigned_to_id,
                 fn ($query) => $query->where('user_id', $task->assigned_to_id)
@@ -256,7 +260,7 @@ class AndroidPushNotificationService
         }
 
         return AppDeviceToken::query()
-            ->where('platform', 'android')
+            ->whereIn('platform', ['android', 'ios'])
             ->orderByDesc('last_used_at')
             ->get()
             ->unique('token_hash')
