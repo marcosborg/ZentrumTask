@@ -75,6 +75,8 @@ it('uses the local tunnel address rather than a legacy production host or URL', 
 it('persists management data across deployments and enables private S3 backups', function (): void {
     $script = file_get_contents(base_path('scripts/deploy-lightsail.sh'));
     expect($script)->toContain('source=${DATABASE_MANAGEMENT_DIRECTORY},target=/var/www/html/storage/app/private/database-management')
+        ->toContain('source=${FIREBASE_DIRECTORY},target=/var/www/html/storage/app/private/firebase,readonly')
+        ->toContain('FCM_SERVICE_ACCOUNT=firebase/firebase-service-account.json')
         ->toContain('DB_BACKUP_DISK=s3')->toContain('DB_MODE=production');
 });
 

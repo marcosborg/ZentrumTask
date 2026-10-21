@@ -9,6 +9,7 @@ CONTAINERS=("$WEB_CONTAINER" "$WORKER_CONTAINER" "$SCHEDULER_CONTAINER")
 DOCKER_NETWORK="zentrum-tvde-net"
 DOCKER_HOST_GATEWAY="172.30.50.1"
 DATABASE_MANAGEMENT_DIRECTORY="/var/lib/zentrum/database-management"
+FIREBASE_DIRECTORY="/var/lib/zentrum/firebase"
 
 declare -A previous_images
 temporary_directory="$(mktemp -d)"
@@ -25,6 +26,7 @@ start_container() {
     local environment_file="$temporary_directory/${name}.env"
     local arguments=(--detach --name "$name" --restart always --network "$DOCKER_NETWORK" --add-host "host.docker.internal:${DOCKER_HOST_GATEWAY}" --env-file "$environment_file")
     arguments+=(--mount "type=bind,source=${DATABASE_MANAGEMENT_DIRECTORY},target=/var/www/html/storage/app/private/database-management")
+    arguments+=(--mount "type=bind,source=${FIREBASE_DIRECTORY},target=/var/www/html/storage/app/private/firebase,readonly")
 
     if [[ "$name" == "$WEB_CONTAINER" ]]; then
         arguments+=(--publish 127.0.0.1:8080:80)
@@ -58,13 +60,16 @@ trap cleanup EXIT
 sudo mkdir -p "$DATABASE_MANAGEMENT_DIRECTORY"
 sudo chown 33:33 "$DATABASE_MANAGEMENT_DIRECTORY"
 sudo chmod 700 "$DATABASE_MANAGEMENT_DIRECTORY"
+sudo mkdir -p "$FIREBASE_DIRECTORY"
+sudo chown 33:33 "$FIREBASE_DIRECTORY"
+sudo chmod 700 "$FIREBASE_DIRECTORY"
 
 for name in "${CONTAINERS[@]}"; do
     previous_images["$name"]="$(sudo docker inspect "$name" --format '{{.Config.Image}}')"
     sudo docker inspect "$name" --format '{{range .Config.Env}}{{println .}}{{end}}' > "$temporary_directory/${name}.env"
     chmod 600 "$temporary_directory/${name}.env"
-    sed -i '/^DB_MODE=/d; /^DB_BACKUP_DISK=/d' "$temporary_directory/${name}.env"
-    printf 'DB_MODE=production\nDB_BACKUP_DISK=s3\n' >> "$temporary_directory/${name}.env"
+    sed -i '/^DB_MODE=/d; /^DB_BACKUP_DISK=/d; /^FCM_SERVICE_ACCOUNT=/d' "$temporary_directory/${name}.env"
+    printf 'DB_MODE=production\nDB_BACKUP_DISK=s3\nFCM_SERVICE_ACCOUNT=firebase/firebase-service-account.json\n' >> "$temporary_directory/${name}.env"
 done
 
 for legacy_name in zentrum-web zentrum-worker zentrum-scheduler; do
@@ -79,6 +84,7 @@ sudo docker run --rm \
     --add-host "host.docker.internal:${DOCKER_HOST_GATEWAY}" \
     --env-file "$temporary_directory/${WEB_CONTAINER}.env" \
     --mount "type=bind,source=${DATABASE_MANAGEMENT_DIRECTORY},target=/var/www/html/storage/app/private/database-management" \
+    --mount "type=bind,source=${FIREBASE_DIRECTORY},target=/var/www/html/storage/app/private/firebase,readonly" \
     "$IMAGE_URI" php artisan migrate --force
 
 echo "Checking the new image before switching production traffic."
@@ -89,6 +95,7 @@ sudo docker run --detach \
     --add-host "host.docker.internal:${DOCKER_HOST_GATEWAY}" \
     --env-file "$temporary_directory/${WEB_CONTAINER}.env" \
     --publish 127.0.0.1:8081:80 \
+    --mount "type=bind,source=${FIREBASE_DIRECTORY},target=/var/www/html/storage/app/private/firebase,readonly" \
     "$IMAGE_URI" web >/dev/null
 
 for _ in {1..30}; do
