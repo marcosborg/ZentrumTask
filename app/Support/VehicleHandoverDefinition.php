@@ -119,6 +119,7 @@ class VehicleHandoverDefinition
         return [
             'delivery' => 'Entrega',
             'return' => 'Devolucao',
+            'inspection' => 'Inspeção',
         ];
     }
 }

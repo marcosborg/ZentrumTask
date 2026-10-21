@@ -44,10 +44,12 @@ class VehicleHandoverProcedureForm
                             ->options([
                                 'delivery' => 'Entrega',
                                 'return' => 'Devolucao',
+                                'inspection' => 'Inspeção',
                             ])
                             ->required()
                             ->native(false)
-                            ->default('delivery'),
+                            ->live()
+                            ->default(fn (): string => request()->query('type') === 'inspection' ? 'inspection' : 'delivery'),
                         DateTimePicker::make('performed_at')
                             ->label('Data e hora')
                             ->required()
@@ -279,7 +281,7 @@ class VehicleHandoverProcedureForm
                         ViewField::make('driver_signature_data_url')
                             ->label('Assinatura do motorista')
                             ->required()
-                            ->disabled()
+                            ->disabled(fn (Get $get, ?VehicleHandoverProcedure $record): bool => $record !== null || $get('type') !== 'inspection')
                             ->view('filament.forms.components.signature-pad'),
                     ]),
             ]);

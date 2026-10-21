@@ -217,7 +217,7 @@ class VehicleHandoverProcedureService
                 $vehicle->update(['status' => 'available']);
                 $procedure->closed_allocation_id = $allocation->id;
                 $procedure->allocation_effective_end_date = $performedAt->toDateString();
-            } else {
+            } elseif ($procedure->type === 'delivery') {
                 $allocation = VehicleAllocation::query()->create([
                     'vehicle_id' => $vehicle->id, 'driver_id' => $driver->id,
                     'starts_at' => $performedAt->copy()->startOfDay()->addDay(), 'status' => 'active',
@@ -615,16 +615,16 @@ class VehicleHandoverProcedureService
 
     protected function guardBusinessRules(string $type, Vehicle $vehicle, Driver $driver): void
     {
-        if (! in_array($type, ['delivery', 'return'], true)) {
+        if (! in_array($type, array_keys(VehicleHandoverDefinition::typeLabels()), true)) {
             throw ValidationException::withMessages([
                 'type' => 'Tipo de procedimento invalido.',
             ]);
         }
 
-        if ($type === 'return') {
+        if (in_array($type, ['return', 'inspection'], true)) {
             if (! $vehicle->currentAllocation) {
                 throw ValidationException::withMessages([
-                    'vehicle_id' => 'A devolucao exige uma viatura com motorista atribuido.',
+                    'vehicle_id' => 'A devolucao ou inspecao exige uma viatura com motorista atribuido.',
                 ]);
             }
 

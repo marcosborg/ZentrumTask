@@ -21,9 +21,11 @@ class VehicleHandoverProcedureInfolist
                     ->components([
                         TextEntry::make('type')
                             ->label('Tipo')
-                            ->formatStateUsing(fn (string $state): string => $state === 'delivery' ? 'Entrega' : 'Devolucao')
+                            ->formatStateUsing(fn (string $state): string => \App\Support\VehicleHandoverDefinition::typeLabels()[$state] ?? $state)
                             ->badge()
-                            ->color(fn (string $state): string => $state === 'delivery' ? 'success' : 'warning'),
+                            ->color(fn (string $state): string => match ($state) {
+                                'delivery' => 'success', 'inspection' => 'info', default => 'warning'
+                            }),
                         TextEntry::make('performed_at')
                             ->label('Executado em')
                             ->dateTime('d/m/Y H:i'),

@@ -22,8 +22,10 @@ class VehicleHandoverProceduresTable
                 TextColumn::make('type')
                     ->label('Tipo')
                     ->badge()
-                    ->color(fn (string $state): string => $state === 'delivery' ? 'success' : 'warning')
-                    ->formatStateUsing(fn (string $state): string => $state === 'delivery' ? 'Entrega' : 'Devolucao'),
+                    ->color(fn (string $state): string => match ($state) {
+                        'delivery' => 'success', 'inspection' => 'info', default => 'warning'
+                    })
+                    ->formatStateUsing(fn (string $state): string => \App\Support\VehicleHandoverDefinition::typeLabels()[$state] ?? $state),
                 TextColumn::make('status')
                     ->label('Estado')
                     ->badge()
@@ -63,6 +65,7 @@ class VehicleHandoverProceduresTable
                     ->options([
                         'delivery' => 'Entrega',
                         'return' => 'Devolucao',
+                        'inspection' => 'Inspeção',
                     ]),
                 SelectFilter::make('status')->label('Estado')->options(['draft' => 'Rascunho', 'completed' => 'Concluido']),
             ])

@@ -44,7 +44,7 @@
 <div class="handover-doc">
     <div class="handover-doc__hero">
         <div>
-            <div class="handover-doc__eyebrow">{{ ($typeLabels[$procedure->type] ?? $procedure->type) === 'Entrega' ? 'Entrega de viatura' : 'Devolucao de viatura' }}</div>
+            <div class="handover-doc__eyebrow">{{ $typeLabels[$procedure->type] ?? $procedure->type }} de viatura</div>
             <h1>{{ $typeLabels[$procedure->type] ?? $procedure->type }}</h1>
             <p>Executado em {{ optional($procedure->performed_at)->format('d/m/Y H:i') }}</p>
         </div>
