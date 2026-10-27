@@ -58,9 +58,10 @@ class VehicleRevisionService
     public function summary(Vehicle $vehicle): ?array
     {
         $vehicle->loadMissing($this->relations());
-        $completed = $vehicle->revisions->whereNotNull('completed_at')->sortBy([['completed_at', 'desc'], ['id', 'desc']])->first();
-        $scheduled = $vehicle->revisions->whereNull('completed_at')
-            ->filter(fn (VehicleRevision $revision): bool => $revision->scheduled_at !== null && ($completed === null || $revision->scheduled_at->gte($completed->completed_at)))
+        $completed = $vehicle->revisions->filter(fn (VehicleRevision $revision): bool => $revision->isRecorded())
+            ->sortByDesc(fn (VehicleRevision $revision): string => ($revision->completed_at ?? $revision->created_at)->toDateString().sprintf('%020d', $revision->id))->first();
+        $scheduled = $vehicle->revisions->reject(fn (VehicleRevision $revision): bool => $revision->isRecorded())
+            ->filter(fn (VehicleRevision $revision): bool => $revision->scheduled_at !== null && ($completed === null || $revision->scheduled_at->gte(($completed->completed_at ?? $completed->created_at)->copy()->startOfDay())))
             ->sortBy([['scheduled_at', 'asc'], ['id', 'desc']])->first();
         $revision = $completed ?? $scheduled;
 

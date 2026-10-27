@@ -107,13 +107,10 @@ it('rejects invalid revisions', function (array $attributes): void {
     expect(fn () => VehicleRevision::factory()->for($this->vehicle)->create($attributes))->toThrow(ValidationException::class);
 })->with([
     'future completion' => [['completed_at' => '2026-10-22']],
-    'missing limits' => [['next_odometer' => null, 'interval_years' => null]],
-    'missing odometer' => [['odometer' => null]],
     'lower next odometer' => [['next_odometer' => 79999]],
     'equal next odometer' => [['next_odometer' => 80000]],
     'zero years' => [['interval_years' => 0]],
     'fractional years' => [['interval_years' => 1.5]],
-    'missing dates' => [['completed_at' => null, 'scheduled_at' => null]],
 ]);
 
 it('emails revisions alone daily with recipient filtering and same-day deduplication', function (): void {
@@ -199,8 +196,6 @@ it('validates completion data in the Filament form', function (array $data, arra
     expect($scheduled->fresh()->completed_at)->toBeNull();
 })->with([
     'future date' => [['completed_at' => '2026-10-22'], ['completed_at']],
-    'missing completion' => [['completed_at' => null], ['completed_at']],
-    'missing limits' => [['next_odometer' => null, 'interval_years' => null], ['next_odometer', 'interval_years']],
     'lower kilometres' => [['next_odometer' => 80000], ['next_odometer']],
 ]);
 
@@ -246,4 +241,53 @@ it('uses a dated Tesla vehicle reading and ignores future snapshots', function (
     $tesla->snapshots()->create(['recorded_at' => '2026-10-20 00:00:00', 'odometer' => 100000, 'raw_payload' => []]);
     $tesla->snapshots()->create(['recorded_at' => '2026-10-22 00:00:00', 'odometer' => 102000, 'raw_payload' => []]);
     expect($this->service->odometer($this->vehicle->fresh())['value'])->toBe(101000.0);
+});
+
+it('accepts optional revision fields through creation and editing', function (array $values): void {
+    $this->actingAs(User::factory()->create());
+    Filament::setCurrentPanel(Filament::getPanel('admin'));
+    $data = array_replace(['scheduled_at' => null, 'completed_at' => null, 'odometer' => null, 'next_odometer' => null, 'interval_years' => null, 'notes' => null], $values);
+    $component = Livewire::test(RevisionsRelationManager::class, ['ownerRecord' => $this->vehicle, 'pageClass' => EditVehicle::class]);
+    $component->callTableAction('create', data: $data)->assertHasNoTableActionErrors();
+    $revision = $this->vehicle->revisions()->sole();
+    expect($revision->completed_at?->toDateString())->toBe($data['completed_at'])->and($revision->odometer)->toBe($data['odometer']);
+    $component->callTableAction('edit', $revision, data: $data)->assertHasNoTableActionErrors();
+})->with([
+    'kilometres only' => [['odometer' => 80000]],
+    'date only' => [['completed_at' => '2026-10-01']],
+    'next kilometres only' => [['next_odometer' => 95000]],
+    'empty' => [[]],
+]);
+
+it('allows completing a scheduled revision with only kilometres', function (): void {
+    $this->actingAs(User::factory()->create());
+    Filament::setCurrentPanel(Filament::getPanel('admin'));
+    $revision = VehicleRevision::factory()->for($this->vehicle)->scheduled()->create();
+    Livewire::test(RevisionsRelationManager::class, ['ownerRecord' => $this->vehicle, 'pageClass' => EditVehicle::class])
+        ->callTableAction('complete', $revision, data: ['completed_at' => null, 'odometer' => 90000, 'next_odometer' => null, 'interval_years' => null])
+        ->assertHasNoTableActionErrors();
+    expect($revision->fresh()->completed_at)->toBeNull()->and($revision->fresh()->isRecorded())->toBeTrue()
+        ->and($this->service->summary($this->vehicle->fresh())['reasons'])->toBe([]);
+});
+
+it('calculates alerts only from available revision information', function (array $values, ?string $reason): void {
+    $revision = $this->vehicle->revisions()->create($values);
+    $summary = $this->service->summary($this->vehicle->fresh());
+    expect($summary['reasons'] ?? [])->toBe($reason ? [$reason] : []);
+    if ($revision->completed_at === null) {
+        expect($summary['due_at'] ?? null)->toBeNull();
+    }
+})->with([
+    'km alert without date' => [['odometer' => 80000, 'next_odometer' => 95000, 'interval_years' => 1], 'Faltam até 5.000 km'],
+    'date alert without km' => [['completed_at' => '2025-10-20', 'interval_years' => 1], 'Prazo de revisão atingido'],
+    'last km without next limit' => [['odometer' => 80000], null],
+    'date without interval' => [['completed_at' => '2025-10-20'], null],
+    'empty record' => [[], null],
+]);
+
+it('uses an undated revision as the current cycle without reviving an older dated alert', function (): void {
+    VehicleRevision::factory()->for($this->vehicle)->create(['completed_at' => '2025-10-20']);
+    $latest = $this->vehicle->revisions()->create(['odometer' => 90000, 'next_odometer' => 120000]);
+    $summary = $this->service->summary($this->vehicle->fresh());
+    expect($summary['revision_id'])->toBe($latest->id)->and($summary['reasons'])->toBe([]);
 });

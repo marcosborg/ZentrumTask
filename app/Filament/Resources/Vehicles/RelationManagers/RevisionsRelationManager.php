@@ -61,20 +61,17 @@ class RevisionsRelationManager extends RelationManager
     }
 
     /** @return array<\Filament\Schemas\Components\Component> */
-    protected function revisionFields(bool $complete = false): array
+    protected function revisionFields(): array
     {
         return [
-            DatePicker::make('scheduled_at')->label('Data agendada')->requiredWithout('completed_at')->native(false),
-            DatePicker::make('completed_at')->label('Data realizada')->maxDate(today())->required($complete)->requiredWithout('scheduled_at')->live()->native(false),
-            TextInput::make('odometer')->label('Quilómetros na realização')->integer()->minValue(0)->maxValue(4294967295)
-                ->required(fn (Get $get): bool => filled($get('completed_at'))),
+            DatePicker::make('scheduled_at')->label('Data agendada')->native(false),
+            DatePicker::make('completed_at')->label('Data realizada')->maxDate(today())->native(false),
+            TextInput::make('odometer')->label('Quilómetros na realização')->integer()->minValue(0)->maxValue(4294967295),
             TextInput::make('next_odometer')->label('Quilómetros da próxima revisão')->helperText('Total do conta-quilómetros, por exemplo 120000.')
                 ->integer()->minValue(1)->maxValue(4294967295)
-                ->gt('odometer')
-                ->required(fn (Get $get): bool => filled($get('completed_at')) && blank($get('interval_years'))),
+                ->gt(fn (Get $get): ?string => filled($get('odometer')) ? 'odometer' : null),
             TextInput::make('interval_years')->label('Anos até à próxima revisão')->default(1)->integer()->minValue(1)->maxValue(100)
-                ->helperText('Deixe vazio para controlar apenas por quilómetros.')
-                ->required(fn (Get $get): bool => filled($get('completed_at')) && blank($get('next_odometer'))),
+                ->helperText('Deixe vazio para controlar apenas por quilómetros.'),
             Textarea::make('notes')->label('Notas')->columnSpanFull(),
         ];
     }
@@ -96,23 +93,23 @@ class RevisionsRelationManager extends RelationManager
             ->columns([
                 TextColumn::make('scheduled_at')->label('Agendada')->date('d/m/Y')->sortable(),
                 TextColumn::make('completed_at')->label('Realizada')->date('d/m/Y')->sortable(),
-                TextColumn::make('state')->label('Estado')->state(fn (VehicleRevision $record): string => $record->completed_at ? 'Realizada' : 'Agendada')->badge(),
+                TextColumn::make('state')->label('Estado')->state(fn (VehicleRevision $record): string => $record->isRecorded() ? 'Registada' : ($record->scheduled_at ? 'Agendada' : 'Por preencher'))->badge(),
                 TextColumn::make('odometer')->label('Km na realização')->numeric(decimalPlaces: 0),
                 TextColumn::make('next_odometer')->label('Próxima revisão (km)')->numeric(decimalPlaces: 0),
                 TextColumn::make('next_date')->label('Próxima revisão (data)')->state(fn (VehicleRevision $record): ?\Illuminate\Support\Carbon => app(VehicleRevisionService::class)->nextDate($record))->date('d/m/Y'),
                 TextColumn::make('notes')->label('Notas')->limit(60)->toggleable(),
             ])
             ->headerActions([
-                CreateAction::make()->label('Registar revisão')->authorize(fn (): bool => $this->canCreate())->fillForm(['completed_at' => today()->toDateString(), 'interval_years' => 1]),
+                CreateAction::make()->label('Registar revisão')->authorize(fn (): bool => $this->canCreate())->fillForm(['interval_years' => 1]),
                 CreateAction::make('schedule')->label('Agendar revisão')->authorize(fn (): bool => $this->canCreate())->schema([
-                    DatePicker::make('scheduled_at')->label('Data agendada')->required()->native(false),
+                    DatePicker::make('scheduled_at')->label('Data agendada')->native(false),
                     Textarea::make('notes')->label('Notas'),
                 ]),
             ])
             ->recordActions([
-                Action::make('complete')->label('Concluir')->visible(fn (VehicleRevision $record): bool => $record->completed_at === null)
+                Action::make('complete')->label('Concluir')->visible(fn (VehicleRevision $record): bool => ! $record->isRecorded())
                     ->authorize(fn (VehicleRevision $record): bool => $this->canEdit($record))
-                    ->schema($this->revisionFields(true))
+                    ->schema($this->revisionFields())
                     ->fillForm(fn (VehicleRevision $record): array => [...$record->attributesToArray(), 'completed_at' => today()->toDateString(), 'interval_years' => $record->interval_years ?? 1])
                     ->action(function (VehicleRevision $record, array $data): void {
                         abort_unless($this->canEdit($record), 403);
