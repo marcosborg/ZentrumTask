@@ -211,14 +211,21 @@ class VehicleHandoverProcedureService
             if (! $definition) {
                 throw ValidationException::withMessages(['key' => 'Zona fotografica invalida.']);
             }
+            $path = $this->storeSinglePhoto($media, 'vehicle-handovers/guided-photos');
+            if (! $path) {
+                throw ValidationException::withMessages(['media' => 'Nao foi possivel guardar a fotografia. Tenta novamente.']);
+            }
             $items = (array) $procedure->guided_photo_items;
             $items[$key] = [
                 'label' => $definition['label'], 'view' => $definition['view'], 'required' => false,
-                'photo_path' => $this->storeSinglePhoto($media, 'vehicle-handovers/guided-photos'),
+                'photo_path' => $path,
             ];
             $procedure->update(['guided_photo_items' => $items, 'last_synced_at' => now()]);
         } elseif ($kind === 'video' && in_array($key, ['exterior', 'interior', 'general'], true)) {
             $path = $this->storeSingleVideo($media);
+            if ($media instanceof UploadedFile && ! $path) {
+                throw ValidationException::withMessages(['media' => 'Nao foi possivel guardar o video. Tenta novamente.']);
+            }
             $url = $path ? Storage::disk('public')->url($path) : null;
             $items = (array) $procedure->video_items;
             $items[$key] = [
@@ -864,6 +871,16 @@ class VehicleHandoverProcedureService
 
     protected function storeSinglePhoto(mixed $photo, string $directory): ?string
     {
+        if ($photo instanceof UploadedFile) {
+            try {
+                return $photo->store($directory, 'public') ?: null;
+            } catch (Throwable $exception) {
+                $this->logMediaFailure('photo', $exception, ['directory' => $directory]);
+
+                return null;
+            }
+        }
+
         if (! is_string($photo) || trim($photo) === '') {
             return null;
         }

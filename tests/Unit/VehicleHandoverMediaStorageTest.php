@@ -48,3 +48,15 @@ it('ignores handover videos that cannot be stored instead of failing the save', 
 
     expect($service->storeVideoForTest($missingVideo))->toBeNull();
 });
+
+it('stores multipart photos without converting them to base64', function () {
+    Storage::fake('public');
+    $path = (new TestVehicleHandoverProcedureService)->storePhotoForTest(UploadedFile::fake()->image('front.jpg'));
+    expect($path)->toBeString();
+    Storage::disk('public')->assertExists($path);
+});
+
+it('does not confirm a draft photo when storage failed', function () {
+    $draft = new \App\Models\VehicleHandoverProcedure(['status' => 'draft']);
+    (new TestVehicleHandoverProcedureService)->storeDraftMedia($draft, 'photo', 'wheel_front_left', 'data:image/png;base64,invalid-base64');
+})->throws(\Illuminate\Validation\ValidationException::class);

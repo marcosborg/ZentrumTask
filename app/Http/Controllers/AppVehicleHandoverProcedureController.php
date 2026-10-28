@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\StoreVehicleHandoverDraftMediaRequest;
 use App\Http\Requests\StoreVehicleHandoverMediaRequest;
 use App\Models\Driver;
 use App\Models\Vehicle;
@@ -132,7 +133,7 @@ class AppVehicleHandoverProcedureController extends AppApiController
         return $this->corsJson(['procedure' => $this->serializeProcedureDetail($procedure)]);
     }
 
-    public function storeDraftMedia(Request $request, VehicleHandoverProcedure $vehicleHandoverProcedure): JsonResponse
+    public function storeDraftMedia(StoreVehicleHandoverDraftMediaRequest $request, VehicleHandoverProcedure $vehicleHandoverProcedure): JsonResponse
     {
         $user = $this->resolveAppUser($request);
         if (! $user || $vehicleHandoverProcedure->operator_user_id !== $user->id) {

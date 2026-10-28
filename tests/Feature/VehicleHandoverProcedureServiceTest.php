@@ -40,6 +40,9 @@ it('uploads wheel photos and saves replaces and removes the general video throug
         ])->assertSuccessful();
         Storage::disk('public')->assertExists($draft->refresh()->video_items[$key]['video_path']);
     }
+    $this->withToken($token)->postJson($endpoint, [
+        'kind' => 'video', 'key' => 'general', 'media' => UploadedFile::fake()->create('large.mp4', 32 * 1024 + 1, 'video/mp4'),
+    ])->assertUnprocessable()->assertHeader('Access-Control-Allow-Origin', '*')->assertJsonValidationErrors('media');
     expect($draft->video_items['general']['label'])->toBe('Video geral');
     $exteriorPath = $draft->video_items['exterior']['video_path'];
     $this->withToken($token)->post($endpoint, ['kind' => 'video', 'key' => 'general', 'media' => ''])->assertSuccessful();

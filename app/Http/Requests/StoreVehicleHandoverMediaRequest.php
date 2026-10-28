@@ -23,7 +23,7 @@ class StoreVehicleHandoverMediaRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'video' => ['required', File::types(['mp4', 'webm', 'mov'])->max('15mb')],
+            'video' => ['required', File::types(['mp4', 'webm', 'mov'])->max(32 * 1024)],
         ];
     }
 
@@ -35,7 +35,7 @@ class StoreVehicleHandoverMediaRequest extends FormRequest
         return [
             'video.required' => 'Seleciona um video para enviar.',
             'video.mimes' => 'O formato do video nao e suportado.',
-            'video.max' => 'O video nao pode exceder 15 MB.',
+            'video.max' => 'O video nao pode exceder 32 MB.',
         ];
     }
 }
