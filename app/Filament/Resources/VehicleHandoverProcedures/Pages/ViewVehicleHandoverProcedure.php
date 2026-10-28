@@ -18,6 +18,7 @@ class ViewVehicleHandoverProcedure extends ViewRecord
     {
         return [
             EditAction::make(),
+            VehicleHandoverProcedureResource::deleteAction(),
             Action::make('regeneratePdf')
                 ->label('Regenerar PDF')
                 ->icon('heroicon-o-arrow-path')

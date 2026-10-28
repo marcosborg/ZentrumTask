@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\VehicleHandoverProcedures\Tables;
 
+use App\Filament\Resources\VehicleHandoverProcedures\VehicleHandoverProcedureResource;
 use Filament\Actions\EditAction;
 use Filament\Actions\ViewAction;
 use Filament\Tables\Columns\TextColumn;
@@ -72,6 +73,7 @@ class VehicleHandoverProceduresTable
             ->recordActions([
                 EditAction::make(),
                 ViewAction::make(),
+                VehicleHandoverProcedureResource::deleteAction(),
             ]);
     }
 }

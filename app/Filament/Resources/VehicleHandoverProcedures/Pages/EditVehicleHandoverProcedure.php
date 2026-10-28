@@ -72,6 +72,7 @@ class EditVehicleHandoverProcedure extends EditRecord
                     }
                 }),
             ViewAction::make(),
+            VehicleHandoverProcedureResource::deleteAction(),
         ];
     }
 }

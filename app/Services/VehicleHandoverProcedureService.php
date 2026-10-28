@@ -250,6 +250,53 @@ class VehicleHandoverProcedureService
         $procedure->delete();
     }
 
+    public function deleteWithAllocationRestoration(VehicleHandoverProcedure $procedure): bool
+    {
+        return $procedure->getConnection()->transaction(function () use ($procedure): bool {
+            $procedure = VehicleHandoverProcedure::query()->lockForUpdate()->findOrFail($procedure->id);
+
+            if ($procedure->type === 'return' && $procedure->status === 'completed') {
+                if (! $procedure->closed_allocation_id) {
+                    throw ValidationException::withMessages(['allocation' => 'Nao e possivel repor: este auto nao identifica a alocacao anterior.']);
+                }
+
+                $vehicle = Vehicle::query()->lockForUpdate()->findOrFail($procedure->vehicle_id);
+                Driver::query()->lockForUpdate()->findOrFail($procedure->driver_id);
+                $allocation = VehicleAllocation::query()->lockForUpdate()->findOrFail($procedure->closed_allocation_id);
+
+                $hasLaterProcedure = VehicleHandoverProcedure::query()
+                    ->whereKeyNot($procedure->id)
+                    ->where('status', 'completed')
+                    ->where(fn ($query) => $query->where('vehicle_id', $procedure->vehicle_id)->orWhere('driver_id', $procedure->driver_id))
+                    ->where(fn ($query) => $query->where('performed_at', '>', $procedure->performed_at)
+                        ->orWhere(fn ($query) => $query->where('performed_at', $procedure->performed_at)->where('id', '>', $procedure->id)))
+                    ->exists();
+
+                $hasConflictingAllocation = VehicleAllocation::query()
+                    ->whereKeyNot($allocation->id)
+                    ->where(fn ($query) => $query->where('vehicle_id', $procedure->vehicle_id)->orWhere('driver_id', $procedure->driver_id))
+                    ->where(fn ($query) => $query->whereNull('ends_at')->orWhere('ends_at', '>', $allocation->ends_at ?? $procedure->performed_at))
+                    ->exists();
+
+                if ($hasLaterProcedure || $hasConflictingAllocation
+                    || $allocation->vehicle_id !== $procedure->vehicle_id
+                    || $allocation->driver_id !== $procedure->driver_id
+                    || $allocation->status !== 'completed' || ! $allocation->ends_at
+                    || $allocation->ends_at->toDateString() !== $procedure->allocation_effective_end_date?->toDateString()
+                    || $vehicle->status !== 'available') {
+                    throw ValidationException::withMessages([
+                        'allocation' => 'Nao e possivel eliminar: existem movimentos posteriores ou a alocacao foi alterada. Resolva esses movimentos primeiro.',
+                    ]);
+                }
+
+                $allocation->update(['ends_at' => null, 'status' => 'active']);
+                $vehicle->update(['status' => 'allocated']);
+            }
+
+            return (bool) $procedure->delete();
+        });
+    }
+
     public function completeDraft(VehicleHandoverProcedure $procedure, User $operator): VehicleHandoverProcedure
     {
         $procedure = DB::transaction(function () use ($procedure): VehicleHandoverProcedure {
@@ -269,10 +316,11 @@ class VehicleHandoverProcedureService
 
             if ($procedure->type === 'return') {
                 $allocation = VehicleAllocation::query()->active()->where('vehicle_id', $vehicle->id)->where('driver_id', $driver->id)->firstOrFail();
-                $allocation->update(['ends_at' => $performedAt, 'status' => 'completed']);
+                $effectiveEnd = $performedAt->copy()->subDay()->endOfDay();
+                $allocation->update(['ends_at' => $effectiveEnd, 'status' => 'completed']);
                 $vehicle->update(['status' => 'available']);
                 $procedure->closed_allocation_id = $allocation->id;
-                $procedure->allocation_effective_end_date = $performedAt->toDateString();
+                $procedure->allocation_effective_end_date = $effectiveEnd->toDateString();
             } elseif ($procedure->type === 'delivery') {
                 $allocation = VehicleAllocation::query()->create([
                     'vehicle_id' => $vehicle->id, 'driver_id' => $driver->id,
@@ -424,8 +472,9 @@ class VehicleHandoverProcedureService
                 ->first();
 
             if ($allocation) {
+                $effectiveEnd = $performedAt->copy()->subDay()->endOfDay();
                 $allocation->update([
-                    'ends_at' => $performedAt,
+                    'ends_at' => $effectiveEnd,
                     'status' => 'completed',
                 ]);
 
@@ -433,7 +482,7 @@ class VehicleHandoverProcedureService
 
                 $procedure->update([
                     'closed_allocation_id' => $allocation->id,
-                    'allocation_effective_end_date' => $performedAt->toDateString(),
+                    'allocation_effective_end_date' => $effectiveEnd->toDateString(),
                 ]);
             } else {
                 Log::warning('vehicle_handover_allocation_not_found', [

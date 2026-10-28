@@ -511,3 +511,45 @@ it('generates a workshop repair pdf when damages are registered', function () {
     expect($output)->toStartWith('%PDF')
         ->and(strlen($output))->toBeGreaterThan(1000);
 });
+
+it('leaves the exchange day without rental charges and preserves actual procedure dates', function (bool $draftFlow, string $date) {
+    $this->travelTo(\Illuminate\Support\Carbon::parse($date));
+    Mail::fake();
+    Storage::fake('public');
+    $operator = User::factory()->create();
+    $driver = Driver::factory()->create();
+    $oldVehicle = Vehicle::factory()->create(['status' => 'allocated']);
+    $newVehicle = Vehicle::factory()->create(['status' => 'available']);
+    $performedAt = \Illuminate\Support\Carbon::parse($date);
+    $allocation = VehicleAllocation::factory()->create([
+        'vehicle_id' => $oldVehicle->id, 'driver_id' => $driver->id,
+        'starts_at' => $performedAt->copy()->subDays(10)->startOfDay(), 'ends_at' => null, 'status' => 'active',
+    ]);
+    $service = app(VehicleHandoverProcedureService::class);
+    $procedures = [];
+    foreach (['return' => $oldVehicle, 'delivery' => $newVehicle] as $type => $vehicle) {
+        $data = [
+            'type' => $type, 'vehicle_id' => $vehicle->id, 'driver_id' => $driver->id,
+            'performed_at' => $date, 'operator_signature_data_url' => 'operator-signature',
+            'driver_signature_data_url' => 'driver-signature',
+        ];
+        if ($draftFlow) {
+            $draft = $service->createDraft($data, $operator);
+            $service->updateDraft($draft, $data);
+            $procedures[$type] = $service->completeDraft($draft, $operator);
+        } else {
+            $procedures[$type] = $service->create($data, $operator);
+        }
+    }
+    $previousDay = $performedAt->copy()->subDay();
+    $followingDay = $performedAt->copy()->addDay();
+    expect($allocation->refresh()->ends_at->format('Y-m-d H:i:s'))->toBe($previousDay->endOfDay()->format('Y-m-d H:i:s'))
+        ->and($procedures['return']->allocation_effective_end_date->toDateString())->toBe($previousDay->toDateString())
+        ->and($procedures['delivery']->createdAllocation->starts_at->format('Y-m-d H:i:s'))->toBe($followingDay->startOfDay()->format('Y-m-d H:i:s'));
+    foreach ($procedures as $procedure) {
+        expect($procedure->performed_at->format('Y-m-d H:i:s'))->toBe($date);
+    }
+    $billing = app(\App\Services\SettlementBillingResolver::class);
+    expect($billing->calculateRentalDays($driver, $performedAt->copy()->startOfDay(), $performedAt->copy()->endOfDay()))->toBe(0)
+        ->and($billing->calculateRentalDays($driver, $previousDay->copy()->startOfDay(), $followingDay->copy()->endOfDay()))->toBe(2);
+})->with([true, false])->with(['2026-10-28 16:45:00', '2026-03-01 00:00:00', '2027-01-01 23:59:00']);
