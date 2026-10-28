@@ -299,8 +299,13 @@ class VehicleHandoverProcedureService
 
     public function completeDraft(VehicleHandoverProcedure $procedure, User $operator): VehicleHandoverProcedure
     {
-        $procedure = DB::transaction(function () use ($procedure): VehicleHandoverProcedure {
-            $procedure->refresh();
+        $completedNow = false;
+        $procedure = $procedure->getConnection()->transaction(function () use ($procedure, &$completedNow): VehicleHandoverProcedure {
+            $procedure = VehicleHandoverProcedure::query()->lockForUpdate()->findOrFail($procedure->id);
+            if ($procedure->status === 'completed') {
+                return $procedure;
+            }
+
             $this->guardDraft($procedure);
             if (trim((string) $procedure->driver_signature_data_url) === '') {
                 throw ValidationException::withMessages(['driver_signature_data_url' => 'A assinatura do motorista e obrigatoria.']);
@@ -337,12 +342,22 @@ class VehicleHandoverProcedureService
             $procedure->completed_at = now();
             $procedure->last_synced_at = now();
             $procedure->save();
+            $completedNow = true;
 
             return $procedure->refresh();
         });
 
-        $this->generateArtifacts($procedure);
-        $this->sendProceduresMail(collect([$procedure]));
+        if ($completedNow) {
+            try {
+                $this->generateArtifacts($procedure);
+                $this->sendProceduresMail(collect([$procedure]));
+            } catch (Throwable $exception) {
+                Log::warning('vehicle_handover_artifacts_failed', [
+                    'procedure_id' => $procedure->id,
+                    'error' => $exception->getMessage(),
+                ]);
+            }
+        }
 
         return $procedure->refresh();
     }

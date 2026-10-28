@@ -407,8 +407,10 @@ it('completes a signed draft exactly once and creates the allocation', function 
         ->and($completed->completed_at)->not->toBeNull()
         ->and($completed->created_allocation_id)->not->toBeNull()
         ->and($vehicle->refresh()->status)->toBe('allocated');
-    expect(fn () => $service->completeDraft($completed, $operator))
-        ->toThrow(\Illuminate\Validation\ValidationException::class);
+    $retried = $service->completeDraft($completed, $operator);
+    expect($retried->id)->toBe($completed->id)
+        ->and($retried->created_allocation_id)->toBe($completed->created_allocation_id)
+        ->and(VehicleAllocation::query()->where('vehicle_id', $vehicle->id)->count())->toBe(1);
 
     Mail::assertSent(VehicleHandoverProceduresMail::class, function (VehicleHandoverProceduresMail $mail): bool {
         return $mail->hasTo('info@zentrum-tvde.com')
@@ -553,3 +555,48 @@ it('leaves the exchange day without rental charges and preserves actual procedur
     expect($billing->calculateRentalDays($driver, $performedAt->copy()->startOfDay(), $performedAt->copy()->endOfDay()))->toBe(0)
         ->and($billing->calculateRentalDays($driver, $previousDay->copy()->startOfDay(), $followingDay->copy()->endOfDay()))->toBe(2);
 })->with([true, false])->with(['2026-10-28 16:45:00', '2026-03-01 00:00:00', '2027-01-01 23:59:00']);
+
+it('returns the completed return on retry without requiring the closed allocation to be active', function () {
+    Mail::fake();
+    Storage::fake('public');
+    $operator = User::factory()->create();
+    $driver = Driver::factory()->create();
+    $vehicle = Vehicle::factory()->create(['status' => 'allocated']);
+    $allocation = VehicleAllocation::factory()->create([
+        'vehicle_id' => $vehicle->id, 'driver_id' => $driver->id,
+        'starts_at' => now()->subDays(10), 'ends_at' => null, 'status' => 'active',
+    ]);
+    $service = app(VehicleHandoverProcedureService::class);
+    $draft = $service->createDraft(['type' => 'return', 'vehicle_id' => $vehicle->id, 'driver_id' => $driver->id], $operator);
+    $service->updateDraft($draft, ['operator_signature_data_url' => 'operator', 'driver_signature_data_url' => 'driver']);
+    $staleDraft = $draft->fresh();
+    $completed = $service->completeDraft($draft, $operator);
+    $before = $allocation->refresh()->getAttributes();
+    $retried = $service->completeDraft($staleDraft, $operator);
+    expect($retried->id)->toBe($completed->id)
+        ->and($retried->status)->toBe('completed')
+        ->and($allocation->refresh()->getAttributes())->toBe($before);
+    Mail::assertSentCount(1);
+    $token = 'retry-return-token';
+    Cache::put('app_auth_token:'.$token, $operator->id, now()->addMinute());
+    $this->withToken($token)->postJson("/app/ops/vehicle-handovers/{$draft->id}/complete")
+        ->assertSuccessful()->assertJsonPath('procedure.status', 'completed');
+    Mail::assertSentCount(1);
+    Cache::put('app_auth_token:other-user', User::factory()->create()->id, now()->addMinute());
+    $this->withToken('other-user')->postJson("/app/ops/vehicle-handovers/{$draft->id}/complete")->assertNotFound();
+});
+
+it('keeps completion successful when document generation fails after committing the allocation', function () {
+    Mail::fake();
+    $operator = User::factory()->create();
+    $driver = Driver::factory()->create();
+    $vehicle = Vehicle::factory()->create(['status' => 'available']);
+    $service = Mockery::mock(VehicleHandoverProcedureService::class)->makePartial();
+    $service->shouldReceive('generateArtifacts')->once()->andThrow(new RuntimeException('PDF unavailable'));
+    $draft = $service->createDraft(['type' => 'delivery', 'vehicle_id' => $vehicle->id, 'driver_id' => $driver->id], $operator);
+    $service->updateDraft($draft, ['operator_signature_data_url' => 'operator', 'driver_signature_data_url' => 'driver']);
+    expect($service->completeDraft($draft, $operator)->status)->toBe('completed')
+        ->and($vehicle->refresh()->status)->toBe('allocated');
+    expect($service->completeDraft($draft, $operator)->status)->toBe('completed');
+    expect(VehicleAllocation::query()->where('vehicle_id', $vehicle->id)->count())->toBe(1);
+});
