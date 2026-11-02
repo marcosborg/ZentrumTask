@@ -25,7 +25,10 @@ use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
@@ -60,6 +63,10 @@ class TeslaIntegration extends Page implements HasTable
     /** @var list<int> */
     #[Locked]
     public array $pendingOdometerVehicleIds = [];
+
+    /** @var array<int, string> */
+    #[Locked]
+    public array $pendingOdometerReasons = [];
 
     #[Locked]
     public string $mileagePeriodStart = '';
@@ -216,6 +223,7 @@ class TeslaIntegration extends Page implements HasTable
                     $this->mileagePeriodStart = $data['period_start'];
                     $this->mileagePeriodEnd = $data['period_end'];
                     $this->pendingOdometerVehicleIds = [];
+                    $this->pendingOdometerReasons = [];
                     $created = 0;
 
                     $vehicles = $this->tvdeMileageVehicles();
@@ -227,6 +235,7 @@ class TeslaIntegration extends Page implements HasTable
 
                         if (! $tesla || str_contains(strtolower((string) $vehicle->model), 'ioniq')) {
                             $this->pendingOdometerVehicleIds[] = $vehicle->getKey();
+                            $this->pendingOdometerReasons[$vehicle->getKey()] = 'Viatura sem ligacao Tesla para recolha automatica.';
 
                             continue;
                         }
@@ -240,13 +249,21 @@ class TeslaIntegration extends Page implements HasTable
 
                             if (! is_numeric($snapshot->odometer)) {
                                 $this->pendingOdometerVehicleIds[] = $vehicle->getKey();
+                                $this->pendingOdometerReasons[$vehicle->getKey()] = 'A Tesla respondeu sem leitura do odometro.';
 
                                 continue;
                             }
 
                             $created++;
-                        } catch (Throwable) {
+                        } catch (Throwable $exception) {
                             $this->pendingOdometerVehicleIds[] = $vehicle->getKey();
+                            $this->pendingOdometerReasons[$vehicle->getKey()] = $this->odometerFailureReason($exception);
+                            Log::warning('Tesla fleet odometer snapshot failed.', [
+                                'vehicle_id' => $vehicle->getKey(),
+                                'tesla_vehicle_id' => $tesla->getKey(),
+                                'exception' => $exception::class,
+                                'reason' => $this->pendingOdometerReasons[$vehicle->getKey()],
+                            ]);
                         }
                     }
 
@@ -254,7 +271,7 @@ class TeslaIntegration extends Page implements HasTable
                     $this->resetTable();
 
                     Notification::make()
-                        ->success()
+                        ->status($this->pendingOdometerVehicleIds === [] ? 'success' : 'warning')
                         ->title('Recolha de km concluida')
                         ->body('Leituras obtidas: '.$created.'. Leituras manuais: '.count($this->pendingOdometerVehicleIds).'.')
                         ->send();
@@ -277,7 +294,7 @@ class TeslaIntegration extends Page implements HasTable
                 ->whereIn('id', $this->pendingOdometerVehicleIds)
                 ->map(fn (Vehicle $vehicle): TextInput => TextInput::make('odometers.'.$vehicle->getKey())
                     ->label($vehicle->license_plate.' — '.($vehicle->currentAllocation?->driver?->name ?? 'Sem condutor atribuido'))
-                    ->helperText($vehicle->displayName())
+                    ->helperText(trim($vehicle->displayName().' — '.($this->pendingOdometerReasons[$vehicle->getKey()] ?? '')))
                     ->numeric()
                     ->minValue(0)
                     ->required()
@@ -306,9 +323,33 @@ class TeslaIntegration extends Page implements HasTable
                 });
 
                 $this->pendingOdometerVehicleIds = [];
+                $this->pendingOdometerReasons = [];
 
                 Notification::make()->success()->title('Leituras manuais guardadas')->send();
             });
+    }
+
+    protected function odometerFailureReason(Throwable $exception): string
+    {
+        if ($exception instanceof RequestException) {
+            return match ($exception->response->status()) {
+                401 => 'Autorizacao Tesla expirada ou invalida. Volte a ligar a conta.',
+                403 => 'A Tesla recusou o acesso. Verifique as permissoes da conta e da viatura.',
+                408 => 'A viatura nao respondeu. Pode estar adormecida ou offline; acorde-a na app Tesla e tente novamente.',
+                429 => 'Limite de pedidos da Tesla atingido. Tente novamente mais tarde.',
+                default => 'Falha da API Tesla (HTTP '.$exception->response->status().').',
+            };
+        }
+
+        if ($exception instanceof ConnectionException) {
+            return 'Nao foi possivel contactar a Tesla: falha de ligacao ou tempo de espera excedido.';
+        }
+
+        if ($exception instanceof ValidationException) {
+            return implode(' ', $exception->validator->errors()->all());
+        }
+
+        return 'Nao foi possivel concluir a leitura. Consulte os registos da aplicacao.';
     }
 
     /** @return Collection<int, Vehicle> */

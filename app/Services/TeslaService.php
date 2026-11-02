@@ -376,8 +376,12 @@ class TeslaService
     protected function hydrateVehicleData(TeslaVehicle $vehicle, bool $isManual = false): ?TeslaVehicleSnapshot
     {
         try {
-            $data = $this->getVehicleData($vehicle);
-        } catch (RequestException) {
+            $data = $this->getVehicleData($vehicle, $isManual ? ['vehicle_state'] : self::VEHICLE_DATA_MODULES);
+        } catch (RequestException $exception) {
+            if ($isManual) {
+                throw $exception;
+            }
+
             return null;
         }
 

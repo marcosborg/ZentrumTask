@@ -364,3 +364,30 @@ it('syncs tesla vehicles into the database', function (): void {
         ->and((float) $snapshot->tpms_pressure_fl)->toBe(3.01)
         ->and((float) $snapshot->inside_temp)->toBe(21.0);
 });
+
+it('requests only vehicle state for a manual odometer snapshot', function (): void {
+    $vehicle = TeslaVehicle::factory()->create();
+    Http::fake([
+        'tesla.test/api/1/vehicles/*/vehicle_data*' => Http::response(['response' => ['vehicle_state' => ['odometer' => 100000]]]),
+        '*' => Http::response(['response' => []]),
+    ]);
+
+    $snapshot = app(TeslaService::class)->createManualOdometerSnapshot($vehicle, '2026-10-26', '2026-11-01');
+
+    expect((float) $snapshot->odometer)->toBe(160934.4);
+    Http::assertSent(fn ($request): bool => str_contains($request->url(), '/vehicle_data') && $request['endpoints'] === 'vehicle_state');
+});
+
+it('preserves the Tesla HTTP failure when collecting a manual odometer', function (int $status): void {
+    $vehicle = TeslaVehicle::factory()->create();
+    Http::fake(['*' => Http::response(['error' => 'unavailable'], $status)]);
+
+    try {
+        app(TeslaService::class)->createManualOdometerSnapshot($vehicle);
+        test()->fail('Expected a Tesla request failure.');
+    } catch (\Illuminate\Http\Client\RequestException $exception) {
+        expect($exception->response->status())->toBe($status);
+    }
+
+    expect($vehicle->snapshots()->count())->toBe(0);
+})->with([403, 408, 429, 503]);

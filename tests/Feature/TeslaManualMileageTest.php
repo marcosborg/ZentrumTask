@@ -119,3 +119,25 @@ it('validates manual odometers and shows the vehicle and driver in the input lab
 
     expect(VehicleWeeklyMileage::query()->count())->toBe(1);
 });
+
+it('explains the Tesla failure beside the missing odometer', function (int $status, string $reason): void {
+    $vehicle = Vehicle::factory()->create(['source' => 'tvde', 'operation' => 'rental']);
+    TeslaVehicle::factory()->create(['vehicle_id' => $vehicle->id]);
+    $exception = new \Illuminate\Http\Client\RequestException(new \Illuminate\Http\Client\Response(new \GuzzleHttp\Psr7\Response($status)));
+    $this->mock(TeslaService::class, function ($mock) use ($exception): void {
+        $mock->shouldReceive('createManualOdometerSnapshot')->once()->andThrow($exception);
+    });
+
+    $page = Livewire::actingAs(User::factory()->create())->test(TeslaIntegration::class)
+        ->callAction('createFleetOdometerSnapshots', data: ['period_start' => '2026-10-26', 'period_end' => '2026-11-01'])
+        ->assertActionMounted('enterManualOdometers');
+
+    expect($page->get('pendingOdometerReasons')[$vehicle->id])->toContain($reason);
+    view()->share('errors', new \Illuminate\Support\ViewErrorBag);
+    expect($page->instance()->getSchema('mountedActionSchema0')->toHtml())->toContain($reason);
+})->with([
+    [403, 'permissoes'],
+    [408, 'adormecida ou offline'],
+    [429, 'Limite de pedidos'],
+    [503, 'HTTP 503'],
+]);

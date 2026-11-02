@@ -168,7 +168,7 @@
                 </div>
 
                 <div class="tesla-admin__stat">
-                    <div class="tesla-admin__stat-label">Veiculos sincronizados</div>
+                    <div class="tesla-admin__stat-label">Veiculos na conta Tesla</div>
                     <div class="tesla-admin__stat-value">{{ $vehicles->count() }}</div>
                 </div>
             </div>

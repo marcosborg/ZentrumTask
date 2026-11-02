@@ -137,7 +137,7 @@ class TeslaController extends Controller
 
         return redirect()
             ->to(TeslaIntegration::getUrl())
-            ->with('success', "{$synced} veiculo(s) Tesla sincronizado(s).");
+            ->with('success', "{$synced} veiculo(s) Tesla atualizado(s) na lista. As leituras dependem da resposta de cada viatura.");
     }
 
     protected function isConfigured(): bool
