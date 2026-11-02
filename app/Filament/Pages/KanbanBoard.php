@@ -102,6 +102,8 @@ class KanbanBoard extends Page
 
     public ?string $whatsappInstructionsUrl = null;
 
+    public ?string $whatsappSlotInstructionsUrl = null;
+
     public $attachmentUpload = null;
 
     public array $commentForm = [
@@ -534,6 +536,7 @@ class KanbanBoard extends Page
     protected function loadTaskMeta(Task $task): void
     {
         $this->whatsappInstructionsUrl = $this->buildWhatsappInstructionsUrl($task);
+        $this->whatsappSlotInstructionsUrl = $this->buildWhatsappInstructionsUrl($task, slot: true);
 
         $this->taskTimeline = [
             'created_at' => optional($task->created_at)?->format('d/m/Y H:i'),
@@ -564,7 +567,7 @@ class KanbanBoard extends Page
             ])->values()->all();
     }
 
-    private function buildWhatsappInstructionsUrl(Task $task): ?string
+    private function buildWhatsappInstructionsUrl(Task $task, bool $slot = false): ?string
     {
         $meta = $task->meta ?? [];
         $phone = $this->normalizeWhatsappPhone(
@@ -584,6 +587,40 @@ class KanbanBoard extends Page
         ));
 
         $greeting = $contactName !== '' ? "Olá, {$contactName}! 👋" : 'Olá! 👋';
+
+        if ($slot) {
+            $slotUrl = route('slot.show');
+            $message = <<<TEXT
+{$greeting}
+
+Obrigado pelo seu interesse no SLOT da Zentrum TVDE! 🚗
+
+Trabalhe com a sua própria viatura, com gestão documental, integração Uber/Bolt e acompanhamento da operação.
+
+💶 Pack Base: 30 € por semana, IVA incluído.
+- Admissão e controlo documental;
+- integração Uber/Bolt;
+- reconciliação de receitas, extratos e pagamentos.
+
+⭐ Pack Premium: 50 € por semana, IVA incluído.
+Inclui todos os benefícios do Base, acompanhamento de acidentes 24/7, pedidos de indemnização por imobilização e viatura de substituição. Estes pedidos dependem das circunstâncias do sinistro e da apreciação das entidades responsáveis; não é garantida a atribuição de indemnização ou de viatura.
+
+🔧 Nos dois packs: check-up gratuito na entrada e a cada 12 meses, descontos e atendimento prioritário na nossa oficina.
+
+Para avançar, indique o pack pretendido e apresente a viatura que pretende integrar. A nossa equipa acompanha a validação da documentação, do perfil fiscal e do contrato.
+
+A ativação depende da elegibilidade do motorista e da viatura, da documentação aprovada e do check-up inicial concluído.
+
+📅 Pagamentos à segunda-feira, após recebimento e reconciliação dos valores das plataformas.
+
+Saiba mais: {$slotUrl}
+
+Zentrum TVDE
+TEXT;
+
+            return 'whatsapp://send?phone='.$phone.'&text='.rawurlencode($message);
+        }
+
         $message = <<<TEXT
 {$greeting}
 

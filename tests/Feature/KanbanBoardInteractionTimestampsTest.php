@@ -233,3 +233,38 @@ it('keeps tasks in place while the configured stage timeout has not expired', fu
         Carbon::setTestNow();
     }
 });
+
+it('builds separate personalized SLOT instructions and resets them for a contact without a phone', function (): void {
+    [, , , $task] = createKanbanFixture();
+    $task->update(['meta' => ['contact_name' => 'Marco Cunha', 'phone' => '914 514 979', 'slot_pack' => 'base']]);
+    $page = new KanbanBoard;
+    $page->openTaskDetail($task->id);
+
+    expect($page->whatsappSlotInstructionsUrl)->toStartWith('whatsapp://send?phone=351914514979&text=');
+    parse_str(parse_url($page->whatsappSlotInstructionsUrl, PHP_URL_QUERY), $query);
+    expect($query['text'])
+        ->toContain('Olá, Marco Cunha!')
+        ->toContain('30 € por semana, IVA incluído')
+        ->toContain('50 € por semana, IVA incluído')
+        ->toContain('check-up gratuito na entrada e a cada 12 meses')
+        ->toContain('não é garantida a atribuição de indemnização ou de viatura')
+        ->toContain('Pagamentos à segunda-feira')
+        ->toContain(route('slot.show'))
+        ->not->toContain('Aluguer semanal');
+    expect($page->whatsappInstructionsUrl)->not->toBe($page->whatsappSlotInstructionsUrl);
+
+    $task->update(['meta' => ['phone' => 'invalid']]);
+    $page->openTaskDetail($task->id);
+    expect($page->whatsappSlotInstructionsUrl)->toBeNull();
+});
+
+it('shows both WhatsApp instruction buttons in the open Kanban card', function (): void {
+    ensureUsersSoftDeletesColumn();
+    [, , , $task] = createKanbanFixture();
+    $task->update(['meta' => ['contact_name' => 'Marco Cunha', 'phone' => '914514979']]);
+
+    \Livewire\Livewire::actingAs(User::factory()->create())->test(KanbanBoard::class)
+        ->call('openTaskDetail', $task->id)
+        ->assertSee('Enviar instruções por WhatsApp')
+        ->assertSee('Enviar instruções SLOT por WhatsApp');
+});
