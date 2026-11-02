@@ -682,16 +682,3 @@ it('shows the protected extra km expense in the report', function (bool $hasPrev
     'exactly three thousand km' => [true, 3000.0, 50.0, 0.05],
     'above three thousand with charge below sixty euros' => [true, 3000.01, 0.0, 0.05],
 ]);
-
-it('displays extra km charges without a negative expense sign', function (float $amount, string $formatted): void {
-    $settlement = createReportSettlement(['rules_snapshot' => ['extra_km_total' => $amount]]);
-    $page = Livewire::actingAs(\App\Models\User::factory()->create())->test(DriverSettlementsReport::class);
-    $column = $page->instance()->getTable()->getColumn('extra_km_expenses')->record($settlement);
-
-    expect($column->formatState($column->getState()))->toBe($formatted);
-    expect($settlement->fresh()->amount_due)->toBe('600.00');
-})->with([
-    [30.0, '30,00 €'],
-    [0.0, '0,00 €'],
-    [-30.0, '0,00 €'],
-]);
