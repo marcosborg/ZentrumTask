@@ -433,7 +433,7 @@ class DriverSettlementsReport extends Page implements HasTable
                     ->label('Km extra')
                     ->alignRight()
                     ->state(fn (DriverSettlement $record): float => $this->effectiveExtraKmTotal($record))
-                    ->formatStateUsing(fn ($state): string => $this->formatEffectMoney($state, 'subtract')),
+                    ->formatStateUsing(fn ($state): string => $this->formatMoney(max(0.0, (float) $state))),
                 TextColumn::make('expenses_total')
                     ->label('Despesas')
                     ->alignRight()
