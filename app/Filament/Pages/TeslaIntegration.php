@@ -288,7 +288,7 @@ class TeslaIntegration extends Page implements HasTable
         return Action::make('enterManualOdometers')
             ->authorize(fn (): bool => auth()->check() && $this->pendingOdometerVehicleIds !== [])
             ->modalHeading('Introduzir km em falta — TVDE')
-            ->modalDescription(fn (): string => $this->mileagePeriodStart.' a '.$this->mileagePeriodEnd.'. Indique o total do odometro em km. Sem leitura da semana anterior, a despesa de km extra sera 0 €.')
+            ->modalDescription(fn (): string => $this->mileagePeriodStart.' a '.$this->mileagePeriodEnd.'. Indique o total do odometro em km, mesmo que inferior ao anterior. A leitura sera guardada. Diferencas semanais negativas, superiores a 3.000 km ou sem leitura da semana anterior nao geram cobranca de km extra.')
             ->modalSubmitActionLabel('Guardar leituras')
             ->schema(fn (): array => $this->tvdeMileageVehicles()
                 ->whereIn('id', $this->pendingOdometerVehicleIds)

@@ -2097,6 +2097,7 @@ class DriverSettlementsReport extends Page implements HasTable
             ->whereDate('period_end', '<=', $settlement->period_end)
             ->orderBy('period_start')
             ->get(['period_start', 'period_end', 'weekly_km', 'vehicle_id'])
+            ->filter(fn (VehicleWeeklyMileage $row): bool => $row->hasReasonableWeeklyDistance())
             ->map(function (VehicleWeeklyMileage $row) use ($limit, $rate): array {
                 $weeklyKm = (float) $row->weekly_km;
                 $extraKm = max(0.0, $weeklyKm - $limit);
@@ -2537,6 +2538,7 @@ class DriverSettlementsReport extends Page implements HasTable
             $driverMileages = $mileagesByDriver->get($record->driver_id, collect());
 
             $current = $driverMileages
+                ->filter(fn (VehicleWeeklyMileage $mileage): bool => $mileage->hasReasonableWeeklyDistance())
                 ->filter(fn (VehicleWeeklyMileage $mileage): bool => $mileage->period_start->betweenIncluded($start, $end)
                     && $mileage->period_end->betweenIncluded($start, $end))
                 ->sum(fn (VehicleWeeklyMileage $mileage): float => (float) $mileage->weekly_km);

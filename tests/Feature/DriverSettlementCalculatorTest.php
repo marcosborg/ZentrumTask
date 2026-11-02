@@ -752,7 +752,7 @@ it('creates a settlement for a driver with vehicle usage and no platform balance
         ->and($settlement->amount_due)->toBe('-100.00');
 });
 
-it('protects extra km charges when the prior week is missing or the charge exceeds sixty euros', function (bool $hasPreviousWeek, float $weeklyKm, float $expected): void {
+it('protects extra km charges when readings or charges are unreasonable', function (bool $hasPreviousWeek, float $weeklyKm, float $expected, float $rate = 0.12): void {
     $driver = Driver::factory()->create();
     $vehicle = Vehicle::factory()->create();
     VehicleAllocation::factory()->create([
@@ -766,7 +766,7 @@ it('protects extra km charges when the prior week is missing or the charge excee
         'driver_id' => $driver->id,
         'valid_from' => '2026-01-01',
         'extra_km_limit' => 2000,
-        'extra_km_rate' => 0.12,
+        'extra_km_rate' => $rate,
     ]);
     if ($hasPreviousWeek) {
         VehicleWeeklyMileage::factory()->create([
@@ -790,4 +790,7 @@ it('protects extra km charges when the prior week is missing or the charge excee
     'exactly sixty euros' => [true, 2500.0, 60.0],
     'above ceiling' => [true, 2501.0, 0.0],
     'below allowance' => [true, 1900.0, 0.0],
+    'negative distance' => [true, -1.0, 0.0],
+    'exactly three thousand km' => [true, 3000.0, 50.0, 0.05],
+    'above three thousand with charge below sixty euros' => [true, 3000.01, 0.0, 0.05],
 ]);

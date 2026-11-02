@@ -42,6 +42,13 @@ class VehicleWeeklyMileage extends Model
         return $this->belongsTo(Vehicle::class);
     }
 
+    public function hasReasonableWeeklyDistance(): bool
+    {
+        return is_numeric($this->weekly_km)
+            && (float) $this->weekly_km >= 0
+            && (float) $this->weekly_km <= 3000;
+    }
+
     public function driver(): BelongsTo
     {
         return $this->belongsTo(Driver::class);

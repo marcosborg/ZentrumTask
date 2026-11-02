@@ -455,6 +455,10 @@ class DriverSettlementCalculator
         $total = 0.0;
 
         foreach ($rows as $row) {
+            if (! $row->hasReasonableWeeklyDistance()) {
+                continue;
+            }
+
             $hasPreviousWeek = data_get($row->raw_row, 'has_previous_week_reading');
 
             $previousWeekKey = $row->vehicle_id.'|'.$row->period_start->copy()->subWeek()->toDateString().'|'.$row->period_end->copy()->subWeek()->toDateString();

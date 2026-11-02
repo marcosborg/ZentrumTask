@@ -11,7 +11,6 @@ use App\Models\VehicleWeeklyMileage;
 use App\Services\TeslaService;
 use App\Services\VehicleOdometerService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Validation\ValidationException;
 use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
@@ -66,13 +65,17 @@ it('stores an initial baseline and calculates only against the immediately prece
         ->and((float) $next->refresh()->weekly_km)->toBe(2400.0);
 });
 
-it('rejects a decreasing odometer instead of charging an invalid difference', function (): void {
+it('preserves manual readings even when the weekly difference is unreasonable', function (float $odometer, float $difference): void {
     $vehicle = Vehicle::factory()->create();
     $service = app(VehicleOdometerService::class);
     $service->record($vehicle, 100000, '2026-10-05', '2026-10-11');
 
-    expect(fn () => $service->record($vehicle, 99999, '2026-10-12', '2026-10-18'))->toThrow(ValidationException::class);
-});
+    $reading = $service->record($vehicle, $odometer, '2026-10-12', '2026-10-18');
+
+    expect((float) $reading->raw_row['current_odometer'])->toBe($odometer)
+        ->and((float) $reading->weekly_km)->toBe($difference)
+        ->and($reading->hasReasonableWeeklyDistance())->toBeFalse();
+})->with([[99999.0, -1.0], [103001.0, 3001.0]]);
 
 it('uses a legacy Tesla baseline from the previous week but not an older snapshot', function (): void {
     $vehicle = Vehicle::factory()->create();
@@ -115,9 +118,11 @@ it('validates manual odometers and shows the vehicle and driver in the input lab
     $page->setActionData(['odometers' => [$vehicle->id => -1]])
         ->callMountedAction()->assertHasActionErrors(['odometers.'.$vehicle->id => 'min'])
         ->setActionData(['odometers' => [$vehicle->id => 99999]])
-        ->callMountedAction()->assertHasActionErrors(['odometers.'.$vehicle->id]);
+        ->callMountedAction()->assertHasNoActionErrors()
+        ->assertNotified('Leituras manuais guardadas');
 
-    expect(VehicleWeeklyMileage::query()->count())->toBe(1);
+    expect(VehicleWeeklyMileage::query()->count())->toBe(2)
+        ->and((float) VehicleWeeklyMileage::query()->whereDate('period_start', '2026-10-12')->sole()->raw_row['current_odometer'])->toBe(99999.0);
 });
 
 it('explains the Tesla failure beside the missing odometer', function (int $status, string $reason): void {

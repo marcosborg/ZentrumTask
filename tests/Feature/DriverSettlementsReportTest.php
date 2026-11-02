@@ -580,7 +580,7 @@ it('recalculates only one driver settlement without changing the others', functi
         ->and($unchangedDriverTwoSettlement->amount_due)->toBe('120.00');
 });
 
-it('shows the protected extra km expense in the report', function (bool $hasPreviousWeek, float $weeklyKm, float $expected): void {
+it('shows the protected extra km expense in the report', function (bool $hasPreviousWeek, float $weeklyKm, float $expected, float $rate = 0.12): void {
     $driver = Driver::factory()->create();
     $vehicle = Vehicle::query()->create([
         'license_plate' => 'AA-11-BB',
@@ -598,7 +598,7 @@ it('shows the protected extra km expense in the report', function (bool $hasPrev
         'percent_driver' => 100,
         'vehicle_rent_value' => null,
         'extra_km_limit' => 2000,
-        'extra_km_rate' => 0.12,
+        'extra_km_rate' => $rate,
     ]);
 
     DB::table('platform_driver_balances')->insert([
@@ -678,4 +678,7 @@ it('shows the protected extra km expense in the report', function (bool $hasPrev
     'above sixty euros' => [true, 4159.0, 0.0],
     'valid charge' => [true, 2250.0, 30.0],
     'exactly sixty euros' => [true, 2500.0, 60.0],
+    'negative distance' => [true, -1.0, 0.0],
+    'exactly three thousand km' => [true, 3000.0, 50.0, 0.05],
+    'above three thousand with charge below sixty euros' => [true, 3000.01, 0.0, 0.05],
 ]);

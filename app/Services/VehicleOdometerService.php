@@ -38,10 +38,6 @@ class VehicleOdometerService
             $previousOdometer = $previousSnapshot?->odometer;
         }
 
-        if (is_numeric($previousOdometer) && $odometer < (float) $previousOdometer) {
-            throw ValidationException::withMessages(['odometers.'.$vehicle->getKey() => 'A leitura nao pode ser inferior a da semana anterior.']);
-        }
-
         $drivers = $vehicle->allocations()
             ->whereIn('status', ['active', 'closed'])
             ->where('starts_at', '<=', $end)
