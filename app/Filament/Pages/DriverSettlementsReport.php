@@ -1505,7 +1505,7 @@ class DriverSettlementsReport extends Page implements HasTable
             ->fillForm(fn (DriverSettlement $record): array => [
                 'operation' => 'create',
                 'adjustment_id' => null,
-                'starts_at' => $record->period_start?->toDateString(),
+                'starts_at' => $record->period_start->max($record->participation?->starts_at ?? $record->period_start)->toDateString(),
                 'recurrence_weeks' => null,
                 'category' => 'acerto',
                 'description' => null,
@@ -1533,8 +1533,8 @@ class DriverSettlementsReport extends Page implements HasTable
                     ->native(false),
                 DatePicker::make('starts_at')
                     ->label('Inicio')
-                    ->native(false)
-                    ->default(fn (DriverSettlement $record): ?string => $record->period_start?->toDateString()),
+                    ->required()
+                    ->native(false),
                 TextInput::make('recurrence_weeks')
                     ->label('Semanas (opcional)')
                     ->numeric()
@@ -1556,6 +1556,11 @@ class DriverSettlementsReport extends Page implements HasTable
                 TextInput::make('amount')
                     ->label('Valor')
                     ->required()
+                    ->rule(fn (): \Closure => function (string $attribute, mixed $value, \Closure $fail): void {
+                        if ($this->parseLocalizedDecimal($value) === null) {
+                            $fail('Indique um valor válido, por exemplo 35,00 €.');
+                        }
+                    })
                     ->placeholder('Ex.: 25,63'),
             ])
             ->action(function (DriverSettlement $record, array $data): void {
@@ -1645,6 +1650,7 @@ class DriverSettlementsReport extends Page implements HasTable
 
                 DriverAdjustment::query()->forOperation(\App\Enums\TvdeOperation::Rental)->create([
                     'driver_id' => $record->driver_id,
+                    'driver_participation_id' => $record->driver_participation_id,
                     'starts_at' => $startsAt,
                     'recurrence_weeks' => $weeks,
                     'category' => (string) ($data['category'] ?? 'acerto'),
@@ -2406,7 +2412,7 @@ class DriverSettlementsReport extends Page implements HasTable
             return null;
         }
 
-        $normalized = trim((string) $value);
+        $normalized = trim(preg_replace('/\s*€$/u', '', trim((string) $value)) ?? '');
 
         if ($normalized === '') {
             return null;

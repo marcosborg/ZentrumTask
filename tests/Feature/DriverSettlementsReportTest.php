@@ -118,6 +118,35 @@ it('shows original file amounts only in the two specified platform columns', fun
         ->and(PlatformDriverBalance::query()->where('driver_id', $zacaria->id)->value('net_amount'))->toBe('469.88');
 });
 
+it('creates a recurring deposit from the settlement modal in the first week of participation', function (): void {
+    $this->actingAs(\App\Models\User::factory()->create());
+    $driver = Driver::factory()->create();
+    $participation = $driver->participations()->sole();
+    $participation->update(['starts_at' => '2026-11-10']);
+    $settlement = createReportSettlement([
+        'driver' => $driver,
+        'driver_participation_id' => $participation->id,
+        'period_start' => '2026-11-09',
+        'period_end' => '2026-11-15',
+    ]);
+
+    Livewire::test(DriverSettlementsReport::class, [
+        'filtersForm' => ['period_start' => '2026-11-09', 'period_end' => '2026-11-15'],
+    ])->callTableAction('manageAdjustments', $settlement, [
+        'category' => 'caucao',
+        'recurrence_weeks' => 14,
+        'amount' => '35 €',
+    ])->assertHasNoTableActionErrors();
+
+    $adjustment = DriverAdjustment::query()->sole();
+    expect($adjustment->driver_participation_id)->toBe($participation->id)
+        ->and($adjustment->starts_at->toDateString())->toBe('2026-11-10')
+        ->and($participation->refresh()->starts_at->toDateString())->toBe('2026-11-10')
+        ->and($adjustment->recurrence_weeks)->toBe(14)
+        ->and($adjustment->category)->toBe('caucao')
+        ->and($adjustment->amount)->toBe('35.00');
+});
+
 it('deletes a manual adjustment directly from the settlements report modal', function () {
     $driver = Driver::factory()->create();
 
