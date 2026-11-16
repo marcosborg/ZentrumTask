@@ -16,7 +16,7 @@ class FetchPlatformReportsCommand extends Command
      * @var string
      */
     protected $signature = 'platform:fetch-reports
-        {--platform=* : Platform(s): bolt, uber}
+        {--platform=* : Platform(s): bolt, uber, pop}
         {--period-start= : Optional period start (Y-m-d)}
         {--period-end= : Optional period end (Y-m-d)}
         {--queue : Dispatch job to queue instead of running inline}
@@ -27,7 +27,7 @@ class FetchPlatformReportsCommand extends Command
      *
      * @var string
      */
-    protected $description = 'Fetch and import Bolt/Uber platform CSV reports using configured connectors';
+    protected $description = 'Fetch and import Bolt/Uber/POP platform CSV reports using configured connectors';
 
     /**
      * Execute the console command.
@@ -138,13 +138,13 @@ class FetchPlatformReportsCommand extends Command
 
         $normalized = $requested
             ->map(fn (string $platform): string => strtolower(trim($platform)))
-            ->filter(fn (string $platform): bool => in_array($platform, ['bolt', 'uber'], true))
+            ->filter(fn (string $platform): bool => in_array($platform, ['bolt', 'uber', 'pop'], true))
             ->unique()
             ->values()
             ->all();
 
         if ($requested->isNotEmpty() && $normalized === []) {
-            throw new RuntimeException('Plataformas invalidas. Use --platform=bolt e/ou --platform=uber.');
+            throw new RuntimeException('Plataformas invalidas. Use --platform=bolt, --platform=uber ou --platform=pop.');
         }
 
         return $normalized;

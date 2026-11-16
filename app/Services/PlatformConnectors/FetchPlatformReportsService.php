@@ -3,6 +3,7 @@
 namespace App\Services\PlatformConnectors;
 
 use App\Services\BoltPlatformCsvImportService;
+use App\Services\PopPlatformCsvImportService;
 use App\Services\UberPlatformCsvImportService;
 use Illuminate\Support\Carbon;
 use RuntimeException;
@@ -13,6 +14,7 @@ class FetchPlatformReportsService
         protected PlatformReportConnectorResolver $connectorResolver,
         protected BoltPlatformCsvImportService $boltImportService,
         protected UberPlatformCsvImportService $uberImportService,
+        protected PopPlatformCsvImportService $popImportService,
     ) {}
 
     /**
@@ -94,7 +96,7 @@ class FetchPlatformReportsService
      */
     protected function normalizePlatforms(?array $platforms): array
     {
-        $supported = ['bolt', 'uber'];
+        $supported = ['bolt', 'uber', 'pop'];
 
         if ($platforms === null || $platforms === []) {
             return $supported;
@@ -108,7 +110,7 @@ class FetchPlatformReportsService
             ->all();
 
         if ($normalized === []) {
-            throw new RuntimeException('Nenhuma plataforma valida fornecida. Use bolt e/ou uber.');
+            throw new RuntimeException('Nenhuma plataforma valida fornecida. Use bolt, uber ou pop.');
         }
 
         return $normalized;
@@ -143,6 +145,7 @@ class FetchPlatformReportsService
     {
         return match ($report->platform) {
             'bolt' => $this->boltImportService->import($report->path, $options),
+            'pop' => $this->popImportService->import($report->path, $options),
             'uber' => $this->uberImportService->import($report->path, $options),
             default => throw new RuntimeException('Plataforma nao suportada para import: '.$report->platform),
         };

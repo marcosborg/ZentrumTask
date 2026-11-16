@@ -12,6 +12,10 @@ beforeEach(function () {
     $this->boltDirectory = $base.DIRECTORY_SEPARATOR.'bolt';
     $this->uberDirectory = $base.DIRECTORY_SEPARATOR.'uber';
 
+    $this->popDirectory = $base.DIRECTORY_SEPARATOR.'pop';
+    mkdir($this->popDirectory, 0777, true);
+    config()->set('services.platform_reports.pop.directory', $this->popDirectory);
+
     mkdir($this->boltDirectory, 0777, true);
     mkdir($this->uberDirectory, 0777, true);
 
@@ -20,7 +24,7 @@ beforeEach(function () {
 });
 
 afterEach(function () {
-    $directories = [$this->boltDirectory, $this->uberDirectory];
+    $directories = [$this->boltDirectory, $this->uberDirectory, $this->popDirectory];
 
     foreach ($directories as $directory) {
         if (! is_dir($directory)) {
@@ -43,7 +47,12 @@ afterEach(function () {
     }
 });
 
-it('fetches and imports bolt and uber reports inline', function () {
+it('fetches and imports bolt, uber and POP reports inline', function () {
+    file_put_contents(
+        $this->popDirectory.DIRECTORY_SEPARATOR.'pop.csv',
+        "Motorista;Ganhos Líquidos;Gorjetas\nPedro Pinto;3,40;0,00"
+    );
+
     file_put_contents(
         $this->boltDirectory.DIRECTORY_SEPARATOR.'bolt-2026W06.csv',
         implode("\n", [
@@ -66,10 +75,12 @@ it('fetches and imports bolt and uber reports inline', function () {
     ])
         ->expectsOutputToContain('BOLT: encontrados=1, importados=1, falhas=0')
         ->expectsOutputToContain('UBER: encontrados=1, importados=1, falhas=0')
-        ->expectsOutputToContain('Totais -> plataformas=2, reports=2, importados=2, falhas=0')
+        ->expectsOutputToContain('POP: encontrados=1, importados=1, falhas=0')
+        ->expectsOutputToContain('Totais -> plataformas=3, reports=3, importados=3, falhas=0')
         ->assertSuccessful();
 
-    expect(PlatformDriverBalance::query()->count())->toBe(2)
+    expect(PlatformDriverBalance::query()->count())->toBe(3)
+        ->and(PlatformDriverBalance::query()->where('platform', 'pop')->value('net_amount'))->toBe('3.40')
         ->and(PlatformDriverBalance::query()->where('platform', 'bolt')->exists())->toBeTrue()
         ->and(PlatformDriverBalance::query()->where('platform', 'uber')->exists())->toBeTrue();
 });

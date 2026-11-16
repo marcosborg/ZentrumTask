@@ -38,6 +38,10 @@ class DriverForm
                 TextInput::make('uber_driver_code')
                     ->label('Codigo Uber')
                     ->maxLength(255),
+                TextInput::make('pop_driver_name')
+                    ->label('Nome POP')
+                    ->unique(ignoreRecord: true)
+                    ->maxLength(255),
                 Textarea::make('notes')
                     ->label('Notas')
                     ->columnSpanFull(),

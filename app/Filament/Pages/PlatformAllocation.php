@@ -57,6 +57,7 @@ class PlatformAllocation extends Page implements HasForms
                     ->options([
                         'bolt' => 'Bolt',
                         'uber' => 'Uber',
+                        'pop' => 'POP',
                     ])
                     ->native(false)
                     ->placeholder('Todas'),

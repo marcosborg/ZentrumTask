@@ -55,6 +55,8 @@ class DriverParticipationResource extends SlotResource
                     TextInput::make('email')->email()->required(),
                     TextInput::make('phone')->label('Telefone'),
                     TextInput::make('nif')->label('NIF'),
+                    TextInput::make('pop_driver_name')->label('Nome POP')->maxLength(255)
+                        ->unique(table: \App\Models\Driver::class, ignorable: fn (DriverParticipation $record) => $record->driver),
                     TextInput::make('iban')->label('IBAN'),
                     Hidden::make('registration_operation')->default('preparing'),
                 ]),
@@ -93,12 +95,14 @@ class DriverParticipationResource extends SlotResource
                 TextInput::make('email')->email()->required(),
                 TextInput::make('phone')->label('Telefone'),
                 TextInput::make('nif')->label('NIF'),
+                TextInput::make('pop_driver_name')->label('Nome POP')->maxLength(255)
+                    ->unique(table: \App\Models\Driver::class, ignorable: fn (DriverParticipation $record) => $record->driver),
                 TextInput::make('iban')->label('IBAN'),
                 TextInput::make('uber_driver_code')->label('Código Uber'),
                 TextInput::make('bolt_driver_code')->label('Código Bolt'),
                 TextInput::make('tvde_certificate_number')->label('Certificado TVDE'),
                 DatePicker::make('tvde_certificate_expires_at')->label('Validade TVDE'),
-            ])->fillForm(fn (DriverParticipation $record) => $record->driver->only(['name', 'email', 'phone', 'nif', 'iban', 'uber_driver_code', 'bolt_driver_code', 'tvde_certificate_number', 'tvde_certificate_expires_at']))
+            ])->fillForm(fn (DriverParticipation $record) => $record->driver->only(['name', 'email', 'phone', 'nif', 'iban', 'pop_driver_name', 'uber_driver_code', 'bolt_driver_code', 'tvde_certificate_number', 'tvde_certificate_expires_at']))
                 ->action(fn (DriverParticipation $record, array $data) => $record->driver->update($data)),
             Action::make('approveDocuments')->label('Validar documentos')->requiresConfirmation()->action(fn (DriverParticipation $record) => $record->update(['documents_approved_at' => now(), 'documents_approved_by' => auth()->id()])),
             Action::make('fiscal')->label('Perfil fiscal')->visible(static::operation() === TvdeOperation::Slot)->schema(SlotForms::fiscal())->action(function (DriverParticipation $record, array $data): void {

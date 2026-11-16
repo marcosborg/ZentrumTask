@@ -69,6 +69,8 @@ class PlatformDriverBalanceAllocator
 
         if ($platform === 'bolt') {
             $column = 'bolt_driver_code';
+        } elseif ($platform === 'pop') {
+            $column = 'pop_driver_name';
         } elseif ($platform === 'uber') {
             $column = 'uber_driver_code';
         } else {

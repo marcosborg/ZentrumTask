@@ -146,10 +146,15 @@ class DriverResource extends Resource
                         TextInput::make('uber_driver_code')
                             ->label('Codigo Uber')
                             ->maxLength(255),
+                        TextInput::make('pop_driver_name')
+                            ->label('Nome POP')
+                            ->unique(ignoreRecord: true)
+                            ->maxLength(255),
                         CheckboxList::make('tvde_platforms')
                             ->label('Plataformas')
                             ->options([
                                 'uber' => 'Uber',
+                                'pop' => 'POP',
                                 'bolt' => 'Bolt',
                                 'free_now' => 'FREE NOW',
                             ])

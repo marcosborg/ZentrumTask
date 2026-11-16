@@ -9,6 +9,7 @@ class PlatformReportConnectorResolver
     public function __construct(
         protected BoltFileSystemReportConnector $boltConnector,
         protected UberFileSystemReportConnector $uberConnector,
+        protected PopFileSystemReportConnector $popConnector,
     ) {}
 
     public function resolve(string $platform): PlatformReportConnector
@@ -16,6 +17,7 @@ class PlatformReportConnectorResolver
         return match ($platform) {
             'bolt' => $this->boltConnector,
             'uber' => $this->uberConnector,
+            'pop' => $this->popConnector,
             default => throw new InvalidArgumentException('Plataforma nao suportada: '.$platform),
         };
     }

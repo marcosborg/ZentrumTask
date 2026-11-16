@@ -217,6 +217,7 @@ class DriverSettlementsReport extends Page implements HasTable
                 ->options([
                     'bolt' => 'Bolt',
                     'uber' => 'Uber',
+                    'pop' => 'POP',
                 ])
                 ->placeholder('Todas')
                 ->native(false),
@@ -404,10 +405,14 @@ class DriverSettlementsReport extends Page implements HasTable
                     ->label('Bolt')
                     ->alignRight()
                     ->formatStateUsing(fn ($state, DriverSettlement $record): string => $this->formatPlatformNetForDisplay($record, 'bolt', $state)),
+                TextColumn::make('pop_net')
+                    ->label('POP')
+                    ->alignRight()
+                    ->formatStateUsing(fn ($state): string => $this->formatMoney($state)),
                 TextColumn::make('total_operadores')
                     ->label('Total operadores')
                     ->alignRight()
-                    ->state(fn (DriverSettlement $record): float => (float) $record->uber_net + (float) $record->bolt_net)
+                    ->state(fn (DriverSettlement $record): float => (float) $record->uber_net + (float) $record->bolt_net + (float) $record->pop_net)
                     ->formatStateUsing(fn ($state): string => $this->formatMoney($state))
                     ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('prio_expenses')
@@ -895,27 +900,18 @@ class DriverSettlementsReport extends Page implements HasTable
                 'driver_settlements.*',
             ]);
 
-        $query->selectSub(
-            PlatformDriverBalance::query()->forOperation(\App\Enums\TvdeOperation::Rental)
-                ->selectRaw('COALESCE(SUM(net_amount), 0)')
-                ->where('platform', 'uber')
-                ->whereColumn('platform_driver_balances.driver_id', 'driver_settlements.driver_id')
-                ->whereColumn('platform_driver_balances.driver_participation_id', 'driver_settlements.driver_participation_id')
-                ->whereColumn('platform_driver_balances.period_start', '>=', 'driver_settlements.period_start')
-                ->whereColumn('platform_driver_balances.period_end', '<=', 'driver_settlements.period_end'),
-            'uber_net'
-        );
-
-        $query->selectSub(
-            PlatformDriverBalance::query()->forOperation(\App\Enums\TvdeOperation::Rental)
-                ->selectRaw('COALESCE(SUM(net_amount), 0)')
-                ->where('platform', 'bolt')
-                ->whereColumn('platform_driver_balances.driver_id', 'driver_settlements.driver_id')
-                ->whereColumn('platform_driver_balances.driver_participation_id', 'driver_settlements.driver_participation_id')
-                ->whereColumn('platform_driver_balances.period_start', '>=', 'driver_settlements.period_start')
-                ->whereColumn('platform_driver_balances.period_end', '<=', 'driver_settlements.period_end'),
-            'bolt_net'
-        );
+        foreach (['uber', 'bolt', 'pop'] as $operator) {
+            $query->selectSub(
+                PlatformDriverBalance::query()->forOperation(\App\Enums\TvdeOperation::Rental)
+                    ->selectRaw('COALESCE(SUM(net_amount), 0)')
+                    ->where('platform', $operator)
+                    ->whereColumn('platform_driver_balances.driver_id', 'driver_settlements.driver_id')
+                    ->whereColumn('platform_driver_balances.driver_participation_id', 'driver_settlements.driver_participation_id')
+                    ->whereColumn('platform_driver_balances.period_start', '>=', 'driver_settlements.period_start')
+                    ->whereColumn('platform_driver_balances.period_end', '<=', 'driver_settlements.period_end'),
+                $operator.'_net'
+            );
+        }
 
         $query->selectSub(
             PlatformDriverBalance::query()->forOperation(\App\Enums\TvdeOperation::Rental)
@@ -1078,6 +1074,7 @@ class DriverSettlementsReport extends Page implements HasTable
         $teslaChargingExpenses = $this->teslaChargingExpensesForSettlement($record);
         $adjustments = $this->adjustmentsForSettlement($record);
         $uberNet = collect($balances)->where('platform', 'uber')->sum('net_amount');
+        $popNet = collect($balances)->where('platform', 'pop')->sum('net_amount');
         $boltNet = collect($balances)->where('platform', 'bolt')->sum('net_amount');
         $tipsTotal = (float) ($record->tips_total ?? 0);
         $expensesTotal = (float) ($record->expenses_total ?? 0);
@@ -1099,6 +1096,7 @@ class DriverSettlementsReport extends Page implements HasTable
             'period_label' => ($record->period_start?->format('d/m/Y') ?? '-').' - '.($record->period_end?->format('d/m/Y') ?? '-'),
             'totals' => [
                 'uber_net' => $this->formatMoney($uberNet),
+                'pop_net' => $this->formatMoney($popNet),
                 'bolt_net' => $this->formatMoney($boltNet),
                 'tips_total' => $this->formatMoney($tipsTotal),
                 'expenses_total' => $this->formatMoney($expensesTotal),

@@ -49,6 +49,10 @@ class DriversTable
                     ->label('Codigo Uber')
                     ->searchable()
                     ->toggleable(),
+                TextColumn::make('pop_driver_name')
+                    ->label('Nome POP')
+                    ->searchable()
+                    ->toggleable(),
                 TextColumn::make('currentAllocation.vehicle.license_plate')
                     ->label('Viatura atual')
                     ->placeholder('-')

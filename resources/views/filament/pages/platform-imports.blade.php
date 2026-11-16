@@ -18,6 +18,7 @@
                         <button type="button" wire:click="$set('importsPlatformFilter', 'all')" @class(['rounded-full border px-3 py-1 text-xs', 'border-primary-500 bg-primary-600/20 text-primary-300' => $importsPlatformFilter === 'all', 'border-gray-700 bg-gray-900 text-gray-200' => $importsPlatformFilter !== 'all'])>Todas</button>
                         <button type="button" wire:click="$set('importsPlatformFilter', 'bolt')" @class(['rounded-full border px-3 py-1 text-xs', 'border-primary-500 bg-primary-600/20 text-primary-300' => $importsPlatformFilter === 'bolt', 'border-gray-700 bg-gray-900 text-gray-200' => $importsPlatformFilter !== 'bolt'])>Bolt</button>
                         <button type="button" wire:click="$set('importsPlatformFilter', 'uber')" @class(['rounded-full border px-3 py-1 text-xs', 'border-primary-500 bg-primary-600/20 text-primary-300' => $importsPlatformFilter === 'uber', 'border-gray-700 bg-gray-900 text-gray-200' => $importsPlatformFilter !== 'uber'])>Uber</button>
+                        <button type="button" wire:click="$set('importsPlatformFilter', 'pop')" @class(['rounded-full border px-3 py-1 text-xs', 'border-primary-500 bg-primary-600/20 text-primary-300' => $importsPlatformFilter === 'pop', 'border-gray-700 bg-gray-900 text-gray-200' => $importsPlatformFilter !== 'pop'])>POP</button>
                         <button type="button" wire:click="$set('importsPlatformFilter', 'prio')" @class(['rounded-full border px-3 py-1 text-xs', 'border-primary-500 bg-primary-600/20 text-primary-300' => $importsPlatformFilter === 'prio', 'border-gray-700 bg-gray-900 text-gray-200' => $importsPlatformFilter !== 'prio'])>PRIO</button>
                         <button type="button" wire:click="$set('importsPlatformFilter', 'via_verde')" @class(['rounded-full border px-3 py-1 text-xs', 'border-primary-500 bg-primary-600/20 text-primary-300' => $importsPlatformFilter === 'via_verde', 'border-gray-700 bg-gray-900 text-gray-200' => $importsPlatformFilter !== 'via_verde'])>Via Verde</button>
                     </div>
@@ -129,9 +130,9 @@
 
         @if ($missingDriverCodes !== [])
             <section class="rounded-xl border border-amber-700 bg-amber-900 px-4 py-3 text-sm text-amber-100">
-                <p class="font-semibold">Estes motoristas ainda nao existem no sistema.</p>
+                <p class="font-semibold">Motoristas por identificar</p>
                 <p class="mt-1 text-amber-200">
-                    Cole o codigo no driver correspondente e execute a alocacao.
+                    {{ ($result['platform'] ?? null) === 'pop' ? 'Copie o nome para o campo Nome POP do motorista correspondente e execute a alocação.' : 'Cole o codigo no driver correspondente e execute a alocacao.' }}
                 </p>
                 <div class="mt-3 flex flex-wrap gap-2">
                     @foreach ($missingDriverCodes as $code)

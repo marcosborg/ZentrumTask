@@ -36,6 +36,9 @@ return [
     ],
 
     'platform_reports' => [
+        'pop' => [
+            'directory' => env('POP_REPORTS_DIRECTORY', 'storage/app/platform-reports/pop'),
+        ],
         'bolt' => [
             'directory' => env('BOLT_REPORTS_DIRECTORY', 'storage/app/platform-reports/bolt'),
         ],

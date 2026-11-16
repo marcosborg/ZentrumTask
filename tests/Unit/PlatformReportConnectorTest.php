@@ -63,11 +63,15 @@ it('resolves connector by platform', function () {
     $boltConnector = new BoltFileSystemReportConnector($this->reportsDir);
     $uberConnector = new UberFileSystemReportConnector($this->reportsDir);
 
+    $popConnector = new \App\Services\PlatformConnectors\PopFileSystemReportConnector($this->reportsDir);
+
     $resolver = new PlatformReportConnectorResolver(
         boltConnector: $boltConnector,
         uberConnector: $uberConnector,
+        popConnector: $popConnector,
     );
 
     expect($resolver->resolve('bolt'))->toBe($boltConnector)
+        ->and($resolver->resolve('pop'))->toBe($popConnector)
         ->and($resolver->resolve('uber'))->toBe($uberConnector);
 });

@@ -71,6 +71,7 @@
                     <tr>
                         <td style="padding:10px; border:1px solid #e5e7eb;"><strong>Uber</strong><br>{{ $payload['totals']['uber_net'] ?? '-' }}</td>
                         <td style="padding:10px; border:1px solid #e5e7eb;"><strong>Bolt</strong><br>{{ $payload['totals']['bolt_net'] ?? '-' }}</td>
+                        <td style="padding:10px; border:1px solid #e5e7eb;"><strong>POP</strong><br>{{ $payload['totals']['pop_net'] ?? '-' }}</td>
                         <td style="padding:10px; border:1px solid #e5e7eb;"><strong>Tips</strong><br>{{ $payload['totals']['tips_total'] ?? '-' }}</td>
                         <td style="padding:10px; border:1px solid #e5e7eb;"><strong>Despesas</strong><br>{{ $payload['totals']['expenses_total'] ?? '-' }}</td>
                         <td style="padding:10px; border:1px solid #e5e7eb;"><strong>Aluguer</strong><br>{{ $payload['totals']['rent_total'] ?? '-' }}</td>

@@ -2,7 +2,6 @@
 
 namespace App\Filament\Pages;
 
-use App\Models\Driver;
 use App\Models\DriverAdjustment;
 use App\Models\PlatformDriverBalance;
 use App\Models\PrioTransaction;
@@ -12,6 +11,7 @@ use App\Models\VehicleWeeklyMileage;
 use App\Models\ViaVerdeTransaction;
 use App\Services\BoltPlatformCsvImportService;
 use App\Services\DriverAdjustmentsCsvImportService;
+use App\Services\PopPlatformCsvImportService;
 use App\Services\PrioFuelCsvImportService;
 use App\Services\UberPlatformCsvImportService;
 use App\Services\VehicleWeeklyMileageImportService;
@@ -26,6 +26,7 @@ use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Contracts\HasForms;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
+use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
@@ -36,6 +37,7 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use RuntimeException;
 use UnitEnum;
 
@@ -109,9 +111,11 @@ class PlatformImports extends Page implements HasForms, HasTable
             ->schema([
                 Select::make('platform')
                     ->label('Plataforma')
+                    ->live()
                     ->options([
                         'bolt' => 'Bolt',
                         'uber' => 'Uber',
+                        'pop' => 'POP',
                         'prio' => 'PRIO Abastecimento',
                         'via_verde' => 'Via Verde',
                     ])
@@ -131,10 +135,12 @@ class PlatformImports extends Page implements HasForms, HasTable
                     ->required()
                     ->columnSpanFull(),
                 DatePicker::make('period_start')
-                    ->label('Periodo inicio (opcional)')
+                    ->label(fn (Get $get): string => $get('platform') === 'pop' ? 'Início do período' : 'Periodo inicio (opcional)')
+                    ->required(fn (Get $get): bool => $get('platform') === 'pop')
                     ->native(false),
                 DatePicker::make('period_end')
-                    ->label('Periodo fim (opcional)')
+                    ->label(fn (Get $get): string => $get('platform') === 'pop' ? 'Fim do período' : 'Periodo fim (opcional)')
+                    ->required(fn (Get $get): bool => $get('platform') === 'pop')
                     ->native(false),
             ])
             ->statePath('data');
@@ -188,32 +194,28 @@ class PlatformImports extends Page implements HasForms, HasTable
             } elseif ($platform === 'via_verde') {
                 $result = app(ViaVerdeCsvImportService::class)->import($path);
             } else {
-                $result = $platform === 'bolt'
-                    ? app(BoltPlatformCsvImportService::class)->import($path, $options)
-                    : app(UberPlatformCsvImportService::class)->import($path, $options);
+                $service = match ($platform) {
+                    'bolt' => BoltPlatformCsvImportService::class,
+                    'uber' => UberPlatformCsvImportService::class,
+                    'pop' => PopPlatformCsvImportService::class,
+                    default => throw new RuntimeException('Plataforma desconhecida.'),
+                };
+                $result = app($service)->import($path, $options);
             }
 
             if (! in_array($platform, ['prio', 'via_verde'], true)) {
                 app(\App\Services\PlatformDriverBalanceAllocator::class)->allocate($platform);
-                $driverCodes = array_values(array_filter(array_map(
-                    fn (string $code): string => strtolower(trim($code)),
-                    $result['driver_codes'] ?? []
-                )));
-
-                if ($driverCodes !== []) {
-                    $column = $platform === 'bolt' ? 'bolt_driver_code' : 'uber_driver_code';
-                    $normalizedColumn = DB::raw("LOWER(TRIM({$column}))");
-
-                    $missing = Driver::query()
-                        ->whereNotNull($column)
-                        ->whereIn($normalizedColumn, $driverCodes)
-                        ->selectRaw("LOWER(TRIM({$column})) as code")
-                        ->pluck('code')
-                        ->filter()
-                        ->all();
-
-                    $this->missingDriverCodes = array_values(array_diff($driverCodes, $missing));
-                }
+                $this->missingDriverCodes = PlatformDriverBalance::query()
+                    ->where('platform', $platform)
+                    ->whereDate('period_start', $result['period_start'])
+                    ->whereDate('period_end', $result['period_end'])
+                    ->whereNull('driver_id')
+                    ->whereIn('driver_code', $platform === 'pop'
+                        ? array_map(fn (string $name): string => Str::lower($name), $result['driver_codes'])
+                        : $result['driver_codes'])
+                    ->get(['driver_code', 'raw_row'])
+                    ->map(fn (PlatformDriverBalance $balance): string => $balance->raw_row['Motorista'] ?? $balance->driver_code)
+                    ->unique()->values()->all();
             } elseif ($platform === 'prio') {
                 $sourceFile = basename($path);
                 $this->missingPrioCards = PrioTransaction::query()

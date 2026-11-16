@@ -20,6 +20,7 @@ class Driver extends Model
         'uber_driver_uuid',
         'bolt_driver_code',
         'uber_driver_code',
+        'pop_driver_name',
         'company_id',
         'name',
         'email',
