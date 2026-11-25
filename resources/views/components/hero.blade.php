@@ -23,27 +23,24 @@
               $imageUrl = $hero?->getFirstMediaUrl('hero_image') ?: $hero?->getFirstMediaUrl('hero_image', 'hero_cover');
           @endphp
           <div class="swiper-slide">
-            <div class="hero-slide" style="background-image: url('{{ $imageUrl ?: asset('website/assets/hero_car_final.png') }}');">
-              <div class="hero-content">
-                <div class="hero-overlay">
-                  <h1 class="display-4">{{ $title }}</h1>
-                  <p class="lead mb-4">
-                    {{ $subtitle }}
-                  </p>
-                  <div class="d-flex flex-wrap gap-3">
-                    @if ($whatsappHref)
-                      <a href="{{ $whatsappHref }}" target="_blank" rel="noopener noreferrer" class="cta-btn hero-whatsapp-btn text-decoration-none">
-                        <i class="fa-brands fa-whatsapp"></i>
-                        WhatsApp
-                      </a>
-                    @endif
-                    <a href="{{ $ctaLink }}" class="cta-btn btn-primaria text-decoration-none">{{ $ctaText }}</a>
-                    @if ($ctaSecondaryText && $ctaSecondaryLink)
-                      <a href="{{ $ctaSecondaryLink }}" class="cta-btn btn-secundaria text-decoration-none">{{ $ctaSecondaryText }}</a>
-                    @endif
-                  </div>
+            <div class="ads-cover">
+              <div class="container">
+                <h1>{{ $title }}</h1>
+                <p class="lead">{{ $subtitle }}</p>
+                <div class="d-flex flex-wrap gap-2">
+                  @if ($whatsappHref)
+                    <a href="{{ $whatsappHref }}" target="_blank" rel="noopener noreferrer" class="btn hero-whatsapp-btn">
+                      <i class="fa-brands fa-whatsapp" aria-hidden="true"></i>
+                      WhatsApp
+                    </a>
+                  @endif
+                  <a href="{{ $ctaLink }}" class="btn btn-light">{{ $ctaText }}</a>
+                  @if ($ctaSecondaryText && $ctaSecondaryLink)
+                    <a href="{{ $ctaSecondaryLink }}" class="btn btn-outline-light">{{ $ctaSecondaryText }}</a>
+                  @endif
                 </div>
               </div>
+              <img src="{{ $imageUrl ?: asset('website/assets/hero_car_final.png') }}" alt="">
             </div>
           </div>
         @endforeach
@@ -58,7 +55,7 @@
                 <a class="btn btn-outline-light" href="{{ route('ads.index') }}#como-funciona">Descobrir como funciona</a>
               </div>
             </div>
-            <img src="{{ asset('website/assets/ads-tesla.webp') }}" width="2000" height="698" style="object-position:75% center" alt="Tesla branco com publicidade Zentrum Ads nas portas laterais">
+            <img src="{{ asset('website/assets/ads-tesla.webp') }}" width="2000" height="698" alt="Tesla branco com publicidade Zentrum Ads nas portas laterais">
           </div>
         </div>
       </div>
@@ -85,38 +82,7 @@
     .hero-swiper {
       position: relative;
     }
-    .hero-overlay h1,
-    .hero-overlay .lead {
-      color: #0f172a;
-    }
-    .hero-slide {
-      position: relative;
-      min-height: 420px;
-      border-radius: 0;
-      overflow: hidden;
-      background-size: cover;
-      background-position: center;
-      background-repeat: no-repeat;
-      display: flex;
-      align-items: center;
-      justify-content: flex-start;
-      padding: 40px 6vw;
-    }
-    .hero-content {
-      width: 100%;
-      max-width: 1200px;
-      margin: 0 auto;
-      display: flex;
-      justify-content: flex-start;
-    }
-    .hero-overlay {
-      background: linear-gradient(90deg, rgba(255,255,255,0.9) 0%, rgba(255,255,255,0.75) 60%, rgba(255,255,255,0.35) 100%);
-      padding: 48px;
-      max-width: 640px;
-      border-radius: 0;
-      margin: 24px;
-      box-shadow: 0 14px 30px rgba(0,0,0,0.08);
-    }
+    .hero-slider .ads-cover img { object-position: 75% center; }
     .hero-pagination {
       margin-top: 1.5rem;
       position: static;
@@ -133,25 +99,14 @@
       align-items: center;
       gap: 8px;
       background: #25d366;
-      color: #fff;
+      color: #102e4c;
       border: 0;
       box-shadow: 0 12px 24px rgba(37, 211, 102, 0.28);
     }
     .hero-whatsapp-btn:hover {
       background: #1ebe5d;
-      color: #fff;
+      color: #102e4c;
       transform: translateY(-1px);
-    }
-    @media (max-width: 991px) {
-      .hero-slider { padding-top: 2.5rem; }
-      .hero-slide { min-height: 360px; padding: 32px 5vw; }
-      .hero-overlay { margin: 0; width: 100%; }
-    }
-    @media (max-width: 767px) {
-      .hero-slide { min-height: 320px; padding: 28px 20px; }
-      .hero-overlay { padding: 32px; }
-      .hero-overlay h1 { font-size: 2rem; }
-      .hero-overlay .lead { font-size: 1rem; }
     }
   </style>
 @endpushOnce
