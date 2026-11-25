@@ -82,6 +82,18 @@
     .hero-swiper {
       position: relative;
     }
+    .hero-swiper > .swiper-wrapper {
+      height: auto;
+      align-items: stretch;
+    }
+    .hero-swiper .swiper-slide {
+      display: flex;
+      height: auto;
+    }
+    .hero-swiper .ads-cover {
+      flex: 1;
+      min-width: 0;
+    }
     .hero-slider .ads-cover img { object-position: 75% center; }
     .hero-pagination {
       margin-top: 1.5rem;
@@ -120,7 +132,6 @@
 
       new Swiper(swiperEl, {
         loop: true,
-        autoHeight: true,
         autoplay: {
           delay: 5000,
           disableOnInteraction: false,
