@@ -15,7 +15,7 @@
 <h1>{{ $kit ? 'Media kit Zentrum Ads.' : 'A sua marca não precisa de ficar parada.' }}</h1>
 <p class="lead">Publicidade em viaturas TVDE que acompanha o movimento das cidades. Campanhas personalizadas para empresas, marcas e agências que procuram maior presença urbana.</p>
 <a class="btn btn-light" href="{{ route('ads.index') }}#proposta">Pedir proposta</a> <a class="btn btn-outline-light" href="#formatos">Conhecer os formatos</a></div>
-<img src="{{ asset('website/assets/ads-urban.webp') }}" alt="Exemplo ilustrativo de vinil nas portas laterais de uma viatura elétrica"></header>
+<img src="{{ asset('website/assets/ads-tesla.webp') }}" width="2000" height="698" style="object-position:75% center" alt="Tesla branco com publicidade Zentrum Ads nas portas laterais"></header>
 <div class="container">
 <section id="marcas"><p class="ads-label">Para marcas e agências</p><h2>Da rua do seu negócio às ruas da cidade.</h2>
 <p>A Zentrum TVDE reúne a operação de frota e o acompanhamento dos motoristas. Com a Zentrum Ads, a sua empresa tem um interlocutor para selecionar viaturas, preparar o design e acompanhar a aplicação do vinil.</p>

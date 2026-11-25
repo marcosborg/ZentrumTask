@@ -47,7 +47,7 @@
             </div>
           </div>
         @endforeach
-        <div class="swiper-slide"><div class="hero-slide" style="background-image:url('{{ asset('website/assets/ads-urban.webp') }}')"><div class="hero-content"><div class="hero-overlay"><h2 class="display-4">A sua marca. Sempre em movimento.</h2><p class="lead">Transforme as ruas num espaço de comunicação para a sua empresa. Leve a sua marca mais longe através de campanhas publicitárias em viaturas TVDE.</p><div class="d-flex flex-wrap gap-3"><a class="cta-btn btn-primaria" href="{{ route('ads.index') }}#proposta">Pedir proposta de publicidade</a><a class="cta-btn btn-secundaria" href="{{ route('ads.index') }}#como-funciona">Descobrir como funciona</a></div></div></div></div></div>
+        <div class="swiper-slide"><div class="hero-slide hero-slide-ads" style="background-image:url('{{ asset('website/assets/ads-tesla.webp') }}')"><div class="hero-content"><div class="hero-overlay"><h2 class="display-4">A sua marca. Sempre em movimento.</h2><p class="lead">Transforme as ruas num espaço de comunicação para a sua empresa. Leve a sua marca mais longe através de campanhas publicitárias em viaturas TVDE.</p><div class="d-flex flex-wrap gap-3"><a class="cta-btn btn-primaria" href="{{ route('ads.index') }}#proposta">Pedir proposta de publicidade</a><a class="cta-btn btn-secundaria" href="{{ route('ads.index') }}#como-funciona">Descobrir como funciona</a></div></div></div></div></div>
       </div>
 
       <div class="hero-pagination swiper-pagination"></div>
@@ -130,6 +130,13 @@
     }
     @media (max-width: 991px) {
       .hero-slider { padding-top: 2.5rem; }
+      .hero-slide-ads {
+        background-color: #edf6fa;
+        background-size: auto 220px;
+        background-position: 85% bottom;
+      }
+      .hero-slide.hero-slide-ads { padding-bottom: 220px; }
+      .hero-slide-ads .hero-overlay { box-shadow: none; background: transparent; }
       .hero-slide { min-height: 360px; padding: 32px 5vw; }
       .hero-overlay { margin: 0; width: 100%; }
     }
