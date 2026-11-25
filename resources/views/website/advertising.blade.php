@@ -7,7 +7,7 @@
 <script type="application/ld+json">{!! json_encode(['@context'=>'https://schema.org','@type'=>'Service','name'=>'Zentrum Ads','serviceType'=>'Publicidade em viaturas TVDE','url'=>route('ads.index'),'provider'=>['@type'=>'Organization','name'=>'Zentrum TVDE']], JSON_UNESCAPED_SLASHES) !!}</script>
 @endpush
 @push('styles')
-<link rel="stylesheet" href="{{ asset('website/assets/advertising.css') }}">
+<link rel="stylesheet" href="{{ asset('website/assets/advertising.css') }}?v={{ hash_file('sha256', public_path('website/assets/advertising.css')) }}">
 @endpush
 @section('content')
 <main class="ads">
