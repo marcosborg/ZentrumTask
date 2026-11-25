@@ -47,7 +47,20 @@
             </div>
           </div>
         @endforeach
-        <div class="swiper-slide"><div class="hero-slide hero-slide-ads" style="background-image:url('{{ asset('website/assets/ads-tesla.webp') }}')"><div class="hero-content"><div class="hero-overlay"><h2 class="display-4">A sua marca. Sempre em movimento.</h2><p class="lead">Transforme as ruas num espaço de comunicação para a sua empresa. Leve a sua marca mais longe através de campanhas publicitárias em viaturas TVDE.</p><div class="d-flex flex-wrap gap-3"><a class="cta-btn btn-primaria" href="{{ route('ads.index') }}#proposta">Pedir proposta de publicidade</a><a class="cta-btn btn-secundaria" href="{{ route('ads.index') }}#como-funciona">Descobrir como funciona</a></div></div></div></div></div>
+        <div class="swiper-slide">
+          <div class="ads-cover">
+            <div class="container">
+              <p class="ads-label">Zentrum Ads / Publicidade em movimento</p>
+              <h1>A sua marca. Sempre em movimento.</h1>
+              <p class="lead">Transforme as ruas num espaço de comunicação para a sua empresa. Leve a sua marca mais longe através de campanhas publicitárias em viaturas TVDE.</p>
+              <div class="d-flex flex-wrap gap-2">
+                <a class="btn btn-light" href="{{ route('ads.index') }}#proposta">Pedir proposta de publicidade</a>
+                <a class="btn btn-outline-light" href="{{ route('ads.index') }}#como-funciona">Descobrir como funciona</a>
+              </div>
+            </div>
+            <img src="{{ asset('website/assets/ads-tesla.webp') }}" width="2000" height="698" style="object-position:75% center" alt="Tesla branco com publicidade Zentrum Ads nas portas laterais">
+          </div>
+        </div>
       </div>
 
       <div class="hero-pagination swiper-pagination"></div>
@@ -56,6 +69,7 @@
 </section>
 
 @pushOnce('styles')
+  <link rel="stylesheet" media="screen" href="{{ asset('website/assets/advertising.css') }}?v={{ hash_file('sha256', public_path('website/assets/advertising.css')) }}">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.css" />
   <style>
     .hero-slider {
@@ -71,8 +85,8 @@
     .hero-swiper {
       position: relative;
     }
-    .hero h1,
-    .hero .lead {
+    .hero-overlay h1,
+    .hero-overlay .lead {
       color: #0f172a;
     }
     .hero-slide {
@@ -130,13 +144,6 @@
     }
     @media (max-width: 991px) {
       .hero-slider { padding-top: 2.5rem; }
-      .hero-slide-ads {
-        background-color: #edf6fa;
-        background-size: auto 220px;
-        background-position: 85% bottom;
-      }
-      .hero-slide.hero-slide-ads { padding-bottom: 220px; }
-      .hero-slide-ads .hero-overlay { box-shadow: none; background: transparent; }
       .hero-slide { min-height: 360px; padding: 32px 5vw; }
       .hero-overlay { margin: 0; width: 100%; }
     }
@@ -158,6 +165,7 @@
 
       new Swiper(swiperEl, {
         loop: true,
+        autoHeight: true,
         autoplay: {
           delay: 5000,
           disableOnInteraction: false,
