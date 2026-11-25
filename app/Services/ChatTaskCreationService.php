@@ -303,7 +303,7 @@ class ChatTaskCreationService
     private function resolveLeadStage(): ?Stage
     {
         return Stage::query()
-            ->whereHas('board', fn ($query) => $query->where('is_active', true))
+            ->whereHas('board', fn ($query) => $query->where('is_active', true)->where('slug', '!=', 'zentrum-ads'))
             ->where(function ($query): void {
                 $query
                     ->where('is_initial', true)
@@ -316,7 +316,7 @@ class ChatTaskCreationService
             ->orderBy('position')
             ->first()
             ?? Stage::query()
-                ->whereHas('board', fn ($query) => $query->where('is_active', true))
+                ->whereHas('board', fn ($query) => $query->where('is_active', true)->where('slug', '!=', 'zentrum-ads'))
                 ->orderBy('board_id')
                 ->orderBy('position')
                 ->first();

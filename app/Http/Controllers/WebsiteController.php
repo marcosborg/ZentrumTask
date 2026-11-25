@@ -16,8 +16,10 @@ use Illuminate\Support\Str;
 
 class WebsiteController extends Controller
 {
-    public function index(): View
+    public function index(\Illuminate\Http\Request $request): View
     {
+        \App\Support\AdvertisingAttribution::capture($request);
+
         return view('website.index');
     }
 
@@ -41,7 +43,7 @@ class WebsiteController extends Controller
             return back()->withErrors(['message' => 'Nao foi possivel criar a tarefa: nenhum estagio inicial configurado.']);
         }
 
-        return back()->with('contact_success', 'Pedido enviado com sucesso. Sera contactado brevemente.');
+        return back()->with('ads_interest_received', $request->boolean('ads_interest') && ($data['slot_pack'] ?? null) === 'premium')->with('contact_success', 'Pedido enviado com sucesso. Sera contactado brevemente.');
     }
 
     public function showCms(CmsPage $page, ?string $slug = null): RedirectResponse|View
@@ -100,17 +102,14 @@ class WebsiteController extends Controller
             'vehicle_id' => $vehicle?->getKey(),
         ]);
 
+        $advertisingInterest = $source === 'website_slot' && ($data['slot_pack'] ?? null) === 'premium' && ! empty($data['ads_interest']);
         $stage = Stage::query()
-            ->whereHas('board', fn ($query) => $query->where('is_active', true))
-            ->where('is_initial', true)
+            ->whereHas('board', fn ($query) => $query->where('is_active', true)
+                ->where('slug', $advertisingInterest ? '=' : '!=', 'zentrum-ads'))
+            ->orderByDesc('is_initial')
             ->orderBy('board_id')
             ->orderBy('position')
-            ->first()
-            ?? Stage::query()
-                ->whereHas('board', fn ($query) => $query->where('is_active', true))
-                ->orderBy('board_id')
-                ->orderBy('position')
-                ->first();
+            ->first();
 
         if (! $stage) {
             Log::warning('PUSH_DEBUG website_form createContactLead:no_stage');
@@ -118,7 +117,7 @@ class WebsiteController extends Controller
             return null;
         }
 
-        $task = DB::transaction(function () use ($data, $stage, $source, $vehicle): Task {
+        $task = DB::transaction(function () use ($data, $stage, $source, $vehicle, $advertisingInterest): Task {
             $nextPosition = (int) Task::query()
                 ->where('stage_id', $stage->id)
                 ->max('position');
@@ -159,6 +158,7 @@ class WebsiteController extends Controller
                     'phone' => $data['phone'],
                     'source' => $source,
                     'slot_pack' => $slotPack,
+                    'ads_interest' => $advertisingInterest,
                     'contact_name' => $data['name'],
                     'page_url' => $data['page_url'] ?? null,
                     'vehicle_id' => $vehicle?->getKey(),

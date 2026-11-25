@@ -60,7 +60,7 @@
             <li>Todos os benefícios do Base.</li>
             <li>Serviço de acompanhamento de acidentes 24/7.</li>
             <li>Pedidos de indemnização por imobilização.</li>
-            <li>Viatura de substituição.</li>
+            <li>Viatura de substituição.</li><li>Gestão de publicidade na sua viatura.</li>
           </ul>
           <p class="small">Os pedidos dependem das circunstâncias do sinistro e da apreciação das entidades responsáveis. Não é garantida a atribuição de indemnização ou de viatura.</p>
           <a href="#contactos-slot" class="btn btn-light mt-auto align-self-start">Pedir contacto sobre o Premium</a>
@@ -78,5 +78,6 @@
     </div>
   </section>
 
+  <section id="publicidade-slot" class="container pb-5"><h2>A sua viatura pode valer ainda mais.</h2><p>Com o SLOT Premium pode disponibilizar a sua viatura para campanhas. A participação depende da existência de campanhas, da elegibilidade da viatura, da aceitação das condições, do consentimento contratual e da aprovação da Zentrum.</p><a class="btn btn-primary" href="{{ route('slot.show',['interesse'=>'publicidade']) }}#contactos-slot">Tenho interesse em publicidade na minha viatura</a> <a href="{{ route('slot.show') }}#contactos-slot">Quero aderir ao SLOT</a></section>
   <x-contact heading="Vamos falar sobre o seu SLOT?" intro="Escolha o seu pack e indique na mensagem a viatura que pretende integrar. A equipa Zentrum entra em contacto consigo." source="website_slot" anchor="contactos-slot" submitLabel="Pedir contacto SLOT" />
 @endsection

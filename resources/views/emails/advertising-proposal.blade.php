@@ -1,0 +1,1 @@
+<p>Olá, {{ $contactName }}.</p><p>Recebemos o seu pedido de proposta de publicidade em viaturas TVDE (referência {{ $reference }}). A equipa comercial vai analisar o formato, a região e o período pretendidos e entrará em contacto para preparar a proposta.</p><p>Obrigado pelo interesse,<br>Equipa Zentrum Ads</p>

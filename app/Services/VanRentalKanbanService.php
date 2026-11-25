@@ -18,7 +18,7 @@ class VanRentalKanbanService
                 if ($reservation->task_id) {
                     return;
                 }
-                $stage = Stage::query()->whereHas('board', fn ($query) => $query->where('is_active', true))->orderByDesc('is_initial')->orderBy('position')->first();
+                $stage = Stage::query()->whereHas('board', fn ($query) => $query->where('is_active', true)->where('slug', '!=', 'zentrum-ads'))->orderByDesc('is_initial')->orderBy('position')->first();
                 if (! $stage) {
                     throw new \RuntimeException('Sem etapa Kanban ativa. Configure um quadro e tente novamente.');
                 }

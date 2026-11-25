@@ -179,6 +179,17 @@ Route::post('/app/chat/message', [WebsiteChatController::class, 'message'])
     ->withoutMiddleware([VerifyCsrfToken::class])
     ->middleware('throttle:30,1')
     ->name('app.chat.message');
+Route::get('/publicidade', [\App\Http\Controllers\AdvertisingController::class, 'index'])->name('ads.index');
+Route::get('/publicidade/media-kit', [\App\Http\Controllers\AdvertisingController::class, 'index'])->name('ads.kit');
+Route::post('/publicidade/proposta', [\App\Http\Controllers\AdvertisingController::class, 'store'])->middleware('throttle:5,1')->name('ads.store');
+Route::get('/admin/publicidade/anexos/{attachment}', function (\App\Models\TaskAttachment $attachment) {
+    abort_unless(auth()->user()->canAccessPanel(filament()->getPanel('admin')) && in_array($attachment->disk, ['local', config('filesystems.advertising_disk')], true) && str_starts_with($attachment->path, 'advertising/') && $attachment->task?->board?->slug === 'zentrum-ads', 403);
+
+    return Storage::disk($attachment->disk)->download($attachment->path, $attachment->original_name, ['Cache-Control' => 'private, no-store', 'X-Content-Type-Options' => 'nosniff']);
+})->middleware('auth')->name('ads.attachment');
+Route::view('/publicidade/privacidade', 'website.advertising-privacy')->name('ads.privacy');
+Route::view('/publicidade/obrigado', 'website.advertising-thanks')->name('ads.thanks');
+
 Route::post('/contact', [WebsiteController::class, 'storeContact'])->name('contact.submit');
 Route::get('/cms/{page}/{slug?}', [WebsiteController::class, 'showCms'])->name('cms.show');
 Route::get('/blog', [BlogController::class, 'index'])->name('blog.index');

@@ -23,6 +23,7 @@
       <p class="text-muted mb-4">{{ $intro }}</p>
     @endif
 
+    @if ($hasSuccessMessage && session('ads_interest_received')) @push('scripts')<script>if(document.cookie.split(';').some(c=>c.trim()==='zentrum-cookie-consent=accepted'))window.gtag?.('event','ads_slot_interest');</script>@endpush @endif
     @if ($hasSuccessMessage)
       <div class="alert alert-success mb-3">
         {{ session('contact_success') }}
@@ -43,6 +44,7 @@
       <form method="POST" action="{{ route('contact.submit') }}">
         @csrf
 
+        @if($source === 'website_slot' && request('interesse') === 'publicidade')<input type="hidden" name="ads_interest" value="1">@endif
         <input type="hidden" name="source" value="{{ $source }}" />
         <input type="hidden" name="page_url" value="{{ url()->current() }}" />
 
@@ -93,7 +95,7 @@
               <select class="form-select" id="{{ $formId }}-slot-pack" name="slot_pack" required>
                 <option value="" @selected(! old('slot_pack')) disabled>Escolha o seu pack</option>
                 <option value="base" @selected(old('slot_pack') === 'base')>Base — 30 €/semana, IVA incluído</option>
-                <option value="premium" @selected(old('slot_pack') === 'premium')>Premium — 50 €/semana, IVA incluído</option>
+                <option value="premium" @selected(old('slot_pack', request('interesse') === 'publicidade' ? 'premium' : null) === 'premium')>Premium — 50 €/semana, IVA incluído</option>
               </select>
             </div>
           @endif
@@ -106,7 +108,7 @@
               rows="3"
               placeholder="{{ $vehicle ? 'Diga-nos quando pretende comecar, duvidas sobre a viatura ou pedido de simulacao.' : 'Escreva a sua mensagem aqui' }}"
               required
-            >{{ old('message') }}</textarea>
+            >{{ old('message', $source === 'website_slot' && request('interesse') === 'publicidade' ? 'Tenho interesse em publicidade na minha viatura SLOT Premium.' : '') }}</textarea>
           </div>
           <div class="col-12">
             <button type="submit" class="btn-submit">{{ $submitLabel }}</button>

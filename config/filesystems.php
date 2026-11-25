@@ -37,6 +37,8 @@ return [
 
     'default' => env('FILESYSTEM_DISK', 'local'),
 
+    'advertising_disk' => env('ADVERTISING_DISK', env('APP_ENV') === 'production' ? 's3' : 'local'),
+
     'settlement_receipts_disk' => env(
         'SETTLEMENT_RECEIPTS_DISK',
         env('APP_ENV') === 'production' ? 's3' : 'local',

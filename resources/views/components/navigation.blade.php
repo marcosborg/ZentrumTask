@@ -43,6 +43,11 @@
       <ul class="navbar-nav align-items-xl-center gap-xl-1">
         <li class="nav-item"><a class="nav-link nav-link-custom" href="{{ route('vehicle.index') }}">Aluguer de viaturas para TVDE</a></li>
         <li class="nav-item"><a class="nav-link nav-link-custom" href="{{ route('slot.show') }}">SLOT</a></li>
+        <li class="nav-item dropdown"><button type="button" data-bs-toggle="dropdown" aria-expanded="false" class="nav-link dropdown-toggle nav-link-custom">Publicidade</button><ul class="dropdown-menu">
+          @foreach([''=>'Publicidade em viaturas','#marcas'=>'Para marcas e agências','#formatos'=>'Formatos publicitários','#como-funciona'=>'Como funciona','#proposta'=>'Pedir proposta'] as $anchor=>$label)
+            <li><a class="dropdown-item" href="{{ route('ads.index').$anchor }}">{{ $label }}</a></li>
+          @endforeach
+          <li><a class="dropdown-item" href="{{ route('slot.show') }}#publicidade-slot">Rentabilizar a minha viatura</a></li></ul></li>
         <li class="nav-item"><a class="nav-link nav-link-custom" href="{{ route('van-rentals.index') }}">Aluguer de carrinhas para mudanças</a></li>
         <li class="nav-item dropdown">
           <button class="nav-link dropdown-toggle nav-link-custom" id="navbarMoreDropdown" type="button" data-bs-toggle="dropdown" aria-expanded="false">Opções</button>

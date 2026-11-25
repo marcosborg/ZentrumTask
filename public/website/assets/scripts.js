@@ -42,6 +42,7 @@ document.addEventListener('DOMContentLoaded', () => {
   if (acceptButton) {
     acceptButton.addEventListener('click', () => {
       saveConsent();
+      window.dispatchEvent(new Event('zentrum:consent'));
       hideBanner();
     });
   }

@@ -18,7 +18,7 @@ uses(RefreshDatabase::class);
 it('asks for failed TVDE readings and the IONIQ but excludes private and SLOT vehicles', function (): void {
     $driver = Driver::factory()->create(['name' => 'Condutor IONIQ']);
     $ioniq = Vehicle::factory()->create(['source' => 'tvde', 'operation' => 'rental', 'model' => 'IONIQ', 'status' => 'allocated']);
-    VehicleAllocation::factory()->create(['vehicle_id' => $ioniq->id, 'driver_id' => $driver->id, 'starts_at' => now()->subMonth(), 'ends_at' => null, 'status' => 'active']);
+    VehicleAllocation::factory()->create(['vehicle_id' => $ioniq->id, 'driver_id' => $driver->id, 'starts_at' => '2026-10-05', 'ends_at' => null, 'status' => 'active']);
     $failed = Vehicle::factory()->create(['source' => 'tvde', 'operation' => 'rental']);
     $success = Vehicle::factory()->create(['source' => 'tvde', 'operation' => 'rental']);
     $private = Vehicle::factory()->create(['source' => 'private']);

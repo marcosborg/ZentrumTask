@@ -19,6 +19,7 @@ class ContactTaskRequest extends FormRequest
             'phone' => ['required', 'string', 'max:50'],
             'message' => ['required', 'string', 'max:2000'],
             'vehicle_id' => ['nullable', 'integer', 'exists:vehicles,id'],
+            'ads_interest' => ['exclude_unless:slot_pack,premium', 'nullable', 'boolean'],
             'page_url' => ['nullable', 'string', 'max:500'],
             'source' => ['nullable', 'string', 'max:100'],
             'slot_pack' => ['exclude_unless:source,website_slot', 'required', 'string', 'in:base,premium'],

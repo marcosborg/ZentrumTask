@@ -63,6 +63,9 @@ class GenerateSitemap extends Page
         $links = collect([
             $baseUrl.'/',
             route('vehicle.index'),
+            route('ads.index'),
+            route('ads.kit'),
+            route('slot.show'),
         ]);
 
         $menuLinks = WebsiteMenuItem::query()
@@ -86,6 +89,7 @@ class GenerateSitemap extends Page
 
         $links = $links
             ->merge($menuLinks)
+            ->merge(\App\Models\BlogPost::query()->published()->get(['id', 'slug'])->map(fn ($post): string => route('blog.show', [$post, $post->slug])))
             ->merge($cmsLinks)
             ->merge($fleetLinks)
             ->unique()
